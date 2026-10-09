@@ -11,7 +11,8 @@ import Foundation
 /// suite, and gives `UsageStore` its own fake readers and a scratch
 /// directory. Demo mode never scans this Mac, never spawns a process, never
 /// opens a network connection, and never touches the real status file,
-/// widget snapshot, usage file or saved settings.
+/// widget snapshot (unless `--demo-widgets` asks for it), usage file or saved
+/// settings.
 ///
 /// Every health state the panel can draw appears at least once, across the
 /// agents mcpock's screenshots need to show (Claude Code, Cursor, Grok,
@@ -29,6 +30,17 @@ enum DemoData {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
         arguments.contains("--demo") || environment["MCPOCK_DEMO"] == "1"
+    }
+
+    /// `--demo-widgets` on top of demo mode (1.9.0): the sample set also goes
+    /// to the desktop widgets, for widget screenshots. The widgets' file is
+    /// shared, so this replaces the real setup's widget data until the real
+    /// app runs again and rewrites it. Never true without demo mode.
+    static func writesWidgets(
+        arguments: [String] = CommandLine.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        isActive(arguments: arguments, environment: environment) && arguments.contains("--demo-widgets")
     }
 
     // MARK: - Isolation (never the user's real files or defaults)

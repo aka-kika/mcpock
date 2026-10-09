@@ -13,6 +13,17 @@ final class DemoDataTests: XCTestCase {
                         "only the exact \"1\" turns it on, same spirit as a plain feature flag")
     }
 
+    /// `--demo-widgets` (1.9.0): demo mode may feed the desktop widgets, for
+    /// widget screenshots. Only on top of demo mode, never on its own, so a
+    /// stray flag can never write sample data over a real setup's widgets.
+    func testWidgetsOnlyWithDemoAndTheirOwnFlag() {
+        XCTAssertFalse(DemoData.writesWidgets(arguments: ["mcpock", "--demo"], environment: [:]))
+        XCTAssertTrue(DemoData.writesWidgets(arguments: ["mcpock", "--demo", "--demo-widgets"], environment: [:]))
+        XCTAssertTrue(DemoData.writesWidgets(arguments: ["mcpock", "--demo-widgets"], environment: ["MCPOCK_DEMO": "1"]))
+        XCTAssertFalse(DemoData.writesWidgets(arguments: ["mcpock", "--demo-widgets"], environment: [:]),
+                       "never without demo mode")
+    }
+
     // MARK: - The sample set is fixed
 
     func testConfigsAreDeterministic() {

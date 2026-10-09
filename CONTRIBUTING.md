@@ -55,7 +55,10 @@ open -n build/Build/Products/Debug/mcpock.app --args --demo
 /path/to/mcpock.app/Contents/MacOS/mcpock --demo
 ```
 
-`MCPOCK_DEMO=1` in the environment works the same way. Demo mode is off, and
+`MCPOCK_DEMO=1` in the environment works the same way. For widget screenshots, add
+`--demo-widgets`: the desktop widgets then show the sample set too. Their data
+file is shared, so quit your own mcpock first; the next real launch writes
+your real data back. Demo mode is off, and
 invisible in the UI, unless one of those is set; it never touches your real
 `status.json`, widget snapshot, `usage.json` or saved settings (its own
 monitor and panel persist into a throwaway `UserDefaults` suite instead).

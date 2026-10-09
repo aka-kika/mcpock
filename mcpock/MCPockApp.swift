@@ -53,8 +53,11 @@ struct MCPockApp: App {
         if !isHostingTests && !isDemo { monitor.statusWriter = StatusWriter() }
         // The widgets' snapshot in the App Group container (round 8). Same
         // guard: a test run or a demo run must never touch the real
-        // container, same reason as the status file above.
-        if !isHostingTests && !isDemo { monitor.widgetSnapshotWriter = WidgetSnapshotWriter() }
+        // container, same reason as the status file above. The one exception
+        // is an explicit `--demo --demo-widgets`, for widget screenshots.
+        if !isHostingTests && (!isDemo || DemoData.writesWidgets()) {
+            monitor.widgetSnapshotWriter = WidgetSnapshotWriter()
+        }
         let usageStore = UsageStore(
             readers: isDemo ? DemoData.usageReaders : UsageReaders.all,
             directory: isDemo ? DemoData.throwawayDirectory() : MCPockStatus.defaultDirectory(),
