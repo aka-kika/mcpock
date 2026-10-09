@@ -15,7 +15,7 @@ like Claude Code, Cursor or Codex their extra tools. mcpock finds them in your
 agents' config files, starts each one the way the agent would, and checks that
 it answers.
 
-![mcpock's panel on the Servers tab (made-up demo servers): the ones that need you come first, one broken, one slow, one waiting for a sign-in, one set up differently, each with a health shape, the logos of the agents that use it and its tool count. Beside it, the card of the server that needs a sign-in, with why, Ask an agent and Copy errors.](docs/images/mcpock-servers.png)
+![mcpock's panel on the Servers tab (made-up demo servers): the ones that need you come first, one broken, one slow, one waiting for a sign-in, one set up differently, each with a health shape, the logos of the agents that use it and its tool count. Beside it, the card of the server that needs a sign-in, with why, Ask an agent and Copy errors, and below the card the Problems desktop widget listing the same four servers.](docs/images/mcpock-servers.png)
 
 ## Why
 
@@ -87,7 +87,7 @@ them, checks every server, and shows you what needs attention and why, so you
 - **Lets your agents ask it.** A small read-only MCP server ships inside the
   app, so you can say "check my mcpock" to an agent instead of pasting errors.
 
-![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded.](docs/images/mcpock-agents.png)
+![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded. On the left, the Agents desktop widget with a health bar per agent.](docs/images/mcpock-agents.png)
 
 ## Install
 
