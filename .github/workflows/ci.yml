@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (macOS)
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Prefer latest installed Xcode on the runner
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # The project signs with a real Apple Development identity locally (stable
+      # TCC identity across rebuilds); runners have no certificate, so CI falls
+      # back to ad-hoc signing.
+      - name: Build
+        run: |
+          xcodebuild \
+            -scheme mcpock \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS' \
+            -quiet \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Test
+        run: |
+          xcodebuild \
+            -scheme mcpock \
+            -configuration Debug \
+            -derivedDataPath build \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
+            test
+
+      - name: Upload xcresult on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: build/Logs/Test/**/*.xcresult
+          if-no-files-found: ignore

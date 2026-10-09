@@ -1,0 +1,224 @@
+name: mcpock
+options:
+  bundleIdPrefix: com.mcpock
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+# First (and, on purpose, only) outside dependency: Sparkle 2, for in-app
+# updates. It ships as a prebuilt XCFramework binary target (no Swift source
+# to compile), so it resolves and builds the same under Xcode 27 here and
+# Xcode 26.6 in CI. Pinned to an exact release, never a range, so a new
+# Sparkle version is a deliberate bump, not a silent one.
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_STRICT_CONCURRENCY: targeted
+    CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER: YES
+    CLANG_ENABLE_MODULES: YES
+    ENABLE_TESTABILITY: YES
+    # Shared by the app and its bundled mcpock-mcp helper, so the two can't drift.
+    MARKETING_VERSION: "1.9.0"
+    CURRENT_PROJECT_VERSION: "19"
+targets:
+  mcpock:
+    type: application
+    platform: macOS
+    sources:
+      - path: mcpock
+        excludes:
+          - "**/.DS_Store"
+      # Status file model + the helper's MCP handler (round 7), compiled into
+      # the app too so the tests can drive them.
+      - path: Shared
+    dependencies:
+      # mcpock-mcp ships inside the app at Contents/Helpers/, signed with it.
+      - target: mcpock-mcp
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      # System SQLite (no third-party dependency): the Hermes and Cursor
+      # usage readers read their state databases, read-only.
+      - sdk: libsqlite3.tbd
+      # mcpockWidgets ships inside the app at Contents/PlugIns/ (round 8);
+      # `embed: true` on an app-extension target is enough — XcodeGen wires
+      # up "Embed App Extensions" on its own, the same way it wires up
+      # "Embed Frameworks" for a framework dependency.
+      - target: mcpockWidgets
+        embed: true
+      # WidgetSnapshotWriter calls WidgetCenter.reloadAllTimelines().
+      - sdk: WidgetKit.framework
+      # In-app updates (round 10). Only the app target links it — the
+      # helper and the widget never check for or apply updates.
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.app
+        PRODUCT_NAME: mcpock
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: mcpock/Info.plist
+        # Real (not ad-hoc "-") signing: TCC keys folder-permission grants to the
+        # signing identity, so an ad-hoc app forgets its grants on every rebuild
+        # and re-prompts after restarts; launch-at-login registration goes stale
+        # the same way. Apple Development under the team keeps identity stable.
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: P5RB3W3D58
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGNING_REQUIRED: YES
+        CODE_SIGNING_ALLOWED: YES
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS: ["@executable_path/../Frameworks"]
+        SWIFT_EMIT_LOC_STRINGS: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ALWAYS_SEARCH_USER_PATHS: NO
+        CLANG_ENABLE_OBJC_ARC: YES
+        COPY_PHASE_STRIP: NO
+        DEAD_CODE_STRIPPING: YES
+        GCC_NO_COMMON_BLOCKS: YES
+        VALIDATE_PRODUCT: YES
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+        GCC_TREAT_WARNINGS_AS_ERRORS: NO
+        WARNING_CFLAGS: ["-Wno-unused-parameter"]
+      configs:
+        # Debug and test builds get their own id: macOS files Open at Login
+        # by bundle id and points it at the last copy it saw, so every test
+        # run used to move the user's login item off /Applications (2026-09-26).
+        # A Debug build starts with its own, blank settings.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.app.debug
+    entitlements:
+      path: mcpock/mcpock.entitlements
+      properties:
+        # Round 8: shares a small widget snapshot with mcpockWidgets. No
+        # app-sandbox key here — the app stays unsandboxed (it still needs to
+        # spawn MCP servers and read configs anywhere under ~).
+        com.apple.security.application-groups:
+          - P5RB3W3D58.com.mcpock
+  # Read-only MCP server over stdio (round 7): answers from the status file the
+  # app writes, never probes. Settings > Connect hands out its path.
+  mcpock-mcp:
+    type: tool
+    platform: macOS
+    sources:
+      - path: mcpock-mcp
+      - path: Shared
+        excludes:
+          # Widget-only (round 8): the helper never touches the App Group or
+          # the widgets' snapshot, only the status file.
+          - "AppGroup.swift"
+          - "WidgetSnapshot.swift"
+          - "WidgetSnapshotStore.swift"
+      # Reused from the app: JSON-RPC framing (and the types it throws).
+      - path: mcpock/Services/MCPJSONRPC.swift
+      - path: mcpock/Models/Models.swift
+    settings:
+      base:
+        PRODUCT_NAME: mcpock-mcp
+        PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.app.mcp
+        # An Info.plist inside the binary gives the helper the app's version.
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: P5RB3W3D58
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGNING_REQUIRED: YES
+        CODE_SIGNING_ALLOWED: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        DEAD_CODE_STRIPPING: YES
+  # Desktop widgets (round 8): status, problems and per-agent. Reads the App
+  # Group snapshot the app writes; sandboxed, read-only, never probes.
+  mcpockWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: mcpockWidgets
+        excludes:
+          - "**/.DS_Store"
+      # Just what the widgets need to decode and display the snapshot — not
+      # the whole Shared folder (MCPStatusServer.swift needs MCPJSONRPC.swift,
+      # which the widget has no reason to compile).
+      - path: Shared/AppGroup.swift
+      - path: Shared/MCPockStatus.swift
+      - path: Shared/StatusReport.swift
+      - path: Shared/WidgetSnapshot.swift
+      - path: Shared/WidgetSnapshotStore.swift
+      # The agent logos, the same vector templates the Agents tab uses.
+      - path: mcpock/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_NAME: mcpockWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.app.widgets
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: mcpockWidgets/Info.plist
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: P5RB3W3D58
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGNING_REQUIRED: YES
+        CODE_SIGNING_ALLOWED: YES
+        # Matches the app: real (not ad-hoc) signing keeps the widget's TCC/App
+        # Group grant stable across rebuilds. Hardened runtime is added only
+        # when scripts/release.sh signs with Developer ID, same as the app.
+        ENABLE_HARDENED_RUNTIME: NO
+        SWIFT_EMIT_LOC_STRINGS: NO
+        DEAD_CODE_STRIPPING: YES
+        SKIP_INSTALL: YES
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+        GCC_TREAT_WARNINGS_AS_ERRORS: NO
+      configs:
+        # Must extend the app's Debug id (mcpock target), so a Debug widget
+        # is its own extension next to the Release one. Both still share the
+        # one App Group container, like status.json: whichever mcpock ran
+        # last wrote widget-status.json (last writer wins).
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.app.debug.widgets
+    entitlements:
+      path: mcpockWidgets/mcpockWidgets.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - P5RB3W3D58.com.mcpock
+  mcpockTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: mcpockTests
+    dependencies:
+      - target: mcpock
+      - sdk: libsqlite3.tbd
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mcpock.tests
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mcpock.app/Contents/MacOS/mcpock"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  mcpock:
+    build:
+      targets:
+        mcpock: all
+        mcpockTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - mcpockTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

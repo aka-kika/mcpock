@@ -1,0 +1,40 @@
+build/
+DerivedData/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.swiftpm/
+.idea/
+# XcodeGen can regenerate the project; uncomment to stop tracking it:
+# mcpock.xcodeproj/
+dist/
+build-release/
+# Scratch that should never be tracked
+*.log
+*.bak
+
+# Private planning and local notes: never committed
+.superpowers/
+docs/superpowers/
+NOTES.md
+GATE.md
+HANDOFF.md
+TODO.md
+CLAUDE.local.md
+.claude/
+# Signing identity, team and notary profile (see scripts/release.env.example)
+release.env
+scripts/release.env

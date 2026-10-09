@@ -1,0 +1,7 @@
+# The secret-masking tests use made-up tokens on purpose.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake tokens in mcpock's secret-masking tests"
+paths = ['''^mcpockTests/''']

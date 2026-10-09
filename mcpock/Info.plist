@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+	<!-- In-app updates (round 10, Sparkle 2). The feed is hosted on
+	     mcpock.com (Cloudflare Pages), not GitHub: the repo is private, so
+	     release assets aren't publicly downloadable. -->
+	<key>SUFeedURL</key>
+	<string>https://mcpock.com/appcast.xml</string>
+	<!-- Public half of the EdDSA key Sparkle's generate_keys stored in
+	     the login Keychain (account "mcpock", made 2026-10-09); the private half never
+	     leaves the Keychain and is never in this repo. Sparkle refuses to
+	     install an update whose appcast signature doesn't verify against
+	     this key. -->
+	<key>SUPublicEDKey</key>
+	<string>cWnn72MEaG+PlI5iOPdSCW4lZI+KNrybquhJPkJ9wuc=</string>
+</dict>
+</plist>
