@@ -51,7 +51,8 @@ struct StatusWidgetView: View {
 
     private func markColor(_ s: MCPockWidgetSnapshot) -> Color {
         if !s.firstCheckDone { return Color.secondary }
-        return s.problemCount == 0 ? WidgetColors.healthy(colorScheme) : WidgetColors.broken(colorScheme)
+        if s.problemCount == 0 { return WidgetColors.healthy(colorScheme) }
+        return s.markIsRed ? WidgetColors.broken(colorScheme) : WidgetColors.degraded(colorScheme)
     }
 }
 

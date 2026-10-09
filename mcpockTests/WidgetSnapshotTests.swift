@@ -102,6 +102,53 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(HealthMonitor.widgetLogo("Cursor"), "agent-cursor")
     }
 
+    /// 1.9.1: the widgets color like the panel, red only for broken and
+    /// amber for slow, needs sign-in and set up differently. The snapshot
+    /// says which problems are broken, per server and per agent.
+    func testSnapshotSaysWhatIsBrokenForTheColors() {
+        let servers: [ServerSnapshot] = [
+            ServerSnapshot(config: config("dead", agent: "Codex"), state: .broken,
+                           failureReason: "Non-zero exit (1)", lastChecked: now),
+            ServerSnapshot(config: config("fine", agent: "Codex"), state: .healthy, lastChecked: now),
+            ServerSnapshot(config: config("sluggish", agent: "Cursor"), state: .degraded,
+                           failureReason: "Timed out", lastChecked: now),
+        ]
+        let snapshot = MCPockWidgetSnapshot.build(from: status(servers))
+        XCTAssertEqual(snapshot.problems.map(\.name), ["dead", "sluggish"])
+        XCTAssertEqual(snapshot.problems.map(\.isBroken), [true, false])
+        XCTAssertEqual(snapshot.brokenCount, 1)
+        let codex = snapshot.agents.first { $0.name == "Codex" }
+        let cursor = snapshot.agents.first { $0.name == "Cursor" }
+        XCTAssertEqual(codex?.brokenCount, 1)
+        XCTAssertEqual(codex?.problemCount, 1)
+        XCTAssertEqual(cursor?.brokenCount, 0, "slow is amber, not red")
+        XCTAssertEqual(cursor?.problemCount, 1)
+
+        XCTAssertEqual(snapshot.problems.map(\.showsRed), [true, false])
+        XCTAssertEqual(codex?.redCount, 1)
+        XCTAssertEqual(cursor?.redCount, 0)
+        XCTAssertTrue(snapshot.markIsRed)
+        let onlySlow = MCPockWidgetSnapshot.build(from: status([servers[2]]))
+        XCTAssertFalse(onlySlow.markIsRed, "only slow left: amber mark")
+    }
+
+    /// A snapshot written by 1.9.0 (no broken fields) still reads; the
+    /// widgets then fall back to treating every problem as broken, as before.
+    func testA190SnapshotStillDecodes() throws {
+        let json = """
+        {"agents":[{"fineCount":1,"name":"Cursor","problemCount":1,"serverCount":2}],"checking":false,
+         "fineCount":1,"firstCheckDone":true,"generated":"2026-10-09T21:08:21Z","problemCount":1,
+         "problems":[{"name":"x","status":"slow"}],"schema":1,"totalServers":2}
+        """
+        let snapshot = try MCPockWidgetSnapshot.decoder().decode(MCPockWidgetSnapshot.self, from: Data(json.utf8))
+        XCTAssertNil(snapshot.brokenCount)
+        XCTAssertNil(snapshot.problems.first?.isBroken)
+        XCTAssertNil(snapshot.agents.first?.brokenCount)
+        XCTAssertTrue(snapshot.problems.first?.showsRed ?? false, "older data keeps the old red")
+        XCTAssertEqual(snapshot.agents.first?.redCount, 1)
+        XCTAssertTrue(snapshot.markIsRed)
+    }
+
     func testStoreRoundTripsThroughAThrowawayDirectory() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-widget-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }

@@ -44,7 +44,8 @@ enum StatusSnapshot {
                 name: section.displayName,
                 serverCount: section.servers.count,
                 problemCount: section.problems.count,
-                fineCount: section.fineCount
+                fineCount: section.fineCount,
+                brokenCount: section.brokenCount
             )
         }
         return MCPockStatus(

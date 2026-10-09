@@ -51,6 +51,28 @@ final class WidgetReloadPolicyTests: XCTestCase {
         ))
     }
 
+    /// 1.9.1: a change inside the minute is not dropped, it is sent when the
+    /// minute is up. Found after installing 1.9.0: the first reload went out
+    /// while checks were still running, the results came in seconds later,
+    /// and the widgets showed old data for over ten minutes.
+    func testAThrottledChangeIsSentWhenTheMinuteIsUp() {
+        let drawn = snapshot(problemCount: 0)
+        let next = snapshot(problemCount: 1, problems: [.init(name: "wake", status: "not answering")])
+        XCTAssertEqual(WidgetReloadPolicy.nextReload(lastDrawn: drawn, next: next, lastReloadAt: base,
+                                                     now: base.addingTimeInterval(20)), .after(40))
+        XCTAssertEqual(WidgetReloadPolicy.nextReload(lastDrawn: drawn, next: next, lastReloadAt: base,
+                                                     now: base.addingTimeInterval(61)), .now)
+        XCTAssertEqual(WidgetReloadPolicy.nextReload(lastDrawn: nil, next: next, lastReloadAt: nil, now: base), .now)
+    }
+
+    /// Compared with what the widgets last drew, not with the last file
+    /// written: a throttled change stays pending through identical writes.
+    func testNothingToSendWhenTheWidgetsAlreadyShowIt() {
+        let drawn = snapshot(problemCount: 1, problems: [.init(name: "wake", status: "not answering")])
+        XCTAssertEqual(WidgetReloadPolicy.nextReload(lastDrawn: drawn, next: drawn, lastReloadAt: base,
+                                                     now: base.addingTimeInterval(5)), .none)
+    }
+
     func testIdenticalSnapshotNeverReloads() {
         let a = snapshot(problemCount: 2, problems: [.init(name: "x", status: "slow")])
         let b = a

@@ -54,7 +54,7 @@ private struct AgentRow: View {
                 .font(.system(size: 12))
                 .lineLimit(1)
                 .frame(width: 96, alignment: .leading)
-            HealthBarMark(fine: agent.fineCount, problems: agent.problemCount, colorScheme: colorScheme)
+            HealthBarMark(fine: agent.fineCount, problems: agent.problemCount, red: agent.redCount, colorScheme: colorScheme)
             Spacer(minLength: 4)
             Text("\(agent.serverCount)")
                 .font(.system(size: 11, design: .rounded).monospacedDigit())
@@ -86,22 +86,29 @@ private struct AgentLogo: View {
     }
 }
 
-/// A tiny two-segment bar: fine in the healthy color, problems in the broken
-/// color — the widget's version of the Agents tab's `HealthBar`, without its
-/// grow-in animation (widgets don't animate between refreshes).
+/// A tiny bar: broken in red, the other problems in amber, fine in the
+/// healthy color (1.9.1; red for every problem before) — the widget's version
+/// of the Agents tab's `HealthBar`, without its grow-in animation (widgets
+/// don't animate between refreshes).
 private struct HealthBarMark: View {
     let fine: Int
     let problems: Int
+    /// How many of `problems` are broken.
+    let red: Int
     let colorScheme: ColorScheme
 
     var body: some View {
         GeometryReader { geo in
             let total = max(fine + problems, 1)
             let problemWidth = geo.size.width * CGFloat(problems) / CGFloat(total)
+            let redWidth = geo.size.width * CGFloat(red) / CGFloat(total)
             ZStack(alignment: .leading) {
                 Capsule().fill(WidgetColors.healthy(colorScheme).opacity(0.35))
                 if problems > 0 {
-                    Capsule().fill(WidgetColors.broken(colorScheme)).frame(width: problemWidth)
+                    Capsule().fill(WidgetColors.degraded(colorScheme)).frame(width: problemWidth)
+                }
+                if red > 0 {
+                    Capsule().fill(WidgetColors.broken(colorScheme)).frame(width: redWidth)
                 }
             }
         }

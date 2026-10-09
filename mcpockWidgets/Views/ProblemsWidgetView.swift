@@ -34,7 +34,7 @@ struct ProblemsWidgetView: View {
                     ForEach(snapshot.problems) { problem in
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(WidgetColors.broken(colorScheme))
+                                .fill(problem.showsRed ? WidgetColors.broken(colorScheme) : WidgetColors.degraded(colorScheme))
                                 .frame(width: 6, height: 6)
                             Text(problem.name)
                                 .font(.system(size: 12, weight: .medium))

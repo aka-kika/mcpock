@@ -17,15 +17,22 @@ final class WidgetSnapshotWriter {
     private var pending: Task<Void, Never>?
     static let delay: Duration = .milliseconds(800)
     private let containerURL: URL?
+    private let reloadInterval: TimeInterval
     private var lastWritten: MCPockWidgetSnapshot?
+    /// What the widgets were last told to draw (1.9.1): the reload decision
+    /// compares with this, so a held-back change is never lost.
+    private var lastDrawn: MCPockWidgetSnapshot?
     private var lastReloadAt: Date?
+    /// The held-back reload, sent once the interval is up (1.9.1).
+    private var trailingReload: Task<Void, Never>?
     /// Swapped in tests so a run never calls the real WidgetKit.
     var reloadAllTimelines: () -> Void = { WidgetCenter.shared.reloadAllTimelines() }
     /// Swapped in tests for a fixed clock.
     var now: () -> Date = Date.init
 
-    init(containerURL: URL? = AppGroup.containerURL) {
+    init(containerURL: URL? = AppGroup.containerURL, reloadInterval: TimeInterval = WidgetReloadPolicy.minInterval) {
         self.containerURL = containerURL
+        self.reloadInterval = reloadInterval
     }
 
     /// Write soon. `make` runs on the main actor when the write happens, so it
@@ -37,16 +44,36 @@ final class WidgetSnapshotWriter {
             guard let self else { return }
             self.pending = nil
             guard let snapshot = make(), let containerURL = self.containerURL else { return }
-            let shouldReload = WidgetReloadPolicy.shouldReload(
-                previous: self.lastWritten, next: snapshot, lastReloadAt: self.lastReloadAt, now: self.now()
-            )
             self.lastWritten = snapshot
             await Task.detached(priority: .utility) {
                 try? WidgetSnapshotStore.write(snapshot, to: containerURL)
             }.value
-            guard shouldReload else { return }
-            self.lastReloadAt = self.now()
-            self.reloadAllTimelines()
+            self.reloadIfNeeded()
+        }
+    }
+
+    /// Tell WidgetKit about the latest snapshot now, later, or not at all.
+    private func reloadIfNeeded() {
+        guard let latest = lastWritten else { return }
+        switch WidgetReloadPolicy.nextReload(
+            lastDrawn: lastDrawn, next: latest, lastReloadAt: lastReloadAt, now: now(), interval: reloadInterval
+        ) {
+        case .none:
+            return
+        case .now:
+            trailingReload?.cancel()
+            trailingReload = nil
+            lastDrawn = latest
+            lastReloadAt = now()
+            reloadAllTimelines()
+        case .after(let wait):
+            guard trailingReload == nil else { return }
+            trailingReload = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(wait))
+                guard !Task.isCancelled, let self else { return }
+                self.trailingReload = nil
+                self.reloadIfNeeded()
+            }
         }
     }
 }

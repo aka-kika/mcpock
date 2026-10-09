@@ -88,6 +88,10 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         var serverCount: Int
         var problemCount: Int
         var fineCount: Int
+        /// How many of `problemCount` are broken (1.9.1), so the widgets can
+        /// color red only what the panel colors red. Optional: a status file
+        /// from 1.9.0 or earlier has none.
+        var brokenCount: Int? = nil
     }
 
     /// One declaration of a server in one agent's config.

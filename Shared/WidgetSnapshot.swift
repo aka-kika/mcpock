@@ -22,13 +22,24 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
     var problems: [Problem]
     /// Up to `agentLimit`, worst first, aka last — the per-agent widget's rows.
     var agents: [Agent]
+    /// How many of `problemCount` are broken (1.9.1): the status widget's mark
+    /// is red only then, amber for the rest, like the menu bar icon. nil in a
+    /// snapshot from 1.9.0 or earlier.
+    var brokenCount: Int? = nil
 
     struct Problem: Codable, Equatable, Sendable, Identifiable {
         var name: String
         /// Plain words for a glance, not the panel's own wording: "broken"
         /// reads as an alarm on a home screen, so this says "not answering" instead.
         var status: String
+        /// True for a broken server (1.9.1): its dot is red; slow, needs
+        /// sign-in and set up differently are amber, as in the panel. nil in
+        /// a snapshot from 1.9.0 or earlier.
+        var isBroken: Bool? = nil
         var id: String { name }
+        /// Red dot (broken), else amber. An older snapshot says nothing, so
+        /// it keeps the pre-1.9.1 red.
+        var showsRed: Bool { isBroken ?? true }
     }
 
     struct Agent: Codable, Equatable, Sendable, Identifiable {
@@ -40,8 +51,18 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
         var serverCount: Int
         var problemCount: Int
         var fineCount: Int
+        /// How many of `problemCount` are broken (1.9.1): that part of the bar
+        /// is red, the rest of the problems amber. nil in older snapshots.
+        var brokenCount: Int? = nil
         var id: String { name }
+        /// The red part of the bar; an older snapshot paints all problems red.
+        var redCount: Int { min(brokenCount ?? problemCount, problemCount) }
     }
+
+    /// The status widget's mark: red when something is broken, amber when
+    /// only slow, sign-in or set-up problems are left (like the menu bar
+    /// icon's diamond and ring). An older snapshot keeps the red.
+    var markIsRed: Bool { (brokenCount ?? problemCount) > 0 }
 
     static func encoder() -> JSONEncoder {
         let encoder = JSONEncoder()
@@ -66,9 +87,12 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
         logo: (String) -> String? = { _ in nil }
     ) -> MCPockWidgetSnapshot {
         let allProblems = StatusReport.problems(in: status)
-        let problems = allProblems.prefix(problemLimit).map { Problem(name: $0.name, status: plainWord(for: $0.status)) }
+        let problems = allProblems.prefix(problemLimit).map {
+            Problem(name: $0.name, status: plainWord(for: $0.status), isBroken: $0.status == "broken")
+        }
         let agents = (status.perAgent ?? []).prefix(agentLimit).map {
-            Agent(name: $0.name, logo: logo($0.name), serverCount: $0.serverCount, problemCount: $0.problemCount, fineCount: $0.fineCount)
+            Agent(name: $0.name, logo: logo($0.name), serverCount: $0.serverCount, problemCount: $0.problemCount,
+                  fineCount: $0.fineCount, brokenCount: $0.brokenCount)
         }
         return MCPockWidgetSnapshot(
             generated: status.generated,
@@ -78,7 +102,8 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
             problemCount: allProblems.count,
             fineCount: status.counts.fine,
             problems: Array(problems),
-            agents: Array(agents)
+            agents: Array(agents),
+            brokenCount: allProblems.filter { $0.status == "broken" }.count
         )
     }
 
