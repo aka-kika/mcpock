@@ -119,7 +119,25 @@ rm -f "$ZIP"
 
 echo "==> Building + signing the DMG"
 DMG="$DIST_DIR/$APP_NAME.dmg"
-hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+# The styled drag-to-install window (1.10): create-dmg (brew install
+# create-dmg) lays out the app, an Applications link and a pastel
+# background with an arrow (scripts/dmg/make-background.swift draws it). It
+# drives Finder to place the icons, so a Finder window opens for a moment.
+# Without create-dmg, the plain DMG of 1.9 and earlier.
+if command -v create-dmg >/dev/null 2>&1; then
+  create-dmg \
+    --volname "$APP_NAME" \
+    --background scripts/dmg/background.png \
+    --window-size 660 420 \
+    --icon-size 110 \
+    --icon "$APP_NAME.app" 180 190 \
+    --app-drop-link 480 190 \
+    --hide-extension "$APP_NAME.app" \
+    "$DMG" "$APP"
+else
+  echo "    (create-dmg not installed: plain DMG; brew install create-dmg for the styled one)"
+  hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG"
+fi
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 echo "==> Notarizing + stapling the DMG"
