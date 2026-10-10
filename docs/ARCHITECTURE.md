@@ -116,6 +116,7 @@ card is open).
 | `Views/StatusIconView.swift`, `SpinnableIcon.swift` | Menu-bar icon; the refresh glyph's spin |
 | `Views/Settings*.swift`, `Services/SettingsLauncher.swift` | Settings window: General, Servers, Agents, Connect, About |
 | `Services/StatusItemRightClick.swift` | Right-click on the menu-bar icon: Settings, Quit |
+| `Services/GlobalHotKey.swift` | Control-Option-M from any app (1.10): a Carbon `RegisterEventHotKey` (no permission prompt), on/off in Settings > General; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
 | `Theme/Theme.swift` | Colour tokens (Light semantic, Dark soft dark), fonts, `AppearanceApplier` |
 
 ### Usage counts (1.7)

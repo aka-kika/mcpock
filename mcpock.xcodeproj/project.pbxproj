@@ -146,6 +146,7 @@
 		C93AD96DFB1F7A00D7E6CD84 /* SettingsConnectPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED8CBB526F6DA5BACEDE01D /* SettingsConnectPane.swift */; };
 		C95773E8BCEF064D2EE2BF5C /* MCPStatusServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6016F282B85807123025DA19 /* MCPStatusServer.swift */; };
 		CD801F97435D388993139C40 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = BA8B15BA67861AFEA1A9C0E3 /* libsqlite3.tbd */; };
+		CDC90D5B9B6FD63EDD0074E8 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948336ED0AEDE8607880F255 /* GlobalHotKey.swift */; };
 		CF954D0E0B4BF2C343F83F6E /* StaleRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 117C8C04C6CD01D7DE96E99A /* StaleRowTests.swift */; };
 		CFDF45655363574E1378E984 /* ConfigShapeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D303B7FC33C862D2B776D42 /* ConfigShapeTests.swift */; };
 		D00603FC1C3B0EC5D9278FA4 /* HermesUsageReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9211F9554340D9C17DC4A74F /* HermesUsageReaderTests.swift */; };
@@ -326,6 +327,7 @@
 		8D354EF49B4DADDD58F07225 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		8E4F324ECFEDA81271EA73A9 /* AgentRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRegistryTests.swift; sourceTree = "<group>"; };
 		9211F9554340D9C17DC4A74F /* HermesUsageReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesUsageReaderTests.swift; sourceTree = "<group>"; };
+		948336ED0AEDE8607880F255 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
 		948823B093A0600FEC098AFD /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		96BF45D23DABD099DB1DDCEB /* MCPMessageBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPMessageBuffer.swift; sourceTree = "<group>"; };
 		981D0A65C6D25412CF19A2A7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -537,6 +539,7 @@
 				CA59574B047CB376A17C6816 /* DemoData.swift */,
 				04B7D28F4D12D112B292503D /* Differs.swift */,
 				7876E4D27E20FAAD47B81527 /* ErrorExport.swift */,
+				948336ED0AEDE8607880F255 /* GlobalHotKey.swift */,
 				4EBF1461A92D93E004FC288D /* GooseConfig.swift */,
 				E407298A6EEAB2B72A412E24 /* HeadersHelper.swift */,
 				20F0FF81443366BED2D0CC60 /* HealthMonitor.swift */,
@@ -860,6 +863,7 @@
 				73D5359F4C96FF5B813717E4 /* Differs.swift in Sources */,
 				D5FAC77B4E0F57B1F90D70BC /* ErrorExport.swift in Sources */,
 				E2FA789DD0B61BB981967566 /* GlassPanelController.swift in Sources */,
+				CDC90D5B9B6FD63EDD0074E8 /* GlobalHotKey.swift in Sources */,
 				D1A50ECFC7C9BCFC66087F83 /* GooseConfig.swift in Sources */,
 				6CDC5C6F960ED5F15113F7B5 /* GrokUsageReader.swift in Sources */,
 				09F6AF8D2A5042B8030A654D /* HTTPProbe.swift in Sources */,
@@ -1104,7 +1108,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1118,7 +1122,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 1.10.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1351,7 +1355,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1370,7 +1374,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 1.10.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

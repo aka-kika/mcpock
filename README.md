@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.9.1](https://img.shields.io/badge/version-1.9.1-7a8fb0)](docs/RELEASE-NOTES-v1.9.1.md)
+[![Version 1.10.0](https://img.shields.io/badge/version-1.10.0-7a8fb0)](docs/RELEASE-NOTES-v1.10.0.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -73,8 +73,10 @@ them, checks every server, and shows you what needs attention and why, so you
 - **Quiet menu bar icon.** Plain when all is fine, a small ring when something
   is slow or needs a look, a small diamond when something is broken. No
   numbers, no blinking, no notifications.
-- **Keyboard friendly.** Arrow keys move, Return opens the card, Escape closes,
-  Cmd-F searches servers, agents and tool names, Cmd-C copies the selected
+- **Keyboard friendly.** Control-Option-M opens and closes the panel from any
+  app (turn it off in Settings > General). Arrow keys move, Return opens the
+  card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
+  checks the selected row again (or every server), Cmd-C copies the selected
   row's error (or its details).
 - **Desktop widgets.** Status (small), Problems and Agents (medium): right-click
   the desktop, **Edit Widgets…**, search mcpock. They update after each check.
@@ -115,7 +117,8 @@ Needs **macOS 26 or later** on Apple Silicon.
 2. Click a row that needs you. The card says why, in plain words.
 3. Click **Copy errors** (or **Ask an agent**) and paste it to your agent, or
    fix the config yourself.
-4. Click **Check again** on the card (or **Refresh** in the footer) to confirm.
+4. Click **Check again** on the card (or press Cmd-R) to confirm. It reads the
+   config file again first, so a fix shows up right away.
 5. Right-click any server for Pause, Pin, Hide, **Copy Details**,
    **Copy Errors** and **Ask an Agent** (a prompt that asks an agent to look into
    the problem and advise you before it changes anything). Pause a server
@@ -270,7 +273,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-583 unit tests at v1.9.1, and the build keeps zero warnings. They cover the
+585 unit tests at v1.10.0, and the build keeps zero warnings. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's

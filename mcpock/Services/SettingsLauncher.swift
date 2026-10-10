@@ -34,7 +34,8 @@ enum SettingsLauncher {
     /// if a new General section pushes its content past this.
     static let contentWidth: CGFloat = 540
     // 1.7: +40 for General's new "Usage" row (Off | 7 days | 30 days | All time).
-    static let contentHeight: CGFloat = 620
+    // 1.10: +40 for "Open with ⌃⌥M" (`GlobalHotKey`).
+    static let contentHeight: CGFloat = 660
     /// What the SwiftUI root fills: AppKit's content size is the layout rect
     /// *below* the title bar even with `.fullSizeContentView`, and the root runs
     /// under that bar too (the tab strip's title band), so it is that much taller.

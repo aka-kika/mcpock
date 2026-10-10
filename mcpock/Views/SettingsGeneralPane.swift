@@ -18,6 +18,7 @@ struct SettingsGeneralPane: View {
     @AppStorage(AppPreferences.probeIntervalKey) private var probeIntervalRaw = ProbeInterval.default.rawValue
     @AppStorage(AppPreferences.hideScrollBarsKey) private var hideScrollBars = AppPreferences.defaultHideScrollBars
     @AppStorage(AppPreferences.usageWindowKey) private var usageWindowRaw = UsageWindow.default.rawValue
+    @AppStorage(AppPreferences.openPanelHotKeyKey) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
     @State private var exportNote: String?
@@ -32,6 +33,10 @@ struct SettingsGeneralPane: View {
 
     static let hideScrollBarsTitle = "Hide scroll bars"
     static let hideScrollBarsHelp = "Lists still scroll with the trackpad or mouse wheel."
+    static let hotKeyTitle = "Open with \(GlobalHotKey.displayText)"
+    static let hotKeyHelp = "\(GlobalHotKey.spokenText) opens and closes the panel from any app. "
+        + "Then use the arrow keys, Return and Escape."
+    static let hotKeyTakenText = "Another app already uses \(GlobalHotKey.displayText), so mcpock can't."
     static let sliderWidth: CGFloat = 190
     /// Fixed to the widest stop label ("Manual", "15 min"), so the text
     /// beside the slider never changes width or wraps while dragging and the
@@ -108,11 +113,17 @@ struct SettingsGeneralPane: View {
                         }
                     }
                 ))
+                Toggle(Self.hotKeyTitle, isOn: $openPanelHotKey)
+                    .help(Self.hotKeyHelp)
             } footer: {
                 if let launchError {
                     Text(launchError)
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusBroken)
+                } else if openPanelHotKey && GlobalHotKey.shared.isTaken {
+                    Text(Self.hotKeyTakenText)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.statusDegraded)
                 } else {
                     footerText(shownInterval == .manual
                         ? "Checks only when you press Refresh in the panel."

@@ -24,8 +24,8 @@ settings:
     CLANG_ENABLE_MODULES: YES
     ENABLE_TESTABILITY: YES
     # Shared by the app and its bundled mcpock-mcp helper, so the two can't drift.
-    MARKETING_VERSION: "1.9.1"
-    CURRENT_PROJECT_VERSION: "20"
+    MARKETING_VERSION: "1.10.0"
+    CURRENT_PROJECT_VERSION: "21"
 targets:
   mcpock:
     type: application

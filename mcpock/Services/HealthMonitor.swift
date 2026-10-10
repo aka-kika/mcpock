@@ -418,9 +418,16 @@ final class HealthMonitor {
     /// state untouched. Waits out an in-flight full cycle first (so the two never
     /// probe the same process at once) and then still runs — the user asked for
     /// this row specifically, and the cycle may have skipped it for backoff.
+    ///
+    /// Reads the config files again first (1.10): Check again is what she
+    /// presses right after fixing a server's config, and probing the command
+    /// and keys from before the fix kept the row red until the next timer
+    /// round. A config whose probe spec changed starts over from `.unknown`
+    /// (`merged`), so the row spins and then shows the fixed server's answer.
     func refresh(groupName: String) async {
         guard !isPaused(groupName) else { return }
         await awaitInFlightCycle()
+        await reloadConfigs()
         let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
         guard !ids.isEmpty else { return }
 

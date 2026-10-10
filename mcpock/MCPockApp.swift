@@ -82,6 +82,10 @@ struct MCPockApp: App {
         let updateController = UpdateController()
         _updateController = State(initialValue: updateController)
         SettingsLauncher.updateController = updateController
+        // ⌃⌥M opens and closes the panel from any app (1.10). Never while
+        // hosting tests (returned above): a test run must not take the key.
+        // Read from `.standard` like the theme, since Settings writes it there.
+        GlobalHotKey.shared.start { PanelToggle.toggle() }
         // A full check cycle just finished. The usage store starts only once
         // discovery has named the servers: the Cursor and Hermes readers split
         // call names against them, and a reader's cursor never goes back, so a

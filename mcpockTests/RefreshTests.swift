@@ -19,12 +19,15 @@ final class RefreshTests: XCTestCase {
     /// because awaiting a completed task returns without suspending and the
     /// finished task was still in `probeTask`. Every mix of overlapping refreshes
     /// must complete. Uses `refreshNow` / `refresh(groupName:)` only — never
-    /// `refreshAll`, which would discover and launch the real servers on this Mac.
+    /// `refreshAll`, which would launch the real servers on this Mac.
+    /// `refresh(groupName:)` reads the configs again (1.10), so discovery is
+    /// stubbed out: the test never scans this Mac.
     /// If the spin comes back this test pins the main actor and the run hangs,
     /// which is the loudest possible failure.
     @MainActor
     func testOverlappingRefreshesAlwaysComplete() async {
         let monitor = HealthMonitor()   // no servers: a cycle finishes at once
+        monitor.discover = { [] }
         for _ in 0..<50 {
             async let a: () = monitor.refreshNow()
             async let b: () = monitor.refreshNow(force: true)
@@ -137,7 +140,9 @@ final class RefreshTests: XCTestCase {
         let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.retireSuite(named: suite) }
-        let state = PanelState(monitor: HealthMonitor(defaults: defaults), defaults: defaults)
+        let monitor = HealthMonitor(defaults: defaults)
+        monitor.discover = { [] }   // Check again reads the configs again (1.10)
+        let state = PanelState(monitor: monitor, defaults: defaults)
         state.checkAgain("nothing")
         XCTAssertTrue(state.isChecking("nothing"), "on before the re-probe runs")
         for _ in 0..<200 where state.isChecking("nothing") { try? await Task.sleep(for: .milliseconds(10)) }
@@ -172,6 +177,43 @@ final class RefreshTests: XCTestCase {
         XCTAssertTrue(state.checkingNames.isEmpty, "cleared on completion")
         let second = try XCTUnwrap(monitor.servers.first?.lastChecked)
         XCTAssertGreaterThan(second, first, "cleared only after this server's probe finished")
+    }
+
+    /// 1.10 (the Wasdy note: "paste the fix, hit test, see green"): Check
+    /// again reads the config files again before it probes. Before, it
+    /// re-ran the command from before the fix, and the row stayed red until
+    /// the next timer round or a full Refresh.
+    @MainActor
+    func testCheckAgainUsesTheFixedConfig() async throws {
+        let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        let monitor = HealthMonitor(defaults: defaults)
+        func cfg(_ command: String) -> ServerConfig {
+            ServerConfig(id: "Test:postiz", name: "postiz", source: ServerSource(label: "Test"), projectPath: nil,
+                         transport: .stdio, command: command, args: [], env: [:], url: nil, headers: [:])
+        }
+        let probed = LockedList()
+        monitor.probe = { config, _ in
+            probed.append(config.command ?? "")
+            return config.command == "fixed"
+                ? ProbeResult(state: .healthy, failureReason: nil, tools: [])
+                : ProbeResult(state: .broken, failureReason: "not found", tools: nil)
+        }
+        let typo = cfg("typo"), fixed = cfg("fixed")
+        monitor.discover = { [typo] }
+        await monitor.startRefreshAll().value
+        XCTAssertEqual(monitor.servers.first?.state, .broken)
+
+        // She fixes the config file, then presses Check again on the row.
+        monitor.discover = { [fixed] }
+        let state = PanelState(monitor: monitor, defaults: defaults)
+        state.checkAgain("postiz")
+        for _ in 0..<500 where state.isChecking("postiz") { try? await Task.sleep(for: .milliseconds(10)) }
+
+        XCTAssertEqual(probed.items.last, "fixed", "probes the command from the file as it is now")
+        XCTAssertEqual(monitor.servers.count, 1)
+        XCTAssertEqual(monitor.servers.first?.state, .healthy, "green right away, not at the next timer round")
     }
 
     /// Stale-row bug (stress run, 2026-09-26): a config changed or removed between

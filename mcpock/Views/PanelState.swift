@@ -536,7 +536,7 @@ final class PanelState {
 
     // MARK: - Keyboard
 
-    /// Arrow keys, Return, Escape, ⌘F and ⌘C for the panel. A local event monitor
+    /// Arrow keys, Return, Escape, ⌘F, ⌘R and ⌘C for the panel. A local event monitor
     /// rather than SwiftUI focus: while the search field is open it holds the
     /// keyboard focus (so typing searches), and the monitor answers the navigation
     /// keys before the field sees them. Installed once; it only acts on events
@@ -590,6 +590,16 @@ final class PanelState {
 
         if command && key == "f" {
             openSearch()
+            return true
+        }
+        if command && key == "r" {
+            // ⌘R (1.10): Check again on the selected row, right after a fix;
+            // with nothing selected, the footer's Refresh (every server).
+            if let name = selectedGroup?.name {
+                checkAgain(name)
+            } else if !monitor.isRefreshing {
+                monitor.startRefreshAll()
+            }
             return true
         }
         if command && key == "c" {

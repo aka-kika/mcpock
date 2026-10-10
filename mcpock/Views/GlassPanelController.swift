@@ -71,6 +71,7 @@ final class GlassPanelController: NSObject {
         }
         panel.onPerformClose = { [weak self] in self?.close() }
         state.requestClose = { [weak self] in self?.close() }
+        PanelToggle.glassToggle = { [weak self] in self?.toggleFromShortcut() ?? false }
         // Follow the theme: the item exists only while it is Glass.
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
@@ -139,12 +140,14 @@ final class GlassPanelController: NSObject {
 
     // MARK: - Open and close
 
-    private func present(from button: NSStatusBarButton) {
+    /// `onMouseScreen` (the shortcut): under the item in the menu bar of the
+    /// screen the pointer is on, not the one AppKit keeps the button in.
+    private func present(from button: NSStatusBarButton, onMouseScreen: Bool = false) {
         host.rootView = AnyView(
             MenuBarPanelView(monitor: monitor, panel: state)
                 .environment(\.inGlassPanel, true)
         )
-        layout(under: button)
+        layout(under: button, onMouseScreen: onMouseScreen)
         generation += 1
         isShown = true
         panel.alphaValue = 0
@@ -160,6 +163,21 @@ final class GlassPanelController: NSObject {
             self.animateIn()
         }
         installEventMonitors()
+    }
+
+    /// ⌃⌥M (`GlobalHotKey`, 1.10). A click on the item from code doesn't begin
+    /// an expanded-interface session, so the shortcut opens the panel itself,
+    /// without one: the outside-click monitors and Escape close it as usual.
+    /// False while the theme isn't Glass (no item), so the caller falls back
+    /// to the MenuBarExtra item.
+    func toggleFromShortcut() -> Bool {
+        guard let button = statusItem?.button else { return false }
+        if isShown {
+            close()
+        } else {
+            present(from: button, onMouseScreen: true)
+        }
+        return true
     }
 
     /// Ends the menu bar's session when there is one (its end callback then
@@ -230,12 +248,20 @@ final class GlassPanelController: NSObject {
     }
 
     /// Top edge just under the item, centered on it, kept inside the screen.
-    private func layout(under button: NSStatusBarButton) {
+    private func layout(under button: NSStatusBarButton, onMouseScreen: Bool = false) {
         guard let window = button.window else { return }
-        let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
+        var anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
+        var screen = window.screen
+        if onMouseScreen, let home = window.screen {
+            let mouse = NSEvent.mouseLocation
+            if let target = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }), target != home {
+                anchor = GlassPanelStyle.anchor(anchor, movedFrom: home.frame, to: target.frame, top: target.visibleFrame.maxY)
+                screen = target
+            }
+        }
         let frame = GlassPanelStyle.frame(
             anchor: anchor,
-            visible: window.screen?.visibleFrame,
+            visible: screen?.visibleFrame,
             width: MenuBarPanelView.panelWidth,
             height: MenuBarPanelView.panelHeight
         )
@@ -331,6 +357,16 @@ enum GlassPanelStyle {
         #else
         return false // built without the macOS 27 SDK: no glass panel to show
         #endif
+    }
+
+    /// The item's place in another screen's menu bar, for the shortcut (1.10):
+    /// every display has its own copy of the menu bar, with the status items
+    /// lined up from the right edge, so the copy sits as far from that
+    /// screen's right edge as the button does from its own. `top` is the
+    /// bottom of the target's menu bar. Pure, for the tests.
+    nonisolated static func anchor(_ anchor: NSRect, movedFrom home: NSRect, to target: NSRect, top: CGFloat) -> NSRect {
+        let fromRight = home.maxX - anchor.midX
+        return NSRect(x: target.maxX - fromRight - anchor.width / 2, y: top, width: anchor.width, height: anchor.height)
     }
 
     /// Top edge just under the item, centered on it, kept inside the screen.

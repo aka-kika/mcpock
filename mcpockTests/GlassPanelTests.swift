@@ -42,6 +42,18 @@ final class GlassPanelTests: XCTestCase {
             anchor: NSRect(x: 4, y: 1056, width: 24, height: 24), visible: visible, width: 380, height: 560)
         XCTAssertEqual(left.minX, visible.minX + GlassPanelStyle.screenMargin)
     }
+
+    /// ⌃⌥M (1.10) opens the panel on the screen the pointer is on: the item's
+    /// copy there sits as far from that screen's right edge as the real one.
+    func testShortcutAnchorMovesToTheOtherScreensMenuBar() {
+        let home = NSRect(x: -320, y: 900, width: 1920, height: 1080)
+        let target = NSRect(x: 0, y: 0, width: 1600, height: 900)
+        let button = NSRect(x: 1151, y: 1950, width: 38, height: 30)
+        let moved = GlassPanelStyle.anchor(button, movedFrom: home, to: target, top: 870)
+        XCTAssertEqual(home.maxX - button.midX, target.maxX - moved.midX, "same distance from the right edge")
+        XCTAssertEqual(moved.minY, 870, "just under the target's menu bar")
+        XCTAssertEqual(moved.size, button.size)
+    }
 }
 
 /// Escape in the glass panel: card, compare and search come first, then the

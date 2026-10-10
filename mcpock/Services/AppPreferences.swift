@@ -107,6 +107,15 @@ enum AppPreferences {
     /// open in the Agents tab. Off hides the numbers and stops reading
     /// entirely.
     static let usageWindowKey = "usageWindow"
+
+    /// Settings > General "Open with ⌃⌥M" (1.10): the shortcut that opens
+    /// and closes the panel from any app (`GlobalHotKey`). On by default.
+    static let openPanelHotKeyKey = "openPanelHotKey"
+    static let defaultOpenPanelHotKey = true
+
+    static func loadOpenPanelHotKey(from defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: openPanelHotKeyKey) as? Bool ?? defaultOpenPanelHotKey
+    }
     static let defaultUsageWindow = UsageWindow.default
 
     static func loadUsageWindow(from defaults: UserDefaults = .standard) -> UsageWindow {
