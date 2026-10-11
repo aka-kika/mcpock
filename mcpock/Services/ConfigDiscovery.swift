@@ -25,8 +25,13 @@ enum ConfigDiscovery {
         // 1. Registry: exact paths with friendly labels.
         for agent in registry {
             let canonical = ConfigScanner.canonicalPath(agent.path)
-            guard let text = try? String(contentsOfFile: agent.path, encoding: .utf8),
-                  let parsed = agent.shape.parse(text) else { continue }
+            let parsed: [DiscoveredEntry]?
+            if let parseData = agent.shape.parseData {
+                parsed = (try? Data(contentsOf: URL(fileURLWithPath: agent.path))).flatMap(parseData)
+            } else {
+                parsed = (try? String(contentsOfFile: agent.path, encoding: .utf8)).flatMap(agent.shape.parse)
+            }
+            guard let parsed else { continue }
             let entries = droppingStaleProjects(parsed, folderExists: folderExists)
             claimedPaths.insert(canonical)
             let source = ServerSource(label: agent.label, path: agent.path)

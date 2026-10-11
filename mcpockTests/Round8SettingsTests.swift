@@ -57,7 +57,7 @@ final class Round8SettingsTests: XCTestCase {
         ])
         // The real registry: every known file is in the default prompt.
         let real = ConnectSnippets.claudeSetupPrompt(path: path)
-        for agent in AgentRegistry.known {
+        for agent in AgentRegistry.known where !agent.shape.isAppSettings {
             XCTAssertTrue(real.contains(CardText.shortPath(agent.path)), agent.path)
         }
     }

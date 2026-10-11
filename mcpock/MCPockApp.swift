@@ -19,6 +19,8 @@ struct MCPockApp: App {
     /// Read so the MenuBarExtra item hides the moment the theme turns Glass.
     @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
 
+    private static let isHostingTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     init() {
         // A server can exit between the "still running?" check and a write
         // to its stdin. The write then raises SIGPIPE, whose default action
@@ -108,8 +110,12 @@ struct MCPockApp: App {
     }
 
     var body: some Scene {
-        // Hidden while the Glass theme's own panel owns the menu-bar item.
-        MenuBarExtra(isInserted: .constant(!GlassPanelStyle.usesGlassPanel(themeRaw: themeRaw))) {
+        // Hidden while the Glass theme's own panel owns the menu-bar item, and
+        // while hosting unit tests (1.10.1): a test run must not put a second
+        // mcpock icon in the menu bar of the Mac it runs on.
+        MenuBarExtra(isInserted: .constant(
+            !Self.isHostingTests && !GlassPanelStyle.usesGlassPanel(themeRaw: themeRaw)
+        )) {
             MenuBarPanelView(monitor: monitor, panel: panel)
                 .onAppear {
                     StatusItemRightClick.install()

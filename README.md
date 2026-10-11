@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.10.0](https://img.shields.io/badge/version-1.10.0-7a8fb0)](docs/RELEASE-NOTES-v1.10.0.md)
+[![Version 1.10.1](https://img.shields.io/badge/version-1.10.1-7a8fb0)](docs/RELEASE-NOTES-v1.10.1.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -202,13 +202,17 @@ by the scan, with no code change.
 | MiniMax | `~/.minimax/mcp.json` | JSON |
 | OpenCode | `~/.config/opencode/opencode.json` (`mcp`) | JSON |
 | aka | Asked from aka's local helper (`127.0.0.1:6464`) while aka runs | API |
+| Tinycast | `~/Library/Preferences/com.tinycast.app.plist` (`mcpServers`) | Settings |
 
 Notes: servers turned off with `enabled: false` are skipped. Servers marked
 `"builtin": true` (they run inside their own app) are shown
 but never started. **aka** keeps its servers in its own database, so mcpock
 asks aka's local helper for the list and starts each server the way aka does;
 because aka launches servers its own way, it never counts toward "set up
-differently". Thirty agents have their real logo in the app; others show two
+differently". **Tinycast** keeps its servers in its own settings and their
+keys and sign-ins in its own Keychain items, which mcpock never reads: a
+Tinycast server that needs one shows as managed by its app, the others are
+checked like any other. Thirty agents have their real logo in the app; others show two
 letters.
 
 ## Privacy and safety
@@ -273,7 +277,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-585 unit tests at v1.10.0, and the build keeps zero warnings. They cover the
+592 unit tests at v1.10.1, and the build keeps zero warnings. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's

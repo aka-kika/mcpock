@@ -239,7 +239,13 @@ enum ConnectSnippets {
         var order: [String] = []
         var paths: [String: [String]] = [:]
         var shapes: [String: ConfigShape] = [:]
+        var appSettings: [String] = []
         for agent in agents {
+            // Servers kept in the agent's own settings: no file to edit here.
+            if agent.shape.isAppSettings {
+                if !appSettings.contains(agent.label) { appSettings.append(agent.label) }
+                continue
+            }
             if paths[agent.label] == nil { order.append(agent.label) }
             paths[agent.label, default: []].append(CardText.shortPath(agent.path, home: home))
             shapes[agent.label] = shapes[agent.label] ?? agent.shape
@@ -249,7 +255,10 @@ enum ConnectSnippets {
             let files = (paths[label] ?? []).joined(separator: " or ")
             return "- \(name): \(files) (\(formatNote(label: label, shape: shapes[label])))"
         }
-        return lines + ["- aka: no file; it keeps its servers in its own settings"]
+        let settingsLines = appSettings.map {
+            "- \(AgentBadge.displayLabel($0)): no file; add \(serverName) in its own MCP settings"
+        }
+        return lines + settingsLines + ["- aka: no file; it keeps its servers in its own settings"]
     }
 
     /// How step 3 treats an agent's file, in a few words.

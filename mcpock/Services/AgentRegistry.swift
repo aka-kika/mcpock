@@ -46,6 +46,9 @@ enum AgentRegistry {
             KnownAgent(label: "Hermes", path: home(".hermes/config.yaml"), shape: .mcpServersYAML),
             KnownAgent(label: "Kimi Code", path: home(".kimi-code/mcp.json"), shape: .json),
             KnownAgent(label: "OpenCode", path: home(".config/opencode/opencode.json"), shape: .json),
+            // 1.10.1: Tinycast keeps its servers in its own preferences.
+            KnownAgent(label: "Tinycast", path: home("Library/Preferences/com.tinycast.app.plist"),
+                       shape: .tinycastDefaults),
         ]
     }
 }
@@ -165,6 +168,7 @@ struct AgentBadge: Hashable, Sendable {
         "OpenCode": "OC",
         "Windsurf": "Ws",
         "VS Code": "VS",
+        "Tinycast": "Tc",
     ]
 
     /// Badge for any source label: a registry label ("Cursor"), a scanned one

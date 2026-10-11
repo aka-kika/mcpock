@@ -25,11 +25,25 @@ struct DiscoveredEntry {
 struct ConfigShape {
     let id: String
     let parse: (String) -> [DiscoveredEntry]?
+    /// Set for an agent that keeps its servers in its own settings (a binary
+    /// preferences plist) instead of a text config: the registry reads the raw
+    /// bytes and hands them here, and `parse` is never called. The scan never
+    /// uses these shapes.
+    var parseData: ((Data) -> [DiscoveredEntry]?)? = nil
+
+    /// True for an agent whose servers live in its own settings, not in a file
+    /// anyone should edit by hand.
+    var isAppSettings: Bool { parseData != nil }
 
     static let json = ConfigShape(id: "json") { JSONConfigShape.parse($0) }
     static let mcpServersTOML = ConfigShape(id: "mcp-servers-toml") { MCPServersTOML.shapeEntries($0) }
     static let gooseYAML = ConfigShape(id: "goose-yaml") { GooseConfig.shapeEntries($0) }
     static let mcpServersYAML = ConfigShape(id: "mcp-servers-yaml") { MCPServersYAML.shapeEntries($0) }
+
+    /// Tinycast (1.10.1): its MCP servers live in its preferences plist.
+    static let tinycastDefaults = ConfigShape(id: "tinycast-defaults", parse: { _ in nil }) {
+        TinycastConfig.parse($0)
+    }
 
     /// Order matters only for scan detection (first non-nil wins); JSON is cheapest.
     static let all: [ConfigShape] = [.json, .mcpServersTOML, .gooseYAML, .mcpServersYAML]
@@ -97,5 +111,64 @@ enum JSONConfigShape {
         if entry["env"] == nil, let environment = entry["environment"] as? [String: Any] {
             entry["env"] = environment
         }
+    }
+}
+
+/// Tinycast keeps its MCP servers in its preferences
+/// (`~/Library/Preferences/com.tinycast.app.plist`): `mcpEnabled` (Bool) and
+/// `mcpServers`, JSON bytes holding an array of
+/// `{"name", "isEnabled", "transport": {"stdio": {"command", "arguments",
+/// "environmentKeys"}} | {"http": {"url", "headerName"}}, "oauth"}`.
+///
+/// Only the key names are in the plist; the values (environment variables, the
+/// header, OAuth tokens) sit in Tinycast's own Keychain items, which mcpock can't
+/// and shouldn't read. A server that needs one would look broken or "needs
+/// sign-in" when mcpock starts it without, so it is marked `builtin` and shows
+/// as managed by its app. A server that needs no secret is checked like any other.
+enum TinycastConfig {
+    static func parse(_ data: Data) -> [DiscoveredEntry]? {
+        guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let root = plist as? [String: Any]
+        else { return nil }
+        // MCP switched off in Tinycast: it starts none of them, so neither do we.
+        if (root["mcpEnabled"] as? Bool) == false { return nil }
+        let raw: Data?
+        if let bytes = root["mcpServers"] as? Data {
+            raw = bytes
+        } else if let text = root["mcpServers"] as? String {
+            raw = text.data(using: .utf8)
+        } else {
+            raw = nil
+        }
+        guard let raw, let servers = (try? JSONSerialization.jsonObject(with: raw)) as? [[String: Any]] else {
+            return nil
+        }
+        let entries = servers.compactMap(entry(from:))
+        return entries.contains(where: \.hasEndpoint) ? entries : nil
+    }
+
+    private static func entry(from server: [String: Any]) -> DiscoveredEntry? {
+        guard let name = server["name"] as? String, !name.isEmpty else { return nil }
+        if (server["isEnabled"] as? Bool) == false { return nil }
+        guard let transport = server["transport"] as? [String: Any] else { return nil }
+        var entry: [String: Any] = [:]
+        // `oauth` may be a flag or a settings object; either way a sign-in Tinycast holds.
+        var needsSecret = false
+        if let oauth = server["oauth"], !(oauth is NSNull) {
+            needsSecret = (oauth as? Bool) ?? true
+        }
+        if let stdio = transport["stdio"] as? [String: Any] {
+            entry["command"] = stdio["command"] as? String
+            entry["args"] = (stdio["arguments"] as? [String]) ?? []
+            if let keys = stdio["environmentKeys"] as? [String], !keys.isEmpty { needsSecret = true }
+        } else if let http = transport["http"] as? [String: Any] {
+            entry["type"] = "http"
+            entry["url"] = http["url"] as? String
+            if let header = http["headerName"] as? String, !header.isEmpty { needsSecret = true }
+        } else {
+            return nil
+        }
+        if needsSecret { entry["builtin"] = true }
+        return DiscoveredEntry(name: name, entry: entry)
     }
 }
