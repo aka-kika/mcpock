@@ -89,7 +89,7 @@ them, checks every server, and shows you what needs attention and why, so you
 - **Lets your agents ask it.** A small read-only MCP server ships inside the
   app, so you can say "check my mcpock" to an agent instead of pasting errors.
 
-![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded. On the left, the Agents desktop widget with a health bar per agent.](docs/images/mcpock-agents.png)
+![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded. On the left, the Status desktop widget (4 need you, 14 servers) and the Agents widget with a health bar per agent.](docs/images/mcpock-agents.png)
 
 ## Install
 
