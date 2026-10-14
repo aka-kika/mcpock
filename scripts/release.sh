@@ -127,6 +127,7 @@ DMG="$DIST_DIR/$APP_NAME.dmg"
 if command -v create-dmg >/dev/null 2>&1; then
   create-dmg \
     --volname "$APP_NAME" \
+    --volicon "$APP/Contents/Resources/AppIcon.icns" \
     --background scripts/dmg/background.png \
     --window-size 660 420 \
     --icon-size 110 \
@@ -144,8 +145,29 @@ echo "==> Notarizing + stapling the DMG"
 xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
 
+# The app icon on the .dmg file itself in Finder (1.10.5, as Sift does). It
+# lives in the file's resource fork and Finder info, outside the file's data,
+# so the signature, the stapled ticket, the SHA-256 and Sparkle's signature
+# all stay valid; done last so nothing above can drop it. A download over
+# HTTP carries only the data, so only local copies show it; the mounted
+# disk's icon (--volicon above) is inside the image and always shows.
+echo "==> DMG file icon"
+if xcrun -find Rez >/dev/null 2>&1 && xcrun -find DeRez >/dev/null 2>&1 && xcrun -find SetFile >/dev/null 2>&1; then
+  ICON_DIR=$(mktemp -d)
+  cp "$APP/Contents/Resources/AppIcon.icns" "$ICON_DIR/Icon.icns"
+  sips -i "$ICON_DIR/Icon.icns" >/dev/null
+  xcrun DeRez -only icns "$ICON_DIR/Icon.icns" > "$ICON_DIR/Icon.rsrc"
+  xcrun Rez -append "$ICON_DIR/Icon.rsrc" -o "$DMG"
+  xcrun SetFile -a C "$DMG"
+  rm -f "$ICON_DIR/Icon.icns" "$ICON_DIR/Icon.rsrc"
+  rmdir "$ICON_DIR"
+else
+  echo "    (Xcode icon tools missing: the DMG file keeps the plain icon)"
+fi
+
 echo "==> Verifying Gatekeeper acceptance"
 spctl --assess --type execute --verbose=4 "$APP" || true
 xcrun stapler validate "$DMG"
+codesign --verify "$DMG"
 
 echo "Shipped: $DMG (Developer ID signed, notarized, stapled)"
