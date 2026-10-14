@@ -185,9 +185,12 @@ final class UsageStore {
     /// Only counts, cursors and buckets ever get to disk — never a call's
     /// arguments, result or any chat text (those never even reach `UsageEvent`).
     private struct Persisted: Codable {
+        /// 2 since 1.10.6 (cursors carry `UsageCursor.newest`); missing before.
+        var version: Int?
         var buckets: [PersistedBucket]
         var cursors: [String: UsageCursor]
     }
+    nonisolated private static let formatVersion = 2
     private struct PersistedBucket: Codable {
         let agent: String
         let server: String
@@ -211,6 +214,15 @@ final class UsageStore {
         }
         buckets = loaded
         cursors = decoded.cursors
+        // Saved before 1.10.6: the counts are kept as they are, and every
+        // source read back then counts as read up to when the file was last
+        // saved, so one that starts over later never adds those calls again.
+        if decoded.version == nil,
+           let saved = (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.modificationDate] as? Date {
+            for agent in cursors.keys where cursors[agent]?.countedBefore == nil {
+                cursors[agent]?.countedBefore = UsageCursor.millis(saved)
+            }
+        }
     }
 
     nonisolated private static func persist(
@@ -223,7 +235,7 @@ final class UsageStore {
                 days: Dictionary(uniqueKeysWithValues: days.map { (String($0.key), $0.value) })
             )
         }
-        let payload = Persisted(buckets: bucketList, cursors: cursors)
+        let payload = Persisted(version: formatVersion, buckets: bucketList, cursors: cursors)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(payload)

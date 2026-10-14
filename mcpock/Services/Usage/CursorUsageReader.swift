@@ -107,17 +107,26 @@ struct CursorUsageReader: UsageReader {
             return ([], cursor)
         }
 
+        // Started over (the rowids went back, e.g. a reset or a VACUUM that
+        // renumbered them): count only calls newer than the ones already
+        // counted, never the old ones a second time. A restart cut short
+        // (SQLITE_BUSY) is not kept, so the rows it didn't reach are never
+        // read later without that check.
+        let restarted = sinceRowid != storedRowid
+        guard !restarted || scan.isComplete else { return ([], cursor) }
         guard scan.maxRowid > sinceRowid else {
             // Nothing new. After a reset to an empty table, remember the
             // restart so the stale high cursor isn't kept.
-            guard sinceRowid != storedRowid else { return ([], cursor) }
-            var reset = cursor.values
-            reset[Self.cursorKey] = sinceRowid
-            return ([], UsageCursor(values: reset))
+            guard restarted else { return ([], cursor) }
+            var reset = cursor
+            reset.values[Self.cursorKey] = sinceRowid
+            return ([], reset)
         }
-        var nextValues = cursor.values
-        nextValues[Self.cursorKey] = scan.maxRowid
-        return (scan.events, UsageCursor(values: nextValues))
+        var next = cursor
+        next.values[Self.cursorKey] = scan.maxRowid
+        let events = restarted ? cursor.uncounted(scan.events, from: Self.cursorKey) : scan.events
+        next.noteCounted(events, from: Self.cursorKey)
+        return (events, next)
     }
 
     // MARK: - Scanning
@@ -134,6 +143,8 @@ struct CursorUsageReader: UsageReader {
     private struct ScanResult {
         var events: [UsageEvent]
         var maxRowid: Int64
+        /// Read to the end (SQLITE_DONE), not stopped by SQLITE_BUSY or an error.
+        var isComplete = false
     }
 
     /// Reads every `bubbleId:` row past `sinceRowid`, in rowid order, and
@@ -155,7 +166,7 @@ struct CursorUsageReader: UsageReader {
         """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            return ScanResult(events: [], maxRowid: sinceRowid)
+            return ScanResult(events: [], maxRowid: sinceRowid, isComplete: false)
         }
         defer { sqlite3_finalize(statement) }
 
@@ -164,6 +175,7 @@ struct CursorUsageReader: UsageReader {
 
         var events: [UsageEvent] = []
         var maxRowid = sinceRowid
+        var isComplete = false
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoFormatterNoFraction = ISO8601DateFormatter()
@@ -175,6 +187,7 @@ struct CursorUsageReader: UsageReader {
                 // error) stops here rather than looping forever — whatever
                 // rows were already read still count, and the cursor only
                 // advances to the last one actually seen.
+                isComplete = step == SQLITE_DONE
                 break
             }
             let rowid = sqlite3_column_int64(statement, 0)
@@ -192,7 +205,7 @@ struct CursorUsageReader: UsageReader {
             events.append(UsageEvent(agent: "Cursor", server: split.server, date: date))
         }
 
-        return ScanResult(events: events, maxRowid: maxRowid)
+        return ScanResult(events: events, maxRowid: maxRowid, isComplete: isComplete)
     }
 
     private static func columnText(_ statement: OpaquePointer?, _ index: Int32) -> String? {

@@ -98,10 +98,30 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         XCTAssertGreaterThan(cursor.values.values.first ?? 0, 0)
 
         // Replaced with something shorter than the old offset.
-        try! Data((line(name: "mcp__pieces__ask_pieces_ltm") + "\n").utf8).write(to: url)
+        try! Data((line(name: "mcp__pieces__ask_pieces_ltm", timestamp: "2026-01-02T10:00:00.000Z") + "\n").utf8).write(to: url)
         let (events, _) = reader.read(since: cursor, knownServers: [])
         XCTAssertEqual(events.count, 1, "the shrink is detected and the new content is read from the start")
         XCTAssertEqual(events.first?.server, "pieces")
+    }
+
+    /// A transcript rewritten shorter but still holding calls already counted
+    /// (review, 2026-10-14, item 11): only the call newer than those counts.
+    func testRewrittenFileNeverCountsOldCallsTwice() {
+        let url = write([
+            line(name: "mcp__skill-librarian__librarian_find", timestamp: "2026-01-01T10:00:00.000Z"),
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T11:00:00.000Z"),
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T12:00:00.000Z"),
+        ])
+        let reader = ClaudeCodeUsageReader(root: root)
+        let (first, cursor) = reader.read(since: .empty, knownServers: [])
+        XCTAssertEqual(first.count, 3)
+
+        try! Data([
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T12:00:00.000Z"),
+            line(name: "mcp__pieces__ask_pieces_ltm", timestamp: "2026-01-01T13:00:00.000Z"),
+        ].map { $0 + "\n" }.joined().utf8).write(to: url)
+        let (second, _) = reader.read(since: cursor, knownServers: [])
+        XCTAssertEqual(second.map(\.server), ["pieces"], "the call counted before is not counted again")
     }
 
     func testIncompleteTrailingLineIsNotConsumedYet() {
@@ -302,6 +322,55 @@ final class UsageStoreTests: XCTestCase {
         let second = UsageStore(readers: [FakeReader(agent: "Code", events: [])], directory: directory, isHostingTests: false, defaults: defaults)
         await second.start(knownServers: [])?.value
         XCTAssertEqual(second.count(agent: "Code", server: "reed-md", window: .allTime), 1)
+    }
+
+    /// Counts saved before 1.10.6 have no per-source "newest call" yet: a
+    /// source that starts over after the update counts only calls made after
+    /// the file was last saved, and the old counts stay as they were.
+    func testCountsSavedBeforeTheUpdateAreNeverAddedTwice() async throws {
+        let saved = ISO8601DateFormatter().date(from: "2026-10-01T12:00:00Z")!
+        let legacy = """
+            {"buckets":[{"agent":"Code","server":"\(HealthMonitor.normalizedName("reed-md"))","days":{"\(UsageStore.dayIndex(for: saved))":5}}],
+             "cursors":{"Code":{"values":{"src":900}}}}
+            """
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent(UsageStore.fileName)
+        try Data(legacy.utf8).write(to: file)
+        try FileManager.default.setAttributes([.modificationDate: saved], ofItemAtPath: file.path)
+
+        let replayed = [
+            UsageEvent(agent: "Code", server: "reed-md", date: saved.addingTimeInterval(-3600)), // counted back then
+            UsageEvent(agent: "Code", server: "reed-md", date: saved.addingTimeInterval(3600)), // new
+        ]
+        let store = UsageStore(readers: [RestartingReader(agent: "Code", events: replayed)], directory: directory, isHostingTests: false, defaults: defaults)
+        await store.start(knownServers: [])?.value
+        XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .allTime), 6, "5 kept, 1 new, the old call not again")
+
+        let written = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
+        XCTAssertEqual(written?["version"] as? Int, 2)
+    }
+
+    /// Plays a source that started over: hands back every event it holds,
+    /// minus the ones the cursor says were already counted.
+    private struct RestartingReader: UsageReader {
+        let agent: String
+        let events: [UsageEvent]
+        func read(since cursor: UsageCursor, knownServers: Set<String>) -> (events: [UsageEvent], cursor: UsageCursor) {
+            var next = cursor
+            let fresh = cursor.uncounted(events, from: "src")
+            next.noteCounted(fresh, from: "src")
+            next.values["src"] = 1
+            return (fresh, next)
+        }
+    }
+
+    func testCursorSavedBeforeTheUpdateStillDecodes() throws {
+        let cursor = try JSONDecoder().decode(UsageCursor.self, from: Data(#"{"values":{"a":3}}"#.utf8))
+        XCTAssertEqual(cursor, UsageCursor(values: ["a": 3]))
+        var next = cursor
+        next.noteCounted([UsageEvent(agent: "Code", server: "x", date: Date(timeIntervalSince1970: 10))], from: "a")
+        let roundTrip = try JSONDecoder().decode(UsageCursor.self, from: JSONEncoder().encode(next))
+        XCTAssertEqual(roundTrip.newest["a"], 10_000)
     }
 
     func testHostingTestsNeverWritesTheFile() async {

@@ -161,6 +161,29 @@ final class HermesUsageReaderTests: XCTestCase {
     /// A row that can't be turned into a server name (`mcp` with nothing
     /// after it) or has no usable timestamp is skipped, not a crash, and
     /// doesn't stop the rows around it from being read.
+    /// state.db replaced by a smaller one that still holds a call already
+    /// counted (review, 2026-10-14, item 11): only the newer call counts.
+    func testReplacedStoreNeverCountsOldCallsTwice() throws {
+        let path = home.path + "/state.db"
+        try makeStateDB(at: path, rows: [
+            Row(toolName: "mcp_recall_search", timestamp: 1_780_000_000),
+            Row(toolName: "mcp_recall_search", timestamp: 1_780_000_100),
+            Row(toolName: "mcp_recall_search", timestamp: 1_780_000_200),
+        ])
+        let reader = HermesUsageReader(hermesHome: home.path)
+        let (first, cursor) = reader.read(since: .empty, knownServers: ["recall"])
+        XCTAssertEqual(first.count, 3)
+
+        try FileManager.default.removeItem(atPath: path)
+        try makeStateDB(at: path, rows: [
+            Row(toolName: "mcp_recall_search", timestamp: 1_780_000_200),
+            Row(toolName: "mcp_wigolo_search", timestamp: 1_780_000_300),
+        ])
+        let (second, next) = reader.read(since: cursor, knownServers: ["recall", "wigolo"])
+        XCTAssertEqual(second.map(\.server), ["wigolo"])
+        XCTAssertEqual(next.values["main"], 2)
+    }
+
     func testBadLineIsSkipped() throws {
         try makeStateDB(at: home.appendingPathComponent("state.db").path, rows: [
             Row(toolName: "mcp_", timestamp: 1_780_000_000),

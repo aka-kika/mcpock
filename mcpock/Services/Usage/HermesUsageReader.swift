@@ -28,35 +28,33 @@ struct HermesUsageReader: UsageReader {
     }
 
     func read(since cursor: UsageCursor, knownServers: Set<String>) -> (events: [UsageEvent], cursor: UsageCursor) {
-        var values = cursor.values
+        var next = cursor
         var events: [UsageEvent] = []
 
-        let mainKey = "main"
-        let (mainEvents, mainLast) = Self.readStore(
-            path: hermesHome + "/state.db",
-            agentLabel: agent,
-            knownServers: knownServers,
-            since: values[mainKey] ?? 0
-        )
-        events.append(contentsOf: mainEvents)
-        if let mainLast { values[mainKey] = mainLast }
-
-        // Every profile that keeps its own state.db gets its own cursor entry
-        // and reports under "Hermes · <name>" (the label mcpock already uses
-        // for a profile's scanned config, `ConfigDiscovery.label`).
+        // The main state.db, then every profile that keeps its own: each
+        // gets its own cursor entry, and a profile reports under
+        // "Hermes · <name>" (the label mcpock already uses for a profile's
+        // scanned config, `ConfigDiscovery.label`).
+        var stores = [(key: "main", path: hermesHome + "/state.db", label: agent)]
         for name in Self.profileNames(hermesHome: hermesHome) {
-            let key = "profile:\(name)"
-            let (profileEvents, profileLast) = Self.readStore(
-                path: hermesHome + "/profiles/\(name)/state.db",
-                agentLabel: "\(agent) · \(name)",
+            stores.append((key: "profile:\(name)", path: hermesHome + "/profiles/\(name)/state.db", label: "\(agent) · \(name)"))
+        }
+        for store in stores {
+            var (found, lastID, restarted) = Self.readStore(
+                path: store.path,
+                agentLabel: store.label,
                 knownServers: knownServers,
-                since: values[key] ?? 0
+                since: next.values[store.key] ?? 0
             )
-            events.append(contentsOf: profileEvents)
-            if let profileLast { values[key] = profileLast }
+            // Its row ids went back (reset or replaced): count only calls
+            // newer than the ones it already gave.
+            if restarted { found = next.uncounted(found, from: store.key) }
+            next.noteCounted(found, from: store.key)
+            events.append(contentsOf: found)
+            if let lastID { next.values[store.key] = lastID }
         }
 
-        return (events, UsageCursor(values: values))
+        return (events, next)
     }
 
     /// Profile folder names under `hermesHome/profiles` that have their own
@@ -73,27 +71,29 @@ struct HermesUsageReader: UsageReader {
     /// Reads new rows from one `state.db`. A missing file: no events, `nil`
     /// last (the caller leaves that cursor key untouched). A file that was
     /// reset or replaced with a smaller one (its highest id now below `since`)
-    /// is read from the start, same as a shrunk file would be. A row this
-    /// reader can't make sense of (no server name to report) is skipped.
+    /// is read from the start and reported as `restarted`, same as a shrunk
+    /// file would be. A row this reader can't make sense of (no server name
+    /// to report) is skipped.
     private static func readStore(
         path: String,
         agentLabel: String,
         knownServers: Set<String>,
         since: Int64
-    ) -> (events: [UsageEvent], lastID: Int64?) {
-        guard FileManager.default.fileExists(atPath: path) else { return ([], nil) }
+    ) -> (events: [UsageEvent], lastID: Int64?, restarted: Bool) {
+        guard FileManager.default.fileExists(atPath: path) else { return ([], nil, false) }
 
         var db: OpaquePointer?
         let uri = "file:\(path)?mode=ro"
         guard sqlite3_open_v2(uri, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db else {
             sqlite3_close(db)
-            return ([], nil)
+            return ([], nil, false)
         }
         defer { sqlite3_close(db) }
         sqlite3_busy_timeout(db, 200)
 
-        guard let maxID = queryMaxID(db) else { return ([], nil) }
-        let startID = since > maxID ? 0 : since
+        guard let maxID = queryMaxID(db) else { return ([], nil, false) }
+        let restarted = since > maxID
+        let startID = restarted ? 0 : since
 
         let sql = """
             SELECT id, tool_name, timestamp FROM messages
@@ -106,7 +106,7 @@ struct HermesUsageReader: UsageReader {
         // 2026-10-14). Same as the Cursor reader.
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
-            return ([], nil)
+            return ([], nil, false)
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, startID)
@@ -123,7 +123,10 @@ struct HermesUsageReader: UsageReader {
             guard time > 0, let server = serverName(from: name, knownServers: knownServers) else { continue }
             events.append(UsageEvent(agent: agentLabel, server: server, date: Date(timeIntervalSince1970: time)))
         }
-        return (events, step == SQLITE_DONE ? maxID : lastRead)
+        // A restart cut short is not kept: next time starts over again, so
+        // the old rows it didn't reach are never counted without the check.
+        if restarted && step != SQLITE_DONE { return ([], nil, false) }
+        return (events, step == SQLITE_DONE ? maxID : lastRead, restarted)
     }
 
     private static func queryMaxID(_ db: OpaquePointer) -> Int64? {

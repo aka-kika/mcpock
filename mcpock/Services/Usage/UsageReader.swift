@@ -20,7 +20,53 @@ struct UsageEvent: Hashable, Sendable {
 /// wrote a cursor reads its values.
 struct UsageCursor: Codable, Equatable, Sendable {
     var values: [String: Int64]
+    /// Per source (a transcript file, a database; same key the reader uses in
+    /// `values`): the newest call time counted from it, in milliseconds since
+    /// 1970. A source that starts over (shrank, was replaced, its row ids
+    /// reset) is read again from the start, and only calls newer than this
+    /// are counted, so the store never adds old calls twice (review,
+    /// 2026-10-14, item 11).
+    var newest: [String: Int64] = [:]
+    /// Set by `UsageStore` on counts saved before 1.10.6, which have no
+    /// `newest`: when that file was last saved, so every source read back
+    /// then counts as read up to that time.
+    var countedBefore: Int64?
+
     static let empty = UsageCursor(values: [:])
+
+    private enum CodingKeys: String, CodingKey {
+        case values, newest, countedBefore
+    }
+
+    /// A call's time as `newest` stores it.
+    static func millis(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1000).rounded(.down))
+    }
+
+    /// After `source` started over: only the events newer than anything
+    /// already counted from it.
+    func uncounted(_ events: [UsageEvent], from source: String) -> [UsageEvent] {
+        let cutoff = [newest[source], countedBefore].compactMap { $0 }.max()
+        guard let cutoff else { return events }
+        return events.filter { Self.millis($0.date) > cutoff }
+    }
+
+    /// Remembers the newest of `events` as counted from `source`.
+    mutating func noteCounted(_ events: [UsageEvent], from source: String) {
+        guard let latest = events.lazy.map({ Self.millis($0.date) }).max() else { return }
+        newest[source] = max(newest[source] ?? latest, latest)
+    }
+}
+
+extension UsageCursor {
+    /// Cursors saved before 1.10.6 carry only `values`. In an extension so
+    /// the memberwise `UsageCursor(values:)` stays.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        values = try container.decode([String: Int64].self, forKey: .values)
+        newest = try container.decodeIfPresent([String: Int64].self, forKey: .newest) ?? [:]
+        countedBefore = try container.decodeIfPresent(Int64.self, forKey: .countedBefore)
+    }
 }
 
 /// Reads one agent's MCP calls from its own files, read-only. A missing or

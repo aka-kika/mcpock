@@ -37,10 +37,14 @@ struct ClaudeCodeUsageReader: UsageReader {
             let size = fileSize(file)
             var offset = cursor.values[path] ?? 0
             // Shrank or was replaced with something shorter: nothing at the
-            // old offset can still be valid, so start this file over.
-            if size < offset { offset = 0 }
+            // old offset can still be valid, so start this file over,
+            // counting only calls newer than the ones it already gave.
+            let restarted = size < offset
+            if restarted { offset = 0 }
             guard size > offset else { continue }
-            let (found, newOffset) = scan(file, from: offset, knownServers: knownServers)
+            var (found, newOffset) = scan(file, from: offset, knownServers: knownServers)
+            if restarted { found = nextCursor.uncounted(found, from: path) }
+            nextCursor.noteCounted(found, from: path)
             events.append(contentsOf: found)
             nextCursor.values[path] = newOffset
         }

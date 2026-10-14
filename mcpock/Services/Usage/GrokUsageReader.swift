@@ -46,6 +46,7 @@ struct GrokUsageReader: UsageReader {
         }
 
         let files = eventFiles(fileManager: fileManager)
+        var next = cursor
         var values = cursor.values
         var events: [UsageEvent] = []
 
@@ -60,19 +61,24 @@ struct GrokUsageReader: UsageReader {
             var startOffset = values[offsetKey] ?? 0
             let storedInode = values[inodeKey]
 
-            // The file shrank or was swapped for a different one: start over.
+            // The file shrank or was swapped for a different one: start over,
+            // counting only calls newer than the ones it already gave.
+            var restarted = false
             if let storedInode, storedInode != inode {
-                startOffset = 0
+                restarted = true
             }
             if startOffset > size {
-                startOffset = 0
+                restarted = true
             }
+            if restarted { startOffset = 0 }
 
             if startOffset < size {
-                let (newEvents, consumedOffset) = GrokUsageReader.readNewLines(
+                var (newEvents, consumedOffset) = GrokUsageReader.readNewLines(
                     atPath: path,
                     from: startOffset
                 )
+                if restarted { newEvents = next.uncounted(newEvents, from: key) }
+                next.noteCounted(newEvents, from: key)
                 events.append(contentsOf: newEvents)
                 values[offsetKey] = consumedOffset
             } else {
@@ -81,7 +87,8 @@ struct GrokUsageReader: UsageReader {
             values[inodeKey] = inode
         }
 
-        return (events, UsageCursor(values: values))
+        next.values = values
+        return (events, next)
     }
 
     // MARK: - Discovery

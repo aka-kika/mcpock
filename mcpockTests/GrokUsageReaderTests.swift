@@ -155,6 +155,25 @@ final class GrokUsageReaderTests: XCTestCase {
         XCTAssertEqual(secondEvents.first?.server, "skill-librarian")
     }
 
+    /// A replaced session file that still holds a call already counted
+    /// (review, 2026-10-14, item 11): only the newer call counts.
+    func testReplacedFileNeverCountsOldCallsTwice() throws {
+        let path = eventsPath()
+        try write([
+            mcpCallStarted(server: "wigolo", tool: "search", ts: "2026-09-20T10:00:00.000Z"),
+        ], to: path)
+        let reader = GrokUsageReader(root: tempRoot)
+        let (_, cursor) = reader.read(since: .empty, knownServers: [])
+
+        try FileManager.default.removeItem(at: path)
+        try write([
+            mcpCallStarted(server: "wigolo", tool: "search", ts: "2026-09-20T10:00:00.000Z"),
+            mcpCallStarted(server: "skill-librarian", tool: "librarian_find", ts: "2026-09-21T09:00:00.000Z"),
+        ], to: path)
+        let (events, _) = reader.read(since: cursor, knownServers: [])
+        XCTAssertEqual(events.map(\.server), ["skill-librarian"])
+    }
+
     /// A malformed line is skipped, never crashes, and does not stop the
     /// valid lines around it from being read.
     func testBadJSONLineSkipped() throws {

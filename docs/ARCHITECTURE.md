@@ -123,7 +123,7 @@ card is open).
 
 | File | Role |
 |------|------|
-| `Services/Usage/UsageReader.swift` | The contract: `UsageEvent` (agent, server, date; nothing else), `UsageCursor`, `UsageReader` |
+| `Services/Usage/UsageReader.swift` | The contract: `UsageEvent` (agent, server, date; nothing else), `UsageCursor` (where each source stopped, and the newest call counted from it: a source that starts over counts only newer calls), `UsageReader` |
 | `Services/Usage/UsageStore.swift` | Runs the readers off the main thread, daily buckets per (agent, normalized server), windows 7 / 30 days / all time, persists counts and cursors to `usage.json`; refresh at most every 10 min after a full cycle |
 | `Services/Usage/UsageReaders.swift` | `UsageReaders.all`: the readers in use |
 | `Services/Usage/ClaudeCodeUsageReader.swift` | `~/.claude/projects/**/*.jsonl`, `mcp__<server>__<tool>`, byte offsets per file |

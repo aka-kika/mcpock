@@ -200,6 +200,21 @@ final class CursorUsageReaderTests: XCTestCase {
         XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 1)
     }
 
+    /// Started over with calls already counted still in the table (a VACUUM
+    /// renumbers rowids too): only the newer call counts (review, 2026-10-14,
+    /// item 11).
+    func testResetDatabaseNeverCountsOldCallsTwice() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:c:old", name: "mcp-serverone-do_thing", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        fixture.putBubble(key: "bubbleId:c:new", name: "mcp-servertwo-do_thing", status: "completed", createdAt: "2026-09-21T10:00:00.000Z")
+        let counted = ISO8601DateFormatter().date(from: "2026-09-20T10:00:00Z")!
+        let stale = UsageCursor(values: [CursorUsageReader.cursorKey: 5_000], newest: [CursorUsageReader.cursorKey: UsageCursor.millis(counted)])
+        let result = CursorUsageReader(databasePath: path).read(since: stale, knownServers: [])
+        XCTAssertEqual(result.events.map(\.server), ["servertwo"])
+        XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 2)
+    }
+
     /// A missing database is not an error: no events, same cursor back.
     func testMissingDatabaseReturnsNoEventsSameCursor() {
         let missingPath = root.appendingPathComponent("does-not-exist.vscdb").path
