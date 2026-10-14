@@ -7,10 +7,11 @@ import Foundation
 /// `MCPOCK_DEMO=1`; off, and invisible, otherwise (no menu, no setting, no
 /// banner). `MCPockApp.init` checks `isActive()` once at launch and, only
 /// then, swaps `HealthMonitor.discover` and `HealthMonitor.probe` for the
-/// closures here, points the monitor/panel at a throwaway `UserDefaults`
-/// suite, and gives `UsageStore` its own fake readers and a scratch
-/// directory. Demo mode never scans this Mac, never spawns a process, never
-/// opens a network connection, and never touches the real status file,
+/// closures here, points the monitor, panel and Settings at a throwaway
+/// `UserDefaults` suite (`AppPreferences.store`), starts no Sparkle updater,
+/// and gives `UsageStore` its own fake readers and a scratch directory.
+/// Demo mode never scans this Mac, never spawns a process, never opens a
+/// network connection, and never touches the real status file,
 /// widget snapshot (unless `--demo-widgets` asks for it), usage file or saved
 /// settings.
 ///
@@ -30,6 +31,15 @@ enum DemoData {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
         arguments.contains("--demo") || environment["MCPOCK_DEMO"] == "1"
+    }
+
+    /// `isActive()` for the running app: never while it hosts unit tests,
+    /// which must keep their own defaults and files.
+    static func isActiveForApp(
+        arguments: [String] = CommandLine.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        environment["XCTestConfigurationFilePath"] == nil && isActive(arguments: arguments, environment: environment)
     }
 
     /// `--demo-widgets` on top of demo mode (1.9.0): the sample set also goes

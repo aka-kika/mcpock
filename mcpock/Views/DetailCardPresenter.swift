@@ -136,7 +136,7 @@ enum SidePanel {
     static func attach(_ panel: NSPanel, to parent: NSWindow) {
         // Theme: the user's choice (nil follows the system), as every mcpock
         // window gets from `AppearanceApplier`.
-        let themeRaw = UserDefaults.standard.string(forKey: AppPreferences.themeKey)
+        let themeRaw = AppPreferences.store.string(forKey: AppPreferences.themeKey)
         panel.appearance = (themeRaw.flatMap(AppTheme.init(rawValue:)) ?? AppPreferences.defaultTheme).nsAppearance
         panel.level = parent.level
         if panel.parent !== parent {

@@ -439,9 +439,9 @@ final class HealthMonitor {
             let results = await withTaskGroup(of: ([String], ProbeResult).self) { group in
                 for instances in specGroups.values {
                     let config = instances[0].config
-                    let fetchTools = instances.contains { $0.state != .healthy }
+                    // Check again always re-reads the tool list (review, 2026-10-14).
                     let ids = instances.map(\.id)
-                    group.addTask { (ids, await probe(config, fetchTools)) }
+                    group.addTask { (ids, await probe(config, true)) }
                 }
                 var out: [String: ProbeResult] = [:]
                 for await (ids, r) in group {
@@ -478,7 +478,8 @@ final class HealthMonitor {
         servers[index].lastChecked = Date()
         if smoothed.state == .healthy {
             // Update cached tools when this probe fetched them; otherwise keep the
-            // last known set (probes only re-fetch on a transition to healthy).
+            // last known set (a timer round re-fetches only on a transition to
+            // healthy; Refresh and Check again always do).
             if let tools = result.tools { servers[index].tools = tools }
             servers[index].failureReason = nil
             servers[index].slowStartSeconds = result.slowStartSeconds
@@ -631,7 +632,7 @@ final class HealthMonitor {
         timerTask = nil
         // Manual mode: no timer at all — probing happens only via "Refresh now"
         // and per-server refresh.
-        guard let interval = AppPreferences.loadProbeInterval().seconds else { return }
+        guard let interval = AppPreferences.loadProbeInterval(from: defaults).seconds else { return }
         timerTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(interval))
@@ -679,9 +680,10 @@ final class HealthMonitor {
         await withTaskGroup(of: ([String], ProbeResult).self) { group in
             for instances in specGroups.values {
                 let config = instances[0].config
-                // Fetch tools if ANY instance needs them (probes only re-fetch on a
-                // transition to healthy).
-                let fetchTools = instances.contains { $0.state != .healthy }
+                // Fetch tools if ANY instance needs them (a timer round re-fetches
+                // only on a transition to healthy), and always on Refresh
+                // (`force`), so a server's new tools show (review, 2026-10-14).
+                let fetchTools = force || instances.contains { $0.state != .healthy }
                 let ids = instances.map(\.id)
                 group.addTask {
                     (ids, await probe(config, fetchTools))

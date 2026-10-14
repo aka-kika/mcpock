@@ -308,7 +308,7 @@ private struct AgentServerRow: View {
     /// agent (a Hermes profile).
     let usageRecordedAs: String?
     @State private var isHovered = false
-    @AppStorage(AppPreferences.usageWindowKey) private var usageWindowRaw = UsageWindow.default.rawValue
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
 
     /// Server rows share the scroll view with the agent rows, whose ids are the
     /// agent labels; a prefix keeps a server called "mcp" apart from the agent.

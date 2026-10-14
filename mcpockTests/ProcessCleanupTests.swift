@@ -463,6 +463,36 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertEqual(outcome, "timeout", "Expected a clean ProbeError.timeout, got \(outcome ?? "nil")")
     }
 
+    /// Review 2026-10-14: a bad Content-Length that arrived before any read
+    /// was waiting was dropped, and the read then waited out its whole
+    /// timeout. It now fails at once with the framing error.
+    func testFramingErrorBeforeTheReadFailsAtOnce() async throws {
+        let runner = try ProcessRunner(
+            command: "/bin/sh", args: ["-c", "printf 'Content-Length: -5\\r\\n\\r\\n'; sleep 30"], env: [:]
+        )
+        try? await Task.sleep(for: .milliseconds(500))   // the header lands with no read parked
+
+        let box = OutcomeBox()
+        let probe = Task.detached {
+            do {
+                _ = try await runner.readMessage(timeout: .seconds(10))
+                box.set("unexpected-data")
+            } catch let e as ProbeError {
+                if case .protocolError = e { box.set("protocol") } else { box.set("other-probeerror") }
+            } catch {
+                box.set("other")
+            }
+        }
+        let deadline = ContinuousClock.now + .seconds(3)
+        while box.get() == nil && ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        let outcome = box.get()
+        probe.cancel()
+        await runner.terminateAndReap()
+        XCTAssertEqual(outcome, "protocol", "fails with the framing error, not after the 10 s timeout")
+    }
+
     /// The port wait must give up on time when the server prints nothing.
     /// It used to block in `availableData` past its own timeout (CI, 2026-09-25).
     func testReadLineTimesOutOnASilentProcess() throws {

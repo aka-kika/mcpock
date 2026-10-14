@@ -251,6 +251,34 @@ final class RefreshTests: XCTestCase {
         XCTAssertEqual(postiz.failureReason, "failed: new-launcher", "checked again, not the old failure")
         XCTAssertEqual(probed.items.last, "new-launcher")
     }
+
+    /// Review 2026-10-14: a healthy server's tool list was never asked for
+    /// again, so tools it gained later never showed. A timer round still
+    /// skips it (cheap); Refresh and Check again always ask.
+    @MainActor
+    func testRefreshAndCheckAgainReadToolsAgain() async throws {
+        let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        let monitor = HealthMonitor(defaults: defaults)
+        let config = ServerConfig(id: "Test:reed", name: "reed", source: ServerSource(label: "Test"), projectPath: nil,
+                                  transport: .stdio, command: "reed", args: [], env: [:], url: nil, headers: [:])
+        let asked = LockedList()
+        monitor.probe = { _, fetchTools in
+            asked.append(fetchTools ? "tools" : "no tools")
+            return ProbeResult(state: .healthy, failureReason: nil, tools: fetchTools ? [] : nil)
+        }
+        monitor.discover = { [config] }
+        await monitor.startRefreshAll().value
+        XCTAssertEqual(monitor.servers.first?.state, .healthy)
+
+        await monitor.timerTick()
+        XCTAssertEqual(asked.items.last, "no tools", "a timer round keeps the healthy server's tools")
+        await monitor.startRefreshAll().value
+        XCTAssertEqual(asked.items.last, "tools", "Refresh asks again")
+        await monitor.refresh(groupName: "reed")
+        XCTAssertEqual(asked.items.last, "tools", "Check again asks again")
+    }
 }
 
 /// A Bool that a `@Sendable` closure can set.

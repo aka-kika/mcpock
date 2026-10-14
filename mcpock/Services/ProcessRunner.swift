@@ -14,6 +14,10 @@ final class ProcessRunner: @unchecked Sendable {
         var pendingContinuations: [(id: UInt64, cont: CheckedContinuation<Data, Error>)] = []
         var nextContinuationID: UInt64 = 0
         var closed = false
+        /// A framing error that arrived while no read was waiting. Kept for the
+        /// next read, which fails at once instead of waiting out the timeout
+        /// (review, 2026-10-14). The stream can't recover from one, so it stays.
+        var framingError: Error?
     }
 
     private let process: Process
@@ -445,6 +449,8 @@ final class ProcessRunner: @unchecked Sendable {
                 if !state.pendingContinuations.isEmpty {
                     let cont = state.pendingContinuations.removeFirst().cont
                     pending.append((cont, .failure(error)))
+                } else {
+                    state.framingError = error
                 }
             }
             return pending
@@ -472,6 +478,9 @@ final class ProcessRunner: @unchecked Sendable {
                 let immediate: Result<Data, Error>? = state.withLock { state in
                     if !state.messageQueue.isEmpty {
                         return .success(state.messageQueue.removeFirst())
+                    }
+                    if let error = state.framingError {
+                        return .failure(error)
                     }
                     if state.closed {
                         return .failure(ProbeError.noData)

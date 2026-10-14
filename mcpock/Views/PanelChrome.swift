@@ -201,7 +201,7 @@ struct WindowReader: NSViewRepresentable {
 /// behaviour when off. `.never`, not `.hidden`: `.hidden` still shows them on
 /// macOS whenever a mouse is connected. Trackpad and wheel scrolling still work.
 struct PanelScrollIndicators: ViewModifier {
-    @AppStorage(AppPreferences.hideScrollBarsKey) private var hide = AppPreferences.defaultHideScrollBars
+    @AppStorage(AppPreferences.hideScrollBarsKey, store: AppPreferences.store) private var hide = AppPreferences.defaultHideScrollBars
 
     func body(content: Content) -> some View {
         content.scrollIndicators(Self.visibility(hide: hide))

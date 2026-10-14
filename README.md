@@ -35,13 +35,15 @@ them, checks every server, and shows you what needs attention and why, so you
   standard MCP format. The same server in several agents shows as one row.
 - **Checks each one.** It starts a local server (or calls a remote one), does
   the MCP handshake, asks for its tool list, then closes it. Every 1 minute to
-  4 hours, or only when you click Refresh.
+  4 hours, or only when you click Refresh. Each round also reads the configs
+  again, so new and changed servers show up. A server that is already fine
+  keeps its tool list between rounds; Refresh and Check again ask for it anew.
 - **Shows health as a shape, not only a colour:**
 
   | Shape | Means |
   |-------|-------|
   | Filled dot (green) | Fine: it started and listed its tools |
-  | Ring (amber) | Slow (no answer in 10 s) or needs sign-in (HTTP 401/403) |
+  | Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
   | Ring (grey) | Still checking |
   | Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
   | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside |
@@ -103,8 +105,8 @@ Needs **macOS 26 or later** on Apple Silicon.
 
 **First launch, good to know:**
 
-- mcpock starts checking the first time you click its icon. On a Mac with many
-  agents the first list takes about 10 seconds.
+- mcpock starts checking as soon as it launches, before you open the panel.
+  On a Mac with many agents the first list takes about 10 seconds.
 - If one of your servers lives in **Documents, Desktop or Downloads**, macOS
   asks whether mcpock may open that folder. Click **Allow**: mcpock has to start
   the server from there to check it. If you clicked Don't Allow, turn it on in
@@ -363,7 +365,8 @@ Click it. The card shows the real error: "command not found" (the program isn't
 installed, or isn't on the PATH mcpock uses: it adds `/opt/homebrew/bin`,
 `/usr/local/bin` and `~/.local/bin`; use a full path in the config if needed),
 "quit on start" with the server's own error text (often a missing API key), or
-no answer in 10 seconds. Copy the error, fix it in the agent's config, then
+no answer in time (20 seconds for a local server, tried twice; 10 seconds for
+a remote one). Copy the error, fix it in the agent's config, then
 Check again.
 
 **It says "Needs sign-in".**
@@ -398,11 +401,13 @@ counts as a problem.
 
 **I added a server and it doesn't show.**
 Click **Refresh** in the footer: it looks for configs again and checks
-everything. The timer only re-checks servers it already knows.
+everything. The timer reads the configs again every round too, so the new
+server also shows up on its own at the next round.
 
 **My agent says mcpock isn't running or hasn't checked yet.**
-Open the panel once: mcpock starts checking on the first click, and writes the
-status file after that.
+Make sure mcpock is running (start it from Applications if its icon isn't in
+the menu bar). It starts checking at launch and writes the status file once the
+first check is done, then ask again.
 
 **Hidden servers?**
 Still checked, just not listed. Change it in Settings > Servers.

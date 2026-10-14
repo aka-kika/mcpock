@@ -185,4 +185,14 @@ final class DiffersTests: XCTestCase {
         XCTAssertEqual(source.target, "https://example.com/mcp")
         XCTAssertFalse(String(describing: source).contains("Bearer secret"))
     }
+
+    /// A `"builtin": true` server runs inside its own app; its declaration is
+    /// never "set up differently" from another agent's (review, 2026-10-14).
+    func testBuiltinDeclarationIsNeverCompared() {
+        var builtin = stdio(.grok, command: "minimax-internal", args: [])
+        builtin.builtin = true
+        XCTAssertTrue(Differs.detect([stdio(.code), builtin]).isEmpty)
+        XCTAssertEqual(Differs.detect([stdio(.code), stdio(.cursor, command: "uvx"), builtin]).map(\.label).sorted(),
+                       [ServerSource.code.label, ServerSource.cursor.label].sorted())
+    }
 }

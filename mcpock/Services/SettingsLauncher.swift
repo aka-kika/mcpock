@@ -124,7 +124,7 @@ enum SettingsLauncher {
         window.delegate = WindowCloser.shared
         // Apply the user's theme choice directly (NSApp.appearance is deliberately
         // left nil so the menu-bar icon follows the system — see AppearanceApplier).
-        let themeRaw = UserDefaults.standard.string(forKey: AppPreferences.themeKey)
+        let themeRaw = AppPreferences.store.string(forKey: AppPreferences.themeKey)
         let theme = themeRaw.flatMap(AppTheme.init(rawValue:)) ?? AppPreferences.defaultTheme
         window.appearance = theme.nsAppearance
 

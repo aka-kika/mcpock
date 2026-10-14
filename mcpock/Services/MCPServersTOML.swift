@@ -4,11 +4,12 @@ import Foundation
 /// by Grok (`~/.grok/config.toml`) and Codex (`~/.codex/config.toml`).
 ///
 /// Servers are TOML tables — `[mcp_servers.<name>]` with `command` / `args` / `url` /
-/// `enabled`, and optional `[mcp_servers.<name>.env]` and `[mcp_servers.<name>.headers]`
-/// sub-tables.
+/// `type` / `enabled`, and `env` and `headers` (Codex: `http_headers`) either as
+/// inline tables (`env = { KEY = "v" }`, how Codex documents it) or as
+/// `[mcp_servers.<name>.env]` sub-tables.
 /// This is a *minimal* TOML reader scoped to exactly that shape (no full TOML spec:
-/// no inline tables, no dotted keys inside a table, no integers/dates), so it stays
-/// dependency-free. Output matches the JSON `mcpServers` map so it reuses the same
+/// no dotted keys inside a table, no multi-line strings, no integers/dates), so it
+/// stays dependency-free. Output matches the JSON `mcpServers` map so it reuses the same
 /// `ConfigDiscovery` parsing pipeline as Claude Code / Cursor.
 enum MCPServersTOML {
     /// Parse `[mcp_servers.*]` tables into a `name → entry` map. `enabled = false`
@@ -23,6 +24,9 @@ enum MCPServersTOML {
         var pendingArrayKey: String?
         var pendingArrayText = ""
         var pendingArrayServer: String?
+        // Open `[` minus `]` so far, outside strings: a `]` inside an element
+        // (`"--glob=[a]"`) does not end the array (review, 2026-10-14).
+        var pendingArrayDepth = 0
 
         func serverName(for path: [String]) -> String? {
             guard path.count >= 2, path[0] == "mcp_servers" else { return nil }
@@ -45,7 +49,8 @@ enum MCPServersTOML {
 
             if pendingArrayKey != nil {
                 pendingArrayText += "\n" + rawLine
-                if rawLine.contains("]") { flushArray() }
+                pendingArrayDepth += bracketDepth(rawLine)
+                if pendingArrayDepth <= 0 { flushArray() }
                 continue
             }
 
@@ -77,21 +82,30 @@ enum MCPServersTOML {
             // `env` and `headers` are the only nested tables Grok writes. Dropping
             // `headers` probes an authenticated server with no Authorization and
             // reports a false HTTP 401 (reed-md).
-            let submapKey: String? = (path.count == 3 && (path[2] == "env" || path[2] == "headers")) ? path[2] : nil
+            let submapKey: String? = path.count == 3 ? submapName(path[2]) : nil
 
             // Multi-line array opener: `args = [` with no closing bracket yet.
-            if isServerLevel, valuePart.hasPrefix("["), !valuePart.contains("]") {
+            if isServerLevel, valuePart.hasPrefix("["), bracketDepth(valuePart) > 0 {
                 pendingArrayKey = key
                 pendingArrayText = valuePart
                 pendingArrayServer = name
+                pendingArrayDepth = bracketDepth(valuePart)
                 continue
             }
 
             if isServerLevel {
                 switch key {
-                case "command", "url":
+                case "command", "url", "type":
                     var e = entries[name] ?? [:]
                     e[key] = unquote(valuePart)
+                    entries[name] = e
+                case "env", "headers", "http_headers":
+                    guard valuePart.hasPrefix("{") else { break }
+                    var e = entries[name] ?? [:]
+                    let mapKey = submapName(key) ?? key
+                    var map = (e[mapKey] as? [String: String]) ?? [:]
+                    map.merge(parseInlineTable(valuePart)) { _, new in new }
+                    e[mapKey] = map
                     entries[name] = e
                 case "args":
                     var e = entries[name] ?? [:]
@@ -123,6 +137,90 @@ enum MCPServersTOML {
     }
 
     // MARK: - Minimal TOML helpers
+
+    /// The entry key a nested table fills: `env`, or `headers` (Codex writes
+    /// `http_headers`). Nil for any other table.
+    private static func submapName(_ key: String) -> String? {
+        switch key {
+        case "env": return "env"
+        case "headers", "http_headers": return "headers"
+        default: return nil
+        }
+    }
+
+    /// `[` minus `]` in a line, skipping both inside quoted strings.
+    private static func bracketDepth(_ line: String) -> Int {
+        var depth = 0
+        forEachUnquoted(line) { c, _ in
+            if c == "[" { depth += 1 } else if c == "]" { depth -= 1 }
+            return false
+        }
+        return depth
+    }
+
+    /// Calls `body` with each character outside quoted strings (and its
+    /// index) until it returns true. Double-quoted (basic) strings honour
+    /// backslash escapes; single-quoted (literal) strings have none.
+    private static func forEachUnquoted(_ s: String, _ body: (Character, String.Index) -> Bool) {
+        var quote: Character?
+        var escaped = false
+        for idx in s.indices {
+            let c = s[idx]
+            if escaped {
+                escaped = false
+            } else if let q = quote {
+                if q == "\"", c == "\\" {
+                    escaped = true
+                } else if c == q {
+                    quote = nil
+                }
+            } else if c == "\"" || c == "'" {
+                quote = c
+            } else if body(c, idx) {
+                return
+            }
+        }
+    }
+
+    /// `{ KEY = "v", "OTHER" = 'w' }` → its string pairs. A value that isn't a
+    /// string (a number, a boolean) is kept as written.
+    private static func parseInlineTable(_ text: String) -> [String: String] {
+        var inner = text.trimmingCharacters(in: .whitespaces)
+        guard inner.hasPrefix("{") else { return [:] }
+        inner.removeFirst()
+        if let close = lastUnquotedIndex(of: "}", in: inner) { inner = String(inner[..<close]) }
+        var map: [String: String] = [:]
+        for pair in splitUnquoted(inner, on: ",") {
+            guard let eq = firstUnquotedIndex(of: "=", in: pair) else { continue }
+            let key = unquote(String(pair[..<eq]))
+            guard !key.isEmpty else { continue }
+            map[key] = unquote(String(pair[pair.index(after: eq)...]))
+        }
+        return map
+    }
+
+    private static func splitUnquoted(_ s: String, on separator: Character) -> [String] {
+        var parts: [String] = []
+        var start = s.startIndex
+        forEachUnquoted(s) { c, idx in
+            if c == separator {
+                parts.append(String(s[start..<idx]))
+                start = s.index(after: idx)
+            }
+            return false
+        }
+        parts.append(String(s[start...]))
+        return parts
+    }
+
+    private static func lastUnquotedIndex(of target: Character, in s: String) -> String.Index? {
+        var found: String.Index?
+        forEachUnquoted(s) { c, idx in
+            if c == target { found = idx }
+            return false
+        }
+        return found
+    }
 
     /// Drop an unquoted `#` comment (and everything after it) from a line.
     /// Respects single/double quotes and backslash escapes inside basic strings.
@@ -172,30 +270,63 @@ enum MCPServersTOML {
 
     /// Index of the first `target` character not inside a quoted string.
     private static func firstUnquotedIndex(of target: Character, in s: String) -> String.Index? {
-        var quote: Character?
-        var idx = s.startIndex
-        while idx < s.endIndex {
-            let c = s[idx]
-            if let q = quote {
-                if c == q { quote = nil }
-            } else if c == "\"" || c == "'" {
-                quote = c
-            } else if c == target {
-                return idx
-            }
-            idx = s.index(after: idx)
+        var found: String.Index?
+        forEachUnquoted(s) { c, idx in
+            if c == target { found = idx; return true }
+            return false
         }
-        return nil
+        return found
     }
 
-    /// Strip one layer of matching surrounding quotes.
+    /// Strip one layer of matching surrounding quotes. A double-quoted (basic)
+    /// string also has its escapes read (`\"`, `\\`, `\n`, `\u00e9`…); a
+    /// single-quoted (literal) one is taken as written.
     private static func unquote(_ s: String) -> String {
         let v = s.trimmingCharacters(in: .whitespaces)
-        if v.count >= 2,
-           (v.hasPrefix("\"") && v.hasSuffix("\"")) || (v.hasPrefix("'") && v.hasSuffix("'")) {
+        if v.count >= 2, v.hasPrefix("'"), v.hasSuffix("'") {
             return String(v.dropFirst().dropLast())
         }
+        if v.count >= 2, v.hasPrefix("\""), v.hasSuffix("\"") {
+            let chars = Array(v)
+            var i = 0
+            return readString(chars, &i)
+        }
         return v
+    }
+
+    /// Reads the quoted string starting at `chars[i]` (its opening quote) and
+    /// leaves `i` on its closing quote.
+    private static func readString(_ chars: [Character], _ i: inout Int) -> String {
+        let quote = chars[i]
+        var s = ""
+        i += 1
+        while i < chars.count, chars[i] != quote {
+            if chars[i] == "\\", quote == "\"", i + 1 < chars.count {
+                let n = chars[i + 1]
+                i += 2
+                switch n {
+                case "n": s += "\n"
+                case "t": s += "\t"
+                case "r": s += "\r"
+                case "b": s += "\u{08}"
+                case "f": s += "\u{0C}"
+                case "u", "U":
+                    let width = n == "u" ? 4 : 8
+                    let hex = String(chars[min(i, chars.count)..<min(i + width, chars.count)])
+                    if hex.count == width, let code = UInt32(hex, radix: 16), let scalar = Unicode.Scalar(code) {
+                        s.unicodeScalars.append(scalar)
+                        i += width
+                    } else {
+                        s.append(n)
+                    }
+                default: s.append(n)   // \" and \\ included
+                }
+                continue
+            }
+            s.append(chars[i])
+            i += 1
+        }
+        return s
     }
 
     /// Pull the quoted string elements out of a (possibly multi-line) TOML array.
@@ -207,26 +338,7 @@ enum MCPServersTOML {
         while i < chars.count {
             let c = chars[i]
             if c == "\"" || c == "'" {
-                let quote = c
-                var s = ""
-                i += 1
-                while i < chars.count, chars[i] != quote {
-                    if chars[i] == "\\", quote == "\"", i + 1 < chars.count {
-                        let n = chars[i + 1]
-                        switch n {
-                        case "n": s += "\n"
-                        case "t": s += "\t"
-                        case "\"": s += "\""
-                        case "\\": s += "\\"
-                        default: s.append(n)
-                        }
-                        i += 2
-                        continue
-                    }
-                    s.append(chars[i])
-                    i += 1
-                }
-                result.append(s)
+                result.append(readString(chars, &i))
             }
             i += 1
         }

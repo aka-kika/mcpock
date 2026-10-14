@@ -100,22 +100,30 @@ struct HermesUsageReader: UsageReader {
             WHERE role = 'tool' AND tool_name LIKE 'mcp%' AND id > ?
             ORDER BY id ASC
             """
+        // A failed prepare or a step cut short (SQLITE_BUSY while Hermes
+        // writes) moves the cursor only past the rows actually read, so the
+        // rest is read next time instead of skipped for good (review,
+        // 2026-10-14). Same as the Cursor reader.
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
-            return ([], maxID)
+            return ([], nil)
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, startID)
 
         var events: [UsageEvent] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var lastRead = startID
+        var step = sqlite3_step(stmt)
+        while step == SQLITE_ROW {
+            defer { step = sqlite3_step(stmt) }
+            lastRead = sqlite3_column_int64(stmt, 0)
             guard let namePtr = sqlite3_column_text(stmt, 1) else { continue } // bad line: no name, skip it
             let name = String(cString: namePtr)
             let time = sqlite3_column_double(stmt, 2)
             guard time > 0, let server = serverName(from: name, knownServers: knownServers) else { continue }
             events.append(UsageEvent(agent: agentLabel, server: server, date: Date(timeIntervalSince1970: time)))
         }
-        return (events, maxID)
+        return (events, step == SQLITE_DONE ? maxID : lastRead)
     }
 
     private static func queryMaxID(_ db: OpaquePointer) -> Int64? {

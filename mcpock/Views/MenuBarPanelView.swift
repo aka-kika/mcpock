@@ -8,7 +8,7 @@ import SwiftUI
 struct MenuBarPanelView: View {
     @Bindable var monitor: HealthMonitor
     @Bindable var panel: PanelState
-    @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
     @Environment(\.inGlassPanel) private var inGlassPanel
     @Environment(\.colorScheme) private var systemColorScheme
     @FocusState private var searchFocused: Bool

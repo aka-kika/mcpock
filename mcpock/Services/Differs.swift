@@ -28,6 +28,13 @@ enum Differs {
         !ownLaunchAgents.contains(agent)
     }
 
+    /// The declarations that take part. A `builtin` server runs inside its
+    /// own app, so its declaration says nothing about how it launches: never
+    /// compared (review, 2026-10-14).
+    static func compared(_ configs: [ServerConfig]) -> [ServerConfig] {
+        configs.filter { !$0.builtin && isCompared(agent: $0.source.label) }
+    }
+
     /// A normalised launch target. Two declarations with equal targets launch the
     /// same thing, whatever their env, headers or working directory.
     struct LaunchTarget: Hashable, Sendable {
@@ -75,7 +82,7 @@ enum Differs {
     /// one). With no strict majority (a 1-vs-1 or 2-vs-2 split) there is no "right"
     /// setup to measure against, so every source is named.
     static func detect(_ allConfigs: [ServerConfig]) -> [DiffNote] {
-        let configs = allConfigs.filter { isCompared(agent: $0.source.label) }
+        let configs = compared(allConfigs)
         guard configs.count > 1 else { return [] }
         let targets = configs.map(launchTarget)
         var counts: [LaunchTarget: Int] = [:]
@@ -114,7 +121,7 @@ enum Differs {
     /// a new agent that copies an existing setup keeps the acknowledgement while
     /// a new, removed or changed target breaks it.
     static func fingerprints(_ configs: [ServerConfig]) -> [String] {
-        let compared = configs.filter { isCompared(agent: $0.source.label) }
+        let compared = Self.compared(configs)
         return Set(compared.map { fingerprint(launchTarget($0)) }).sorted()
     }
 
@@ -133,7 +140,7 @@ enum Differs {
     /// Marking saves all of them, the majority too, so a later split (an agent
     /// removed, no majority left) still reads as intended.
     static func acknowledgements(_ configs: [ServerConfig]) -> [String] {
-        let compared = configs.filter { isCompared(agent: $0.source.label) }
+        let compared = Self.compared(configs)
         return Set(compared.map(acknowledgement)).sorted()
     }
 
@@ -148,7 +155,7 @@ enum Differs {
     ) -> (open: [DiffNote], acknowledged: [DiffNote]) {
         guard let saved, !saved.isEmpty, !notes.isEmpty else { return (notes, []) }
         let savedSet = Set(saved)
-        let compared = configs.filter { isCompared(agent: $0.source.label) }
+        let compared = Self.compared(configs)
         var open: [DiffNote] = []
         var acknowledged: [DiffNote] = []
         for note in notes {

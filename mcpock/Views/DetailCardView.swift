@@ -6,7 +6,7 @@ import SwiftUI
 struct DetailCardHost: View {
     @Bindable var state: PanelState
     let onHeight: (CGFloat) -> Void
-    @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
     @Environment(\.colorScheme) private var colorScheme
 
     private var appTheme: AppTheme { AppTheme(rawValue: themeRaw) ?? .system }

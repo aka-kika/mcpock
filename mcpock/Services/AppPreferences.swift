@@ -3,6 +3,12 @@ import SwiftUI
 
 /// Persisted user preferences (UserDefaults via AppStorage keys).
 enum AppPreferences {
+    /// Where the app keeps its own settings: `.standard`, except in demo mode
+    /// (`DemoData`), which gets a throwaway suite, so a demo run never reads
+    /// or writes the user's real settings, theme included (review,
+    /// 2026-10-14). Decided once, on first use, from the launch arguments.
+    static let store: UserDefaults = DemoData.isActiveForApp() ? DemoData.makeThrowawayDefaults() : .standard
+
     static let themeKey = "appTheme"
     static let defaultTheme = AppTheme.system
 
@@ -10,11 +16,11 @@ enum AppPreferences {
     /// `HealthMonitor.normalizedName` so a hidden name survives case/separator variants.
     static let hiddenServersKey = "hiddenServers"
 
-    static func loadHiddenServers(from defaults: UserDefaults = .standard) -> Set<String> {
+    static func loadHiddenServers(from defaults: UserDefaults = store) -> Set<String> {
         Set(defaults.stringArray(forKey: hiddenServersKey) ?? [])
     }
 
-    static func saveHiddenServers(_ names: Set<String>, to defaults: UserDefaults = .standard) {
+    static func saveHiddenServers(_ names: Set<String>, to defaults: UserDefaults = store) {
         defaults.set(names.sorted(), forKey: hiddenServersKey)
     }
 
@@ -23,11 +29,11 @@ enum AppPreferences {
     /// servers whose spawn has side effects (e.g. OAuth login pages).
     static let pausedServersKey = "pausedServers"
 
-    static func loadPausedServers(from defaults: UserDefaults = .standard) -> Set<String> {
+    static func loadPausedServers(from defaults: UserDefaults = store) -> Set<String> {
         Set(defaults.stringArray(forKey: pausedServersKey) ?? [])
     }
 
-    static func savePausedServers(_ names: Set<String>, to defaults: UserDefaults = .standard) {
+    static func savePausedServers(_ names: Set<String>, to defaults: UserDefaults = store) {
         defaults.set(names.sorted(), forKey: pausedServersKey)
     }
 
@@ -36,11 +42,11 @@ enum AppPreferences {
     /// `HealthMonitor.setPinned` unhides whatever it pins.
     static let pinnedServersKey = "pinnedServers"
 
-    static func loadPinnedServers(from defaults: UserDefaults = .standard) -> Set<String> {
+    static func loadPinnedServers(from defaults: UserDefaults = store) -> Set<String> {
         Set(defaults.stringArray(forKey: pinnedServersKey) ?? [])
     }
 
-    static func savePinnedServers(_ names: Set<String>, to defaults: UserDefaults = .standard) {
+    static func savePinnedServers(_ names: Set<String>, to defaults: UserDefaults = store) {
         defaults.set(names.sorted(), forKey: pinnedServersKey)
     }
 
@@ -53,7 +59,7 @@ enum AppPreferences {
     /// fingerprints and still reads (`Differs.split`).
     static let differsAcknowledgedKey = "differsAcknowledged"
 
-    static func loadDiffersAcknowledged(from defaults: UserDefaults = .standard) -> [String: [String]] {
+    static func loadDiffersAcknowledged(from defaults: UserDefaults = store) -> [String: [String]] {
         switch defaults.object(forKey: differsAcknowledgedKey) {
         case let text as String:
             // The stored form, and what a `-differsAcknowledged '{"feed":[…]}'`
@@ -70,7 +76,7 @@ enum AppPreferences {
         }
     }
 
-    static func saveDiffersAcknowledged(_ acknowledged: [String: [String]], to defaults: UserDefaults = .standard) {
+    static func saveDiffersAcknowledged(_ acknowledged: [String: [String]], to defaults: UserDefaults = store) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(acknowledged.mapValues { $0.sorted() }),
@@ -93,12 +99,12 @@ enum AppPreferences {
     /// so future intervals need no migration.
     static let probeIntervalKey = "probeInterval"
 
-    static func loadProbeInterval(from defaults: UserDefaults = .standard) -> ProbeInterval {
+    static func loadProbeInterval(from defaults: UserDefaults = store) -> ProbeInterval {
         guard defaults.object(forKey: probeIntervalKey) != nil else { return .default }
         return ProbeInterval.fromStored(defaults.integer(forKey: probeIntervalKey))
     }
 
-    static func saveProbeInterval(_ interval: ProbeInterval, to defaults: UserDefaults = .standard) {
+    static func saveProbeInterval(_ interval: ProbeInterval, to defaults: UserDefaults = store) {
         defaults.set(interval.rawValue, forKey: probeIntervalKey)
     }
 
@@ -113,17 +119,17 @@ enum AppPreferences {
     static let openPanelHotKeyKey = "openPanelHotKey"
     static let defaultOpenPanelHotKey = true
 
-    static func loadOpenPanelHotKey(from defaults: UserDefaults = .standard) -> Bool {
+    static func loadOpenPanelHotKey(from defaults: UserDefaults = store) -> Bool {
         defaults.object(forKey: openPanelHotKeyKey) as? Bool ?? defaultOpenPanelHotKey
     }
     static let defaultUsageWindow = UsageWindow.default
 
-    static func loadUsageWindow(from defaults: UserDefaults = .standard) -> UsageWindow {
+    static func loadUsageWindow(from defaults: UserDefaults = store) -> UsageWindow {
         guard defaults.object(forKey: usageWindowKey) != nil else { return defaultUsageWindow }
         return UsageWindow(rawValue: defaults.integer(forKey: usageWindowKey)) ?? defaultUsageWindow
     }
 
-    static func saveUsageWindow(_ window: UsageWindow, to defaults: UserDefaults = .standard) {
+    static func saveUsageWindow(_ window: UsageWindow, to defaults: UserDefaults = store) {
         defaults.set(window.rawValue, forKey: usageWindowKey)
     }
 }

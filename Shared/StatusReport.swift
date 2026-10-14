@@ -23,7 +23,7 @@ enum StatusLoad: Sendable {
 /// `StatusReportTests` runs them on a fixture file.
 enum StatusReport {
     static let notRunningYet = "mcpock isn't running or hasn't checked yet. "
-        + "Open mcpock from the menu bar (its first check starts when you open its panel), then ask again."
+        + "Start mcpock if it isn't running (it checks as soon as it starts), then ask again in a minute."
 
     /// One line on how much to trust the snapshot, or nil when it is fresh.
     static func freshnessNote(_ status: MCPockStatus, now: Date, isRunning: Bool) -> String? {

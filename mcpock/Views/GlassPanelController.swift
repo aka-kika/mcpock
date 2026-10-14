@@ -85,7 +85,7 @@ final class GlassPanelController: NSObject {
     // MARK: - Status item
 
     private func syncWithTheme() {
-        let themeRaw = UserDefaults.standard.string(forKey: AppPreferences.themeKey)
+        let themeRaw = AppPreferences.store.string(forKey: AppPreferences.themeKey)
         guard !isSyncing, syncedThemeRaw != .some(themeRaw) else { return }
         isSyncing = true
         defer { isSyncing = false }

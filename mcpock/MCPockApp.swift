@@ -17,7 +17,7 @@ struct MCPockApp: App {
     /// `monitor` and `glassPanel`. Nil while hosting unit tests.
     @State private var updateController: UpdateController?
     /// Read so the MenuBarExtra item hides the moment the theme turns Glass.
-    @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
 
     private static let isHostingTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
@@ -34,16 +34,17 @@ struct MCPockApp: App {
         // fully offline sample set instead of the user's real setup, never
         // written to her real files or defaults. See `DemoData`. Off, and
         // invisible, otherwise; never true while hosting tests.
-        let isDemo = !isHostingTests && DemoData.isActive()
+        let isDemo = DemoData.isActiveForApp()
         // The one-time settings copy from the old com.mcpbar.app domain (1.6.0)
         // runs BEFORE anything reads defaults: HealthMonitor.init loads the
         // hidden, paused and marked-as-intended servers once. In 1.6.0 the copy
         // ran after it, so the first launch showed none of them (1.6.1). Demo
         // mode skips it too: it must never read or write the user's real domain.
         if !isHostingTests && !isDemo { SettingsMigration.migrateIfNeeded() }
-        // Demo mode's monitor and panel persist into a throwaway suite, never
-        // `.standard` (the user's real saved pins, hidden/paused servers, theme…).
-        let monitorDefaults = isDemo ? DemoData.makeThrowawayDefaults() : .standard
+        // Demo mode's monitor, panel and Settings persist into a throwaway
+        // suite, never `.standard` (the user's real saved pins, hidden/paused
+        // servers, theme…): `AppPreferences.store`.
+        let monitorDefaults = AppPreferences.store
         if isDemo { DemoData.seedPreferences(monitorDefaults) }
         let monitor = HealthMonitor(defaults: monitorDefaults)
         if isDemo {
@@ -81,13 +82,17 @@ struct MCPockApp: App {
         // In-app updates (round 10): never started while hosting tests (the
         // guard above already returned by then), so a test run never reaches
         // the network or shows Sparkle's permission prompt.
-        let updateController = UpdateController()
-        _updateController = State(initialValue: updateController)
-        SettingsLauncher.updateController = updateController
+        // Not in demo mode either: it opens no network connection (review,
+        // 2026-10-14), so Settings shows no update controls there.
+        if !isDemo {
+            let updateController = UpdateController()
+            _updateController = State(initialValue: updateController)
+            SettingsLauncher.updateController = updateController
+        }
         // ⌃⌥M opens and closes the panel from any app (1.10). Never while
         // hosting tests (returned above): a test run must not take the key.
-        // Read from `.standard` like the theme, since Settings writes it there.
-        GlobalHotKey.shared.start { PanelToggle.toggle() }
+        // Read from the same store as the theme, since Settings writes it there.
+        GlobalHotKey.shared.start(defaults: AppPreferences.store) { PanelToggle.toggle() }
         // A full check cycle just finished. The usage store starts only once
         // discovery has named the servers: the Cursor and Hermes readers split
         // call names against them, and a reader's cursor never goes back, so a

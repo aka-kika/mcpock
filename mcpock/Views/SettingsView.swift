@@ -19,7 +19,7 @@ struct SettingsView: View {
     /// Settings on a pane and the window remembers it while hidden.
     @Bindable var selection: SettingsSelection
 
-    @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
     @Environment(\.colorScheme) private var systemColorScheme
 
     private var appTheme: AppTheme { AppTheme(rawValue: themeRaw) ?? .system }

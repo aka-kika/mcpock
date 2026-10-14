@@ -166,8 +166,9 @@ and signed with the app.
 
 **Two cadences, kept apart on purpose.**
 
-- **Discovery** (registry + scan + aka) runs when the monitor starts (the first
-  time the panel opens) and on **Refresh** in the footer (`startRefreshAll()`
+- **Discovery** (registry + scan + aka) runs when the monitor starts (at
+  launch, 1.7.1), at the start of every timer round (`timerTick`), on
+  **Check again**, and on **Refresh** in the footer (`startRefreshAll()`
   → `refreshAll()`). It runs in `Task.detached(priority: .utility)` (the
   replaceable `HealthMonitor.discover` closure, stubbed in tests), then `HealthMonitor.merged`
   folds it into `servers` on the main actor: a server whose id and probe spec
@@ -191,7 +192,8 @@ browser login), so `shouldProbe` filters first:
 **One cycle.**
 
 1. A `TaskGroup` probes every due target in parallel, off the main actor.
-   Tools are fetched only when a server moves **into** healthy.
+   On a timer round, tools are fetched only when a server moves **into**
+   healthy; Refresh (`force`) and Check again always fetch them.
 2. Each result is applied on the main actor as soon as it arrives
    (`apply(_:at:)`), so the list fills in live.
 3. **Smoothing** (`smoothedState`): one transient failure (a timeout) shows
@@ -210,7 +212,7 @@ browser login), so `shouldProbe` filters first:
 ```
 resolve command (PATH, ~, env; app-bundle binary → ELECTRON_RUN_AS_NODE=1)
   → spawn (ProcessRunner)
-  → write initialize (one JSON object + "\n")    read reply by id, 10 s budget
+  → write initialize (one JSON object + "\n")    read reply by id, 20 s budget (retried once)
   → write notifications/initialized
   → write tools/list (only if needed)           read reply by id
   → terminateAndReap(): SIGTERM the tree, wait, SIGKILL the tree

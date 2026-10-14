@@ -14,11 +14,11 @@ struct SettingsGeneralPane: View {
     var statusFilePath: String = MCPockStatus.defaultDirectory()
         .appendingPathComponent(MCPockStatus.fileName).path
 
-    @AppStorage(AppPreferences.themeKey) private var themeRaw = AppPreferences.defaultTheme.rawValue
-    @AppStorage(AppPreferences.probeIntervalKey) private var probeIntervalRaw = ProbeInterval.default.rawValue
-    @AppStorage(AppPreferences.hideScrollBarsKey) private var hideScrollBars = AppPreferences.defaultHideScrollBars
-    @AppStorage(AppPreferences.usageWindowKey) private var usageWindowRaw = UsageWindow.default.rawValue
-    @AppStorage(AppPreferences.openPanelHotKeyKey) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
+    @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.probeIntervalKey, store: AppPreferences.store) private var probeIntervalRaw = ProbeInterval.default.rawValue
+    @AppStorage(AppPreferences.hideScrollBarsKey, store: AppPreferences.store) private var hideScrollBars = AppPreferences.defaultHideScrollBars
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
+    @AppStorage(AppPreferences.openPanelHotKeyKey, store: AppPreferences.store) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
     @State private var exportNote: String?

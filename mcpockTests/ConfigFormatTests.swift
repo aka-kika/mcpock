@@ -71,6 +71,37 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertEqual(servers["hig"]?["args"] as? [String], [])
     }
 
+    /// Review 2026-10-14: a `]` inside a quoted element ended a multi-line
+    /// array early; escapes stayed in strings; `type` and inline `env` /
+    /// `headers` tables (how Codex documents them) were dropped.
+    func testTOMLBracketsEscapesTypeAndInlineTables() {
+        let toml = #"""
+        [mcp_servers.globber]
+        command = "C:\\tools\\\"x\""
+        args = [
+            "--glob=[a-z]*",
+            "--last",
+        ]
+        env = { API_KEY = "k1", "OTHER" = 'w,=x' }
+
+        [mcp_servers.remote]
+        type = "sse"
+        url = "https://example.com/sse"
+        http_headers = { Authorization = "Bearer t" }
+
+        [mcp_servers.after]
+        command = "still-here"
+        """#
+        let servers = MCPServersTOML.servers(fromTOML: toml)
+        let globber = servers["globber"]
+        XCTAssertEqual(globber?["command"] as? String, #"C:\tools\"x""#)
+        XCTAssertEqual(globber?["args"] as? [String], ["--glob=[a-z]*", "--last"])
+        XCTAssertEqual(globber?["env"] as? [String: String], ["API_KEY": "k1", "OTHER": "w,=x"])
+        XCTAssertEqual(servers["remote"]?["type"] as? String, "sse")
+        XCTAssertEqual(servers["remote"]?["headers"] as? [String: String], ["Authorization": "Bearer t"])
+        XCTAssertEqual(servers["after"]?["command"] as? String, "still-here")
+    }
+
     func testGrokParsesHTTPServer() {
         let servers = MCPServersTOML.servers(fromTOML: grokSample)
         XCTAssertEqual(servers["pieces"]?["url"] as? String, "http://localhost:39300/mcp")
