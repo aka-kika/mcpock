@@ -52,6 +52,9 @@ final class GlassPanelController: NSObject {
     /// doesn't order the reopened panel out.
     private var generation = 0
     private(set) var isShown = false
+    /// The app she was in when ⌃⌥M opened the panel: it gets the keyboard
+    /// back when the panel closes from the keyboard (Escape, the shortcut).
+    private var appBeforeShortcut: NSRunningApplication?
 
     init(monitor: HealthMonitor, state: PanelState) {
         self.monitor = monitor
@@ -170,11 +173,18 @@ final class GlassPanelController: NSObject {
     /// without one: the outside-click monitors and Escape close it as usual.
     /// False while the theme isn't Glass (no item), so the caller falls back
     /// to the MenuBarExtra item.
+    ///
+    /// Opening activates mcpock, as the MenuBarExtra path does: a key panel in
+    /// an inactive app still left the keyboard (the arrow keys, Return) with
+    /// the app in front (review, 2026-10-14; Kika confirmed it on macOS 27).
     func toggleFromShortcut() -> Bool {
         guard let button = statusItem?.button else { return false }
         if isShown {
             close()
         } else {
+            let front = NSWorkspace.shared.frontmostApplication
+            appBeforeShortcut = front == NSRunningApplication.current ? nil : front
+            NSApp.activate()
             present(from: button, onMouseScreen: true)
         }
         return true
@@ -194,6 +204,7 @@ final class GlassPanelController: NSObject {
         removeEventMonitors()
         guard isShown else { return }
         isShown = false
+        giveKeyboardBack()
         let generation = generation
         let finish = { [weak self] in
             MainActor.assumeIsolated {
@@ -218,6 +229,17 @@ final class GlassPanelController: NSObject {
         layer.opacity = 0
         layer.add(fade, forKey: "close")
         CATransaction.commit()
+    }
+
+    /// After a shortcut open, hands the keyboard back to the app she came
+    /// from, but only while mcpock still has it in the panel: not when she
+    /// clicked into another app (that app is already in front) or when the
+    /// panel closed for Settings (Settings keeps it).
+    private func giveKeyboardBack() {
+        guard let app = appBeforeShortcut else { return }
+        appBeforeShortcut = nil
+        guard NSApp.isActive, NSApp.keyWindow == nil || NSApp.keyWindow === panel, !app.isTerminated else { return }
+        app.activate()
     }
 
     /// A short fade and drop from the menu bar, like the system dropdowns.
