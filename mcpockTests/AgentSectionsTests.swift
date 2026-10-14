@@ -308,6 +308,20 @@ final class AgentSectionsTests: XCTestCase {
         XCTAssertEqual(AgentSections.build(groups: mixed, query: "tiny", filter: .problems).map(\.agent), ["Code"])
     }
 
+    /// 1.10.4: with every agent closed the arrow keys still have somewhere
+    /// to go: the agent rows, and the open agent's servers right under it.
+    func testArrowStopsWalkAgentsAndTheOpenAgentsServers() {
+        let sections = AgentSections.build(groups: mixed, filter: .all)
+        let agents = sections.map { PanelState.AgentStop.agent($0.agent) }
+        XCTAssertEqual(PanelState.agentStops(in: sections, open: nil), agents, "all closed: just the agents")
+        let open = PanelState.agentStops(in: sections, open: "Grok")
+        let grok = try? XCTUnwrap(open.firstIndex(of: .agent("Grok")))
+        XCTAssertEqual(Array(open[(grok ?? 0) + 1 ... (grok ?? 0) + 3]),
+                       [.server("feed"), .server("matrix"), .server("wake")], "Grok's servers follow its row")
+        XCTAssertEqual(open.count, agents.count + 3)
+        XCTAssertEqual(PanelState.nextSelection(in: agents, from: nil, by: 1), agents.first)
+    }
+
     /// The open agent and the servers the arrow keys walk through.
     func testOpenAgentAndItsServerNames() {
         let sections = AgentSections.build(groups: mixed, filter: .all)

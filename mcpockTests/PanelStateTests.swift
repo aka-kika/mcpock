@@ -36,7 +36,7 @@ final class PanelStateTests: XCTestCase {
         XCTAssertEqual(PanelState.nextSelection(in: ["a", "b"], from: nil, by: 1), "a")
         XCTAssertEqual(PanelState.nextSelection(in: ["a", "b"], from: "gone", by: -1), "a",
                        "a selection that left the list restarts at the top")
-        XCTAssertNil(PanelState.nextSelection(in: [], from: nil, by: 1))
+        XCTAssertNil(PanelState.nextSelection(in: [String](), from: nil, by: 1))
     }
 
     func testAttentionToggleIsRemembered() {

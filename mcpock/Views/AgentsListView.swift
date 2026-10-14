@@ -79,10 +79,16 @@ struct AgentsListView: View {
                 guard let name else { return }
                 withAnimation(.easeInOut(duration: 0.12)) { proxy.scrollTo(AgentServerRow.scrollID(name)) }
             }
+            .onChange(of: panel.selectedAgent) { _, agent in
+                guard let agent else { return }
+                withAnimation(.easeInOut(duration: 0.12)) { proxy.scrollTo(agent) }
+            }
         }
     }
 
     private func toggle(_ agent: String) {
+        // A click leaves no arrow-key mark behind on another row.
+        panel.selectedAgent = nil
         withAnimation(.easeInOut(duration: 0.15)) {
             panel.toggleAgent(agent, in: sections)
         }
@@ -140,6 +146,11 @@ private struct AgentRowView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 9)
+                .background {
+                    // The arrow keys are on this agent (1.10.4).
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(panel.selectedAgent == section.agent ? theme.rowSelected : .clear)
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

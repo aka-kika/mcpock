@@ -38,6 +38,7 @@ final class PanelState {
             guard tab != oldValue else { return }
             closeCard()
             selectedName = nil
+            selectedAgent = nil
         }
     }
     /// The footer's attention toggle: pressed is Needs you, unpressed is All.
@@ -61,6 +62,7 @@ final class PanelState {
     var selectedName: String? {
         didSet {
             guard selectedName != oldValue else { return }
+            if selectedName != nil { selectedAgent = nil }
             isComparing = false
             // A server the arrow keys landed on but the fold is hiding: unfold
             // its agent so the row (and the scroll that follows) has something
@@ -69,6 +71,11 @@ final class PanelState {
             expandFoldIfHidden(selectedName)
         }
     }
+    /// The agent row the arrow keys are on in the Agents tab (1.10.4). The tab
+    /// starts with every agent closed, so the arrows walk the agents; Return or
+    /// Right opens one and its servers join the walk, Left closes it. nil while
+    /// a server row is selected (the two never show at once).
+    var selectedAgent: String?
     /// True while the detail card shows the selected row.
     var isCardOpen = false
     /// The card is showing Compare ("Compare setups") instead of its details.
@@ -208,6 +215,20 @@ final class PanelState {
         }
     }
 
+    /// One place the arrow keys can stop on the Agents tab.
+    enum AgentStop: Equatable {
+        case agent(String)
+        case server(String)
+    }
+
+    /// Every agent in order, with the open agent's servers right under it. Pure.
+    nonisolated static func agentStops(in sections: [AgentSection], open: String?) -> [AgentStop] {
+        sections.flatMap { section -> [AgentStop] in
+            let servers = section.agent == open ? section.listed.map { AgentStop.server($0.name) } : []
+            return [.agent(section.agent)] + servers
+        }
+    }
+
     /// The servers the open agent lists, in order. Pure.
     nonisolated static func agentServerNames(in sections: [AgentSection], open: String?) -> [String] {
         sections.first { $0.agent == open }?.listed.map(\.name) ?? []
@@ -255,6 +276,7 @@ final class PanelState {
         if let selectedName, !orderedNames.contains(selectedName) {
             self.selectedName = nil
         }
+        dropStaleAgentSelection()
     }
 
     func panelClosed() {
@@ -317,6 +339,7 @@ final class PanelState {
             closeCard()
             self.selectedName = nil
         }
+        dropStaleAgentSelection()
     }
 
     /// Whether the panel should switch itself to Needs you. Pure.
@@ -395,15 +418,64 @@ final class PanelState {
 
     /// Arrow keys. With nothing selected, either key lands on the first row.
     func moveSelection(by delta: Int) {
+        if tab == .agents {
+            moveAgentStop(by: delta)
+            return
+        }
         if let next = Self.nextSelection(in: orderedNames, from: selectedName, by: delta) {
             selectedName = next
         }
     }
 
+    /// The Agents tab's walk: agent rows, and the open agent's servers.
+    private func moveAgentStop(by delta: Int) {
+        let sections = agentSections
+        let stops = Self.agentStops(in: sections, open: openAgent(in: sections))
+        let current: AgentStop? = selectedName.map(AgentStop.server) ?? selectedAgent.map(AgentStop.agent)
+        switch Self.nextSelection(in: stops, from: current, by: delta) {
+        case .agent(let agent):
+            closeCard()
+            selectedName = nil
+            selectedAgent = agent
+        case .server(let name):
+            selectedName = name
+        case nil:
+            break
+        }
+    }
+
+    /// An agent row the list no longer shows (the filter or search left it
+    /// out) keeps no arrow-key mark.
+    private func dropStaleAgentSelection() {
+        if let selectedAgent, !agentSections.contains(where: { $0.agent == selectedAgent }) {
+            self.selectedAgent = nil
+        }
+    }
+
+    /// Right (or Return on an agent row) opens the agent the arrows are on,
+    /// Left closes the open one and puts the arrows back on its row. False
+    /// when there was nothing to do, so the key travels on.
+    func openAgentFromKeyboard(_ open: Bool) -> Bool {
+        let sections = agentSections
+        let current = openAgent(in: sections)
+        if open {
+            guard selectedName == nil, let agent = selectedAgent ?? sections.first?.agent,
+                  current != agent else { return false }
+            toggleAgent(agent, in: sections)
+            selectedAgent = agent
+        } else {
+            guard let current else { return false }
+            toggleAgent(current, in: sections)
+            selectedName = nil
+            selectedAgent = current
+        }
+        return true
+    }
+
     /// The row the arrow keys land on: one step along the list, stopping at either
     /// end (no wrap, like a menu). A selection that is no longer in the list, or
     /// none at all, lands on the first row. Pure.
-    nonisolated static func nextSelection(in names: [String], from current: String?, by delta: Int) -> String? {
+    nonisolated static func nextSelection<Item: Equatable>(in names: [Item], from current: Item?, by delta: Int) -> Item? {
         guard !names.isEmpty else { return nil }
         guard let current, let index = names.firstIndex(of: current) else { return names[0] }
         return names[min(max(index + delta, 0), names.count - 1)]
@@ -555,6 +627,8 @@ final class PanelState {
         static let enter: UInt16 = 76
         static let down: UInt16 = 125
         static let up: UInt16 = 126
+        static let left: UInt16 = 123
+        static let right: UInt16 = 124
     }
 
     /// Escape peels one layer at a time: compare, card, search, then (in the
@@ -621,6 +695,10 @@ final class PanelState {
         case KeyCode.down, KeyCode.up:
             moveSelection(by: event.keyCode == KeyCode.down ? 1 : -1)
             return true
+        case KeyCode.left, KeyCode.right:
+            // In the search field they move the text cursor.
+            guard tab == .agents, !(window.firstResponder is NSTextView) else { return false }
+            return openAgentFromKeyboard(event.keyCode == KeyCode.right)
         case KeyCode.returnKey, KeyCode.enter:
             // With the search open, Return closes and clears it (1.4.1). A row she
             // arrowed to in the results keeps its selection and opens its card:
@@ -628,6 +706,17 @@ final class PanelState {
             if isSearchOpen {
                 closeSearch()
                 if selectedName != nil { openCard() }
+                return true
+            }
+            // On an agent row (Agents tab) Return opens or closes that agent.
+            if tab == .agents, selectedName == nil {
+                if let agent = selectedAgent {
+                    let sections = agentSections
+                    toggleAgent(agent, in: sections)
+                    selectedAgent = agent
+                } else {
+                    moveSelection(by: 1)
+                }
                 return true
             }
             if selectedName == nil { moveSelection(by: 1) }
