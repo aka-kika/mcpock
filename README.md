@@ -76,8 +76,8 @@ them, checks every server, and shows you what needs attention and why, so you
   is slow or needs a look, a small diamond when something is broken. No
   numbers, no blinking, no notifications.
 - **Keyboard friendly.** Control-Option-M opens and closes the panel from any
-  app (turn it off in Settings > General). Arrow keys move, Return opens the
-  card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
+  app (turn it off in Settings > General). Arrow keys move (on the Agents tab,
+  Right and Left open and close an agent), Return opens the card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
   checks the selected row again (or every server), Cmd-C copies the selected
   row's error (or its details).
 - **Desktop widgets.** Status (small), Problems and Agents (medium): right-click
