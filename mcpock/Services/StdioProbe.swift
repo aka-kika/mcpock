@@ -130,7 +130,7 @@ enum StdioProbe {
         // If the process exited on its own (not killed by a signal — ours or anyone
         // else's), surface its exit code. `terminationReason` distinguishes a real
         // `exit(15)` from a SIGTERM, which raw status-code comparison cannot.
-        if let runner, !runner.isRunning, runner.exitedNormally {
+        if let runner, (error as? ProbeError)?.isTransient != true, !runner.isRunning, runner.exitedNormally {
             let status = runner.terminationStatus
             if status != 0 {
                 head = ProbeError.nonZeroExit(status).localizedDescription

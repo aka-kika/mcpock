@@ -162,7 +162,9 @@ enum SecretMask {
             guard let range = match.range(of: #"["']?\s*[:=]\s*["']?"#, options: .regularExpression) else { return dots }
             return String(match[..<range.upperBound]) + dots
         }
-        out = replace(Pattern.url, in: out) { url($0) }
+        out = replace(Pattern.url, in: out) {
+            URLComponents(string: $0)?.scheme != nil ? url($0, known: known) : $0
+        }
         out = replace(Pattern.tokenLike, in: out) { looksLikeToken($0) ? dots : $0 }
         return out
     }

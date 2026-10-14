@@ -182,7 +182,9 @@ enum ConfigDiscovery {
         }
 
         guard let urlString, !urlString.isEmpty else { return nil }
-        let helper = (entry["headersHelper"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let helper = source.label == AgentRegistry.claudeCodeLabel
+            ? (entry["headersHelper"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
         var config = ServerConfig(
             id: "\(idPrefix):\(name)",
             name: name,

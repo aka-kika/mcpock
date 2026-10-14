@@ -427,27 +427,37 @@ final class HealthMonitor {
     func refresh(groupName: String) async {
         guard !isPaused(groupName) else { return }
         await awaitInFlightCycle()
-        await reloadConfigs()
-        let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
-        guard !ids.isEmpty else { return }
+        let task = Task {
+            await self.reloadConfigs()
+            guard !self.isPaused(groupName) else { return }
+            let ids = Set(Self.instanceIDs(forGroup: groupName, in: self.servers))
+            guard !ids.isEmpty else { return }
 
-        let targets = servers.filter { ids.contains($0.id) }
-        let probe = self.probe
-        let results = await withTaskGroup(of: (String, ProbeResult).self) { group in
-            for s in targets {
-                let config = s.config
-                let fetchTools = s.state != .healthy
-                group.addTask { (config.id, await probe(config, fetchTools)) }
+            let targets = self.servers.filter { ids.contains($0.id) }
+            let specGroups = Dictionary(grouping: targets, by: { Self.probeSpec($0.config) })
+            let probe = self.probe
+            let results = await withTaskGroup(of: ([String], ProbeResult).self) { group in
+                for instances in specGroups.values {
+                    let config = instances[0].config
+                    let fetchTools = instances.contains { $0.state != .healthy }
+                    let ids = instances.map(\.id)
+                    group.addTask { (ids, await probe(config, fetchTools)) }
+                }
+                var out: [String: ProbeResult] = [:]
+                for await (ids, r) in group {
+                    for id in ids { out[id] = r }
+                }
+                return out
             }
-            var out: [String: ProbeResult] = [:]
-            for await (id, r) in group { out[id] = r }
-            return out
-        }
 
-        for index in servers.indices where ids.contains(servers[index].id) {
-            guard let result = results[servers[index].id] else { continue }
-            apply(result, at: index)
+            for index in self.servers.indices where ids.contains(self.servers[index].id) {
+                guard let result = results[self.servers[index].id] else { continue }
+                self.apply(result, at: index)
+            }
         }
+        probeTask = task
+        await task.value
+        if probeTask == task { probeTask = nil }
     }
 
     /// Fold one probe result into the snapshot at `index`: smoothing, tools cache,
@@ -522,18 +532,22 @@ final class HealthMonitor {
                                        reason: SecretMask.scrub(snapshot.failureReason ?? "Unknown failure", known: known),
                                        command: command)
                 }
-            let sources = variants.map { v in
-                GroupSource(
+            let sources = variants.map { v -> GroupSource in
+                let known = SecretMask.knownSecrets(env: v.config.env, headers: v.config.headers)
+                let target = v.config.transport == .stdio
+                    ? SecretMask.commandLine(command: v.config.command, args: v.config.args, known: known)
+                    : SecretMask.url(v.config.url ?? "", known: known)
+                return GroupSource(
                     configID: v.config.id,
                     label: v.config.displaySource,
                     agent: v.config.source.label,
                     path: v.config.source.path,
                     transport: v.config.transport,
-                    target: v.config.commandLine,
+                    target: target,
                     envKeys: v.config.env.keys.sorted(),
                     headerKeys: v.config.headers.keys.sorted(),
                     state: v.state,
-                    failureReason: v.failureReason
+                    failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) }
                 )
             }
             let configs = variants.map(\.config)

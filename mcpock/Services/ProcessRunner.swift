@@ -84,7 +84,7 @@ final class ProcessRunner: @unchecked Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         if let workingDirectory {
-            process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
+            process.currentDirectoryURL = URL(fileURLWithPath: PathResolver.expandTilde(workingDirectory))
         }
 
         self.process = process

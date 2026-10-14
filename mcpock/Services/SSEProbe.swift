@@ -59,7 +59,8 @@ enum SSEProbe {
                 state: .broken,
                 failureReason: (error as? ProbeError)?.localizedDescription ?? error.localizedDescription,
                 tools: nil,
-                transientFailure: (error as? ProbeError)?.isTransient ?? false
+                transientFailure: HTTPProbe.isTransient(error),
+                needsAttention: (error as? ProbeError)?.needsAttention ?? false
             )
         }
     }
