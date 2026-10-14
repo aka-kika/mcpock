@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.10.5](https://img.shields.io/badge/version-1.10.5-7a8fb0)](docs/RELEASE-NOTES-v1.10.5.md)
+[![Version 1.10.6](https://img.shields.io/badge/version-1.10.6-7a8fb0)](docs/RELEASE-NOTES-v1.10.6.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -242,7 +242,9 @@ letters.
 - **Usage counts read, never keep, your chats.** To count calls, mcpock reads
   the agents' own history files and databases (read-only) and keeps only the
   agent, the server name and the day, in `~/Library/Application
-  Support/mcpock/usage.json`. Never a message, an argument or a result.
+  Support/mcpock/usage.json`, plus, for each history file, the time of the
+  newest call it counted (so a rewritten file is never counted twice).
+  Never a message, an argument or a result.
   Settings > General > Usage > Off stops the reading.
 - **Where it looks.** Only known config paths and the usual config folders.
   The scan never looks inside Documents, Desktop or Downloads, and it skips
@@ -279,7 +281,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-597 unit tests at v1.10.5, and the build keeps zero warnings. They cover the
+603 unit tests at v1.10.6, and the build keeps zero warnings. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
