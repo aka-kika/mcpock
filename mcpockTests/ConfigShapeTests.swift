@@ -120,4 +120,23 @@ final class ConfigShapeTests: XCTestCase {
         XCTAssertEqual(entries?.first?.name, "foo")
         XCTAssertNil(GooseConfig.shapeEntries("nothing here"), "no extensions: → nil")
     }
+
+    /// Argon 2026-10-16 #15: `.jsonc` files (OpenCode, Zed, VS Code) have
+    /// comments and trailing commas; they were found but never read.
+    func testJSONCWithCommentsAndTrailingCommas() {
+        let text = """
+        {
+          // OpenCode servers
+          "mcp": {
+            "docs": { "command": ["npx", "-y", "docs-mcp"], /* inline */ "url": "", },
+            "web": { "url": "https://example.com/mcp//not-a-comment", },
+          },
+        }
+        """
+        let entries = JSONConfigShape.parse(text) ?? []
+        XCTAssertEqual(Set(entries.map(\.name)), ["docs", "web"])
+        XCTAssertEqual(entries.first { $0.name == "web" }?.entry["url"] as? String,
+                       "https://example.com/mcp//not-a-comment", "// inside a string stays")
+        XCTAssertEqual(entries.first { $0.name == "docs" }?.entry["args"] as? [String], ["-y", "docs-mcp"])
+    }
 }

@@ -70,7 +70,8 @@ struct ConfigShape {
 enum JSONConfigShape {
     static func parse(_ text: String, genericKeys: Bool = true) -> [DiscoveredEntry]? {
         guard let data = text.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data),
+              let obj = (try? JSONSerialization.jsonObject(with: data))
+                ?? (try? JSONSerialization.jsonObject(with: Data(JSONC.plainJSON(text).utf8))),
               let root = obj as? [String: Any]
         else { return nil }
 
@@ -118,6 +119,53 @@ enum JSONConfigShape {
         if entry["env"] == nil, let environment = entry["environment"] as? [String: Any] {
             entry["env"] = environment
         }
+    }
+}
+
+/// JSON with comments (`.jsonc`: VS Code, OpenCode, Zed): `//` and `/* */`
+/// comments and trailing commas are removed outside strings, so plain
+/// `JSONSerialization` can read it (Argon 2026-10-16 #15). Tried only after a
+/// strict parse fails.
+enum JSONC {
+    static func plainJSON(_ text: String) -> String {
+        let chars = Array(text.unicodeScalars)
+        var out: [Unicode.Scalar] = []
+        out.reserveCapacity(chars.count)
+        var i = 0
+        var inString = false
+        // Where in `out` a comma sits that may still turn out to be trailing.
+        var pendingComma: Int?
+        while i < chars.count {
+            let c = chars[i]
+            if inString {
+                out.append(c)
+                if c == "\\", i + 1 < chars.count { out.append(chars[i + 1]); i += 2; continue }
+                if c == "\"" { inString = false }
+                i += 1
+                continue
+            }
+            if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
+                while i < chars.count, chars[i] != "\n" { i += 1 }
+                continue
+            }
+            if c == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+                i += 2
+                while i + 1 < chars.count, !(chars[i] == "*" && chars[i + 1] == "/") { i += 1 }
+                i += 2
+                continue
+            }
+            if (c == "}" || c == "]"), let comma = pendingComma {
+                out.remove(at: comma)
+            }
+            if c == "\"" { inString = true; pendingComma = nil }
+            else if c == "," { pendingComma = out.count }
+            else if !CharacterSet.whitespacesAndNewlines.contains(c) { pendingComma = nil }
+            out.append(c)
+            i += 1
+        }
+        var view = String.UnicodeScalarView()
+        view.append(contentsOf: out)
+        return String(view)
     }
 }
 
