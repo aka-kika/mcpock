@@ -53,6 +53,55 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertFalse(isProcessAlive(childPID), "child \(childPID) must not outlive its server")
     }
 
+    /// Argon 2026-10-16 #3: a launcher that exits right away and leaves a child
+    /// holding stdout. The child is reparented to launchd before teardown, so
+    /// only its process group still ties it to the server.
+    func testLauncherThatExitsEarlyLeavesNoOrphanChild() async throws {
+        let pidFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mcpock-early-exit-\(UUID().uuidString).pid")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let runner = try ProcessRunner(
+            command: "/bin/sh",
+            args: ["-c", "sleep 300 & echo $! > '\(pidFile.path)'; exit 0"],
+            env: [:]
+        )
+        var childPID: Int32 = 0
+        for _ in 0..<100 where childPID == 0 || runner.isRunning {
+            try await Task.sleep(for: .milliseconds(20))
+            childPID = Int32((try? String(contentsOf: pidFile, encoding: .utf8))?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+        }
+        XCTAssertGreaterThan(childPID, 0)
+        defer { if isProcessAlive(childPID) { kill(childPID, SIGKILL) } }
+        XCTAssertFalse(runner.isRunning, "the launcher has exited")
+        XCTAssertTrue(isProcessAlive(childPID))
+
+        await runner.terminateAndReap(gracePeriod: .milliseconds(300))
+        try await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertFalse(isProcessAlive(childPID), "child \(childPID) must not outlive its launcher")
+        XCTAssertTrue(runner.stdoutDidFinish, "stdout reader reaches EOF once the child is gone")
+    }
+
+    /// Argon 2026-10-16 #4: a server that floods stderr keeps its first lines
+    /// (where the cause is) and its newest ones, never all of it.
+    func testStderrFloodIsCapped() async throws {
+        let runner = try ProcessRunner(
+            command: "/bin/sh",
+            args: ["-c", "echo 'Error: first cause' >&2; head -c 6000000 /dev/zero | tr '\\0' 'x' >&2; echo >&2; echo 'last words' >&2; sleep 30"],
+            env: [:]
+        )
+        for _ in 0..<250 where !runner.stderrString.contains("last words") {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let text = runner.stderrString
+        XCTAssertTrue(text.hasPrefix("Error: first cause"))
+        XCTAssertTrue(text.contains("last words"))
+        XCTAssertLessThan(text.utf8.count, 3 * 512 * 1024 + 16, "memory stays bounded")
+        XCTAssertEqual(runner.firstErrorLine(), "Error: first cause")
+        await runner.terminateAndReap(gracePeriod: .milliseconds(200))
+    }
+
     /// Spawns a mock MCP server that speaks the real MCP stdio transport
     /// (newline-delimited JSON, NOT Content-Length framing), probes it, ensures cleanup.
     func testMockMCPServerProbeAndCleanup() async throws {

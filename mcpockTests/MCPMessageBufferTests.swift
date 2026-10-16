@@ -135,4 +135,27 @@ final class MCPMessageBufferTests: XCTestCase {
         let message = try XCTUnwrap(try buffer.nextMessage())
         XCTAssertEqual(String(data: message, encoding: .utf8), "{\"jsonrpc\":\"2.0\",\"id\":1}")
     }
+
+    /// Argon 2026-10-16 #4: a JSON line that never ends used to be kept
+    /// forever, growing memory until the app crashed.
+    func testNDJSONLineWithoutNewlineOverCapThrows() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("{\"a\":\"".data(using: .utf8)!)
+        XCTAssertNil(try buffer.nextMessage(), "under the cap it waits for more")
+        buffer.append(Data(repeating: UInt8(ascii: "x"), count: MCPMessageBuffer.maxBodyBytes))
+        XCTAssertThrowsError(try buffer.nextMessage()) { error in
+            guard case ProbeError.protocolError = error else {
+                return XCTFail("Expected ProbeError.protocolError, got \(error)")
+            }
+        }
+    }
+
+    /// A Content-Length header with no blank line after it can't grow forever.
+    func testHeaderThatNeverEndsThrows() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("Content-Length: 10\r\n".data(using: .utf8)!)
+        XCTAssertNil(try buffer.nextMessage())
+        buffer.append(Data(repeating: UInt8(ascii: "x"), count: MCPMessageBuffer.maxHeaderBytes))
+        XCTAssertThrowsError(try buffer.nextMessage())
+    }
 }

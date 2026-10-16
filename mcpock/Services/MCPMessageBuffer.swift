@@ -31,7 +31,13 @@ final class MCPMessageBuffer: @unchecked Sendable {
 
             // Content-Length framing
             if startsWithContentLengthHeader() {
-                guard let bodyStart = findHeaderEnd() else { return nil }
+                guard let bodyStart = findHeaderEnd() else {
+                    // A header that never ends would be kept forever.
+                    if buffer.count > Self.maxHeaderBytes {
+                        throw ProbeError.protocolError("Content-Length header never ends")
+                    }
+                    return nil
+                }
                 let headerBytes = buffer[0..<bodyStart]
                 guard let headerString = String(bytes: headerBytes, encoding: .utf8),
                       let length = parseContentLength(headerString), length >= 0,
@@ -52,6 +58,11 @@ final class MCPMessageBuffer: @unchecked Sendable {
             // Newline-delimited JSON
             if buffer.first == UInt8(ascii: "{") {
                 guard let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) else {
+                    // A line that never ends would grow memory until the app
+                    // crashed (Argon 2026-10-16 #4): same cap as a framed body.
+                    if buffer.count > Self.maxBodyBytes {
+                        throw ProbeError.protocolError("Message too large (no line end)")
+                    }
                     return nil
                 }
                 var line = Array(buffer[0..<newlineIndex])
@@ -88,6 +99,8 @@ final class MCPMessageBuffer: @unchecked Sendable {
     /// The largest message body accepted: far above any real `initialize` or
     /// `tools/list` reply, and small enough that the arithmetic can't overflow.
     static let maxBodyBytes = 64 * 1024 * 1024
+    /// Real headers are a few dozen bytes.
+    static let maxHeaderBytes = 8 * 1024
 
     private func startsWithContentLengthHeader() -> Bool {
         let prefix = buffer.prefix(14)

@@ -5,7 +5,13 @@ import os
 final class ProcessRunner: @unchecked Sendable {
     private struct State {
         var didTerminate = false
+        /// The first `stderrHeadCap` bytes the server printed (where a Node
+        /// stack trace puts its cause), then a rolling tail of the newest
+        /// bytes. A server that floods stderr can't grow memory past about
+        /// 1 MB (Argon 2026-10-16 #4).
         var stderrData = Data()
+        var stderrTailData = Data()
+        var stderrDropped = false
         /// Raw stdout, kept only for one-shot commands (the headers helper).
         var rawStdout = Data()
         var messageBuffer = MCPMessageBuffer()
@@ -32,6 +38,11 @@ final class ProcessRunner: @unchecked Sendable {
     /// Only a one-shot command (the headers helper) keeps its raw stdout; a
     /// server probe never does, so it doesn't hold a copy of every reply.
     private let capturesRawStdout: Bool
+    /// The root's start time. `Process` starts each command in its own process
+    /// group (group ID = root PID), so teardown can still find children a
+    /// launcher left behind after it exited; only members that started after
+    /// the root are ever signalled.
+    private var rootStarted: timeval?
 
     /// Everything the process wrote to stdout so far (capped at 1 MB).
     var rawStdout: Data { state.withLock { $0.rawStdout } }
@@ -123,6 +134,7 @@ final class ProcessRunner: @unchecked Sendable {
             try? stderrPipe.fileHandleForWriting.close()
             throw ProbeError.spawnFailed(error.localizedDescription)
         }
+        rootStarted = Self.startTime(of: process.processIdentifier)
     }
 
     /// Blocking read loop on its own thread; `sink` runs there, in order, and
@@ -223,8 +235,13 @@ final class ProcessRunner: @unchecked Sendable {
         }
 
         // Whatever outlived the root (it exited on its own, or its children
-        // ignored SIGTERM): SIGTERM, a short wait, then SIGKILL.
-        var survivors = tree.filter { $0.isStillTheSameProcess }
+        // ignored SIGTERM): SIGTERM, a short wait, then SIGKILL. The process
+        // group catches children a launcher left behind when it exited before
+        // teardown: reparented to launchd, `pgrep -P` can't find them, but they
+        // keep the group (Argon 2026-10-16 #3). Killing them also ends the
+        // stdout/stderr reader threads, which only stop at EOF.
+        var survivors = Self.merged(tree, groupMembers(of: rootPIDBeforeClose))
+            .filter { $0.isStillTheSameProcess }
         if !survivors.isEmpty {
             survivors.forEach { kill($0.pid, SIGTERM) }
             let survivorDeadline = ContinuousClock.now + .milliseconds(300)
@@ -262,6 +279,9 @@ final class ProcessRunner: @unchecked Sendable {
             signalProcessTree(root: rootPID, signal: SIGKILL)
             kill(rootPID, SIGKILL)
         }
+        groupMembers(of: rootPID)
+            .filter { $0.isStillTheSameProcess }
+            .forEach { kill($0.pid, SIGKILL) }
         failPendingReaders()
     }
 
@@ -311,6 +331,35 @@ final class ProcessRunner: @unchecked Sendable {
         return members
     }
 
+    /// The live members of process group `pgid` that started no earlier than
+    /// this runner's root, never mcpock itself. The start-time floor keeps a
+    /// later, unrelated group that reused the ID out.
+    private func groupMembers(of pgid: Int32) -> [TreeMember] {
+        guard pgid > 0, let floor = rootStarted else { return [] }
+        let stride = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PGRP, pgid]
+        var size = 0
+        guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0, size > 0 else { return [] }
+        var procs = [kinfo_proc](repeating: kinfo_proc(), count: size / stride + 8)
+        size = procs.count * stride
+        guard sysctl(&mib, u_int(mib.count), &procs, &size, nil, 0) == 0 else { return [] }
+        let me = getpid()
+        return procs.prefix(size / stride).compactMap { info in
+            let pid = info.kp_proc.p_pid
+            guard pid > 0, pid != me, info.kp_eproc.e_pgid == pgid, info.kp_proc.p_stat != SZOMB else { return nil }
+            let started = info.kp_proc.p_un.__p_starttime
+            let afterRoot = started.tv_sec > floor.tv_sec
+                || (started.tv_sec == floor.tv_sec && started.tv_usec >= floor.tv_usec)
+            return afterRoot ? TreeMember(pid: pid, started: started) : nil
+        }
+    }
+
+    /// `a` then the members of `b` not already in it (by PID).
+    private static func merged(_ a: [TreeMember], _ b: [TreeMember]) -> [TreeMember] {
+        let seen = Set(a.map(\.pid))
+        return a + b.filter { !seen.contains($0.pid) }
+    }
+
     /// A process's start time from the kernel, or nil when it is gone.
     private static func startTime(of pid: Int32) -> timeval? {
         var info = kinfo_proc()
@@ -356,9 +405,19 @@ final class ProcessRunner: @unchecked Sendable {
         process.terminationReason == .exit
     }
 
+    /// What the server printed to stderr, its middle left out once over the
+    /// cap. Decoded leniently: a cut can split a multi-byte character.
     var stderrString: String {
-        state.withLock { String(data: $0.stderrData, encoding: .utf8) ?? "" }
+        state.withLock { state in
+            let head = String(decoding: state.stderrData, as: UTF8.self)
+            guard !state.stderrTailData.isEmpty || state.stderrDropped else { return head }
+            let tail = String(decoding: state.stderrTailData, as: UTF8.self)
+            return head + (state.stderrDropped ? "\n…\n" : "") + tail
+        }
     }
+
+    static let stderrHeadCap = 512 * 1024
+    static let stderrTailCap = 512 * 1024
 
     /// The last few non-empty stderr lines, joined — for surfacing why a probe failed.
     func stderrTail(maxLines: Int = 2, maxLength: Int = 240) -> String {
@@ -462,7 +521,22 @@ final class ProcessRunner: @unchecked Sendable {
     }
 
     private func handleStderr(_ chunk: Data) {
-        state.withLock { $0.stderrData.append(chunk) }
+        state.withLock { state in
+            var rest = chunk[...]
+            let room = Self.stderrHeadCap - state.stderrData.count
+            if room > 0 {
+                state.stderrData.append(rest.prefix(room))
+                rest = rest.dropFirst(room)
+            }
+            guard !rest.isEmpty else { return }
+            state.stderrTailData.append(rest)
+            // Trim only past twice the cap, so a flood costs one copy per
+            // ~512 KB instead of one per chunk.
+            if state.stderrTailData.count > 2 * Self.stderrTailCap {
+                state.stderrTailData = Data(state.stderrTailData.suffix(Self.stderrTailCap))
+                state.stderrDropped = true
+            }
+        }
     }
 
     private func waitForMessage() async throws -> Data {
