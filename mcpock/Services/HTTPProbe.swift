@@ -169,23 +169,46 @@ enum HTTPProbe {
             throw ProbeError.noData
         }
 
+        // The request's id: the answer must be for it, not a notification or
+        // another request on the same stream (Argon 2026-10-17 #12).
+        let id = (try? MCPJSONRPC.parseJSONObject(body))?["id"] as? Int
+
         // SSE-style response: extract data: lines
         if let contentType = http.value(forHTTPHeaderField: "Content-Type")?.lowercased(),
            contentType.contains("text/event-stream") {
-            return (try parseSSEJSON(data), sessionId)
+            return (try parseSSEJSON(data, id: id), sessionId)
         }
 
-        // Some servers return SSE without the content type; detect "data:" prefix.
-        if let text = String(data: data, encoding: .utf8), text.contains("data:") {
-            if let parsed = try? parseSSEJSON(data) {
+        // Plain JSON first: a JSON answer whose text holds "data:" (a tool
+        // description, a test call's output) is still JSON.
+        do {
+            let json = try MCPJSONRPC.parseJSONObject(data)
+            if let id, isForAnotherRequest(json, id: id) {
+                throw ProbeError.protocolError("The answer was for another request")
+            }
+            return (json, sessionId)
+        } catch {
+            // Some servers return SSE without the content type.
+            if let text = String(data: data, encoding: .utf8), text.contains("data:"),
+               let parsed = try? parseSSEJSON(data, id: id) {
                 return (parsed, sessionId)
             }
+            throw error
         }
-
-        return (try MCPJSONRPC.parseJSONObject(data), sessionId)
     }
 
-    static func parseSSEJSON(_ data: Data) throws -> [String: Any] {
+    /// An answer carrying another request's id. A null or missing id (a
+    /// server's parse error) is not, so its error message still shows.
+    static func isForAnotherRequest(_ message: [String: Any], id: Int) -> Bool {
+        if let number = message["id"] as? NSNumber { return number.intValue != id }
+        if let string = message["id"] as? String { return string != String(id) }
+        return false
+    }
+
+    /// The JSON-RPC answer in an SSE body. With `id`, only the answer to that
+    /// request counts; without, the first message with a result or error,
+    /// else the last JSON message.
+    static func parseSSEJSON(_ data: Data, id: Int? = nil) throws -> [String: Any] {
         guard let text = String(data: data, encoding: .utf8) else {
             throw ProbeError.protocolError("Invalid SSE encoding")
         }
@@ -200,6 +223,10 @@ enum HTTPProbe {
             if payload.isEmpty || payload == "[DONE]" { continue }
             if let payloadData = payload.data(using: .utf8),
                let obj = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
+                if let id {
+                    if MCPJSONRPC.isResponse(obj, to: id) { return obj }
+                    continue
+                }
                 lastJSON = obj
                 // Prefer responses with id/result/error
                 if obj["result"] != nil || obj["error"] != nil {
@@ -208,6 +235,6 @@ enum HTTPProbe {
             }
         }
         if let lastJSON { return lastJSON }
-        throw ProbeError.protocolError("No JSON in SSE stream")
+        throw ProbeError.protocolError(id == nil ? "No JSON in SSE stream" : "No answer to request \(id!) in SSE stream")
     }
 }
