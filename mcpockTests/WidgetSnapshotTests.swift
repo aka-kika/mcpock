@@ -55,10 +55,11 @@ final class WidgetSnapshotTests: XCTestCase {
             ServerSnapshot(config: config("differs1", agent: "Cursor", command: "cmd-a"), state: .healthy, lastChecked: now),
             ServerSnapshot(config: config("differs1", agent: "Grok", command: "cmd-b"), state: .healthy, lastChecked: now),
             // Hidden: never counted, never listed, never in the total.
-            ServerSnapshot(config: config("hiddenBroken", agent: "Cursor"), state: .broken,
-                           failureReason: "Non-zero exit (1)", lastChecked: now),
+            // (A hidden server that breaks comes back, so this one is slow.)
+            ServerSnapshot(config: config("hiddenSlow", agent: "Cursor"), state: .degraded,
+                           failureReason: "Timed out", lastChecked: now),
         ]
-        let snapshot = MCPockWidgetSnapshot.build(from: status(servers, hidden: ["hiddenBroken"]))
+        let snapshot = MCPockWidgetSnapshot.build(from: status(servers, hidden: ["hiddenSlow"]))
 
         XCTAssertEqual(snapshot.problemCount, 5, "5 problems total, hidden one excluded")
         XCTAssertEqual(snapshot.problems.count, 4, "only the worst 4 are listed")

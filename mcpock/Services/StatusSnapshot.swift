@@ -19,27 +19,32 @@ enum StatusSnapshot {
     ) -> MCPockStatus {
         let groups = HealthMonitor.groupByName(servers, acknowledged: acknowledged)
         let byID = Dictionary(servers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let visible = groups.filter { !isHidden($0.name) }
+        let hiddenNames = Set(groups.filter { HealthMonitor.staysHidden($0, isHidden: isHidden($0.name)) }.map(\.name))
+        let staysHidden = { (group: ServerGroup) in hiddenNames.contains(group.name) }
+        let visible = groups.filter { !staysHidden($0) }
 
         let entries = groups.map { group in
-            server(group, byID: byID, hidden: isHidden(group.name), pinned: isPinned(group.name))
+            server(group, byID: byID, hidden: staysHidden(group), pinned: isPinned(group.name))
         }
+        // Counts and per-agent rows cover what the panel lists, so they agree
+        // with the problems list and the widgets (Argon 2026-10-16 #6).
+        let shown = entries.filter { !$0.hidden }
         let counts = MCPockStatus.Counts(
             total: groups.count,
-            broken: entries.filter { $0.status == "broken" }.count,
-            slow: entries.filter { $0.status == "slow" }.count,
-            needsSignIn: entries.filter { $0.status == "needs sign-in" }.count,
-            differs: entries.filter { $0.status == "set up differently" }.count,
-            checking: entries.filter { $0.status == "checking" }.count,
-            fine: entries.filter { $0.status == "fine" }.count,
-            paused: entries.filter { $0.status == "paused" }.count,
-            selfManaged: entries.filter { $0.status == "managed by its app" }.count,
+            broken: shown.filter { $0.status == "broken" }.count,
+            slow: shown.filter { $0.status == "slow" }.count,
+            needsSignIn: shown.filter { $0.status == "needs sign-in" }.count,
+            differs: shown.filter { $0.status == "set up differently" }.count,
+            checking: shown.filter { $0.status == "checking" }.count,
+            fine: shown.filter { $0.status == "fine" }.count,
+            paused: shown.filter { $0.status == "paused" }.count,
+            selfManaged: shown.filter { $0.status == "managed by its app" }.count,
             hidden: groups.count - visible.count
         )
         // Round 8 (widgets): the Agents tab's own rows, same order it uses
         // (worst first, aka last) — `AgentSections.build` is already pure and
         // already what the tab itself calls.
-        let perAgent = AgentSections.build(groups: groups).map { section in
+        let perAgent = AgentSections.build(groups: visible).map { section in
             MCPockStatus.AgentStatus(
                 name: section.displayName,
                 serverCount: section.servers.count,

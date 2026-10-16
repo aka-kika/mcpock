@@ -64,7 +64,8 @@ final class StatusSnapshotTests: XCTestCase {
         ]
     }
 
-    private func build(hidden: Set<String> = ["old"]) -> MCPockStatus {
+    /// `old` is broken, so it comes back despite being hidden; `quiet` stays hidden.
+    private func build(hidden: Set<String> = ["old", "quiet"]) -> MCPockStatus {
         StatusSnapshot.build(
             servers: fixture(),
             isHidden: { hidden.contains($0) },
@@ -114,7 +115,9 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(wake.tools, ["wake_search"])
 
         XCTAssertEqual(status.servers.first { $0.name == "quiet" }?.status, "paused")
-        XCTAssertEqual(status.servers.first { $0.name == "old" }?.hidden, true)
+        XCTAssertEqual(status.servers.first { $0.name == "quiet" }?.hidden, true)
+        XCTAssertEqual(status.servers.first { $0.name == "old" }?.hidden, false,
+                       "a hidden server that breaks comes back (Argon 2026-10-16 #5)")
     }
 
     func testCountsAndHeader() {
@@ -123,12 +126,12 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(status.pid, 4242)
         XCTAssertEqual(status.checkEverySeconds, 900)
         XCTAssertEqual(status.counts.total, 5)
-        XCTAssertEqual(status.counts.broken, 2, "the hidden one still counts as broken")
+        XCTAssertEqual(status.counts.broken, 2, "the broken hidden one is back, so it counts")
         XCTAssertEqual(status.counts.needsSignIn, 1)
         XCTAssertEqual(status.counts.differs, 1)
-        XCTAssertEqual(status.counts.paused, 1)
+        XCTAssertEqual(status.counts.paused, 0, "the hidden paused one is left out (Argon 2026-10-16 #6)")
         XCTAssertEqual(status.counts.hidden, 1)
-        XCTAssertEqual(status.summary, "4 servers \u{00B7} 1 broken \u{00B7} 1 needs sign-in \u{00B7} 1 set up differently",
+        XCTAssertEqual(status.summary, "4 servers \u{00B7} 2 broken \u{00B7} 1 needs sign-in \u{00B7} 1 set up differently",
                        "the summary is the panel's, over the rows she sees")
     }
 
@@ -167,11 +170,11 @@ final class StatusSnapshotTests: XCTestCase {
         let agents = try XCTUnwrap(status.perAgent)
         let cursor = try XCTUnwrap(agents.first { $0.name == "Cursor" })
         // Cursor declares firecrawl (broken), wake (fine), old (broken, hidden
-        // in the panel — still counts here, same as the overall broken count)
-        // and quiet (paused, not a problem, counted as fine like `AgentSection.fineCount` does).
-        XCTAssertEqual(cursor.serverCount, 4)
+        // but back while broken) and quiet (paused and hidden: left out, as
+        // the Agents tab leaves it out).
+        XCTAssertEqual(cursor.serverCount, 3)
         XCTAssertEqual(cursor.problemCount, 2)
-        XCTAssertEqual(cursor.fineCount, 2)
+        XCTAssertEqual(cursor.fineCount, 1)
 
         let code = try XCTUnwrap(agents.first { $0.name == "Claude Code" })
         XCTAssertEqual(code.serverCount, 1)
