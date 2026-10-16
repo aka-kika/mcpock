@@ -110,7 +110,7 @@ enum ConfigScanner {
                   let size = attrs[.size] as? Int, size <= maxFileBytes else { continue }
             guard let text = try? String(contentsOfFile: full, encoding: .utf8) else { continue }
 
-            for shape in ConfigShape.all {
+            for shape in scanShapes(forFileNamed: name) {
                 if let entries = shape.parse(text), entries.contains(where: \.hasEndpoint) {
                     let canonical = canonicalPath(full)
                     out[canonical] = ScannedConfig(path: canonical, label: deriveLabel(fromPath: full), entries: entries)
@@ -118,6 +118,23 @@ enum ConfigScanner {
                 }
             }
         }
+    }
+
+    /// File names that are MCP configs by name (VS Code, Cursor, Windsurf, OpenCode
+    /// and most others). Compared lowercased.
+    static let mcpFileNames: Set<String> = [
+        "mcp.json", ".mcp.json", "mcp.jsonc", "mcp_config.json", "mcp-config.json",
+        "opencode.json", "opencode.jsonc",
+    ]
+
+    /// The shapes the scan tries for one file. A generic `servers` or `mcp` JSON
+    /// block is read only from a file named like an MCP config: any other app's
+    /// settings file with that shape would otherwise have its `command` started
+    /// every minute (Argon 2026-10-16 #1). `mcpServers`, `[mcp_servers]` and the
+    /// YAML shapes are MCP's own keys and stay readable anywhere.
+    static func scanShapes(forFileNamed name: String) -> [ConfigShape] {
+        if mcpFileNames.contains(name.lowercased()) { return ConfigShape.all }
+        return ConfigShape.all.map { $0.id == ConfigShape.json.id ? .jsonMCPServersOnly : $0 }
     }
 
     /// Source label from a config path: the containing folder, dot stripped.

@@ -32,6 +32,21 @@ final class ConfigScannerTests: XCTestCase {
         XCTAssertFalse(found.contains { $0.path.contains("node_modules") }, "node_modules excluded")
     }
 
+    /// Argon 2026-10-16 #1: another app's settings file with a bare `servers` or
+    /// `mcp` block must not become a source, or mcpock starts its `command` every
+    /// minute. The same block in a file named like an MCP config still counts.
+    func testGenericServersBlockOnlyFromMCPNamedFiles() throws {
+        try write("someApp/settings.json", #"{"servers":{"evil":{"command":"/bin/sh","args":["-c","x"]}}}"#)
+        try write("otherApp/state.json", #"{"mcp":{"evil2":{"command":"/bin/sh"}}}"#)
+        try write("Code/User/mcp.json", #"{"servers":{"vs":{"command":"npx"}}}"#)
+        try write("opencode/opencode.jsonc", #"{"mcp":{"oc":{"command":["npx","x"]}}}"#)
+        try write("tool/config.json", #"{"mcpServers":{"ok":{"command":"ok"}}}"#)
+
+        let found = ConfigScanner.scan(roots: [root.path], maxDepth: 3)
+        let names = Set(found.flatMap { $0.entries.map(\.name) })
+        XCTAssertEqual(names, ["vs", "oc", "ok"])
+    }
+
     /// Regression: `excludedDirs` held `Caches`/`Cache` but not lowercase `cache`, so
     /// XDG-style cache dirs were walked. A stale Langflow artifact at
     /// `~/.langflow/cache/<uuid>/_mcp_servers_<uuid>.json` was discovered and probed as a

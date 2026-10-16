@@ -36,6 +36,10 @@ struct ConfigShape {
     var isAppSettings: Bool { parseData != nil }
 
     static let json = ConfigShape(id: "json") { JSONConfigShape.parse($0) }
+    /// The scan's JSON shape for a file whose name says nothing about MCP: only
+    /// `mcpServers` counts. A bare `servers` or `mcp` block is too common in other
+    /// apps' settings, and mcpock would start its `command` every minute.
+    static let jsonMCPServersOnly = ConfigShape(id: "json") { JSONConfigShape.parse($0, genericKeys: false) }
     static let mcpServersTOML = ConfigShape(id: "mcp-servers-toml") { MCPServersTOML.shapeEntries($0) }
     static let gooseYAML = ConfigShape(id: "goose-yaml") { GooseConfig.shapeEntries($0) }
     static let mcpServersYAML = ConfigShape(id: "mcp-servers-yaml") { MCPServersYAML.shapeEntries($0) }
@@ -60,8 +64,11 @@ struct ConfigShape {
 ///   whose env map is called `environment`.
 ///
 /// `"enabled": false` entries are dropped, matching the TOML and YAML readers.
+///
+/// `genericKeys: false` reads only `mcpServers`: the scan uses it for files whose
+/// name is not a known MCP config name (see `ConfigScanner.scanShapes`).
 enum JSONConfigShape {
-    static func parse(_ text: String) -> [DiscoveredEntry]? {
+    static func parse(_ text: String, genericKeys: Bool = true) -> [DiscoveredEntry]? {
         guard let data = text.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data),
               let root = obj as? [String: Any]
@@ -78,10 +85,10 @@ enum JSONConfigShape {
                 entries.append(contentsOf: extract(mcp, projectPath: projectPath))
             }
         }
-        if let servers = root["servers"] as? [String: Any] {
+        if genericKeys, let servers = root["servers"] as? [String: Any] {
             entries.append(contentsOf: extract(servers, projectPath: nil))
         }
-        if let mcp = root["mcp"] as? [String: Any] {
+        if genericKeys, let mcp = root["mcp"] as? [String: Any] {
             if let servers = mcp["servers"] as? [String: Any] {
                 entries.append(contentsOf: extract(servers, projectPath: nil))
             } else {
