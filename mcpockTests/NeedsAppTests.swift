@@ -81,7 +81,7 @@ final class NeedsAppMonitorTests: XCTestCase {
                 : ProbeResult(state: .healthy, failureReason: nil, tools: [MCPToolInfo(name: "wake_search", description: "")])
         }
         let wake = self.wake
-        monitor.hostAppOf = { $0.name == "wake" ? wake : nil }
+        monitor.hostAppOf = { config, _ in config.name == "wake" ? wake : nil }
         monitor.appIsRunning = { _ in wakeRunning.value }
         await monitor.reloadConfigs()
         await monitor.refreshNow(force: true)
@@ -138,10 +138,18 @@ final class NeedsAppMonitorTests: XCTestCase {
         monitor.discover = { [config] }
         monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
         let reed = HostApp(name: "Reed", bundlePath: "/Applications/Reed.app", bundleID: "com.example.reed")
-        monitor.listeningApp = { $0 == 8742 ? reed : nil }
+        let onMain = CallNames()
+        monitor.listeningApp = { port in
+            onMain.add(Thread.isMainThread ? "main" : "background")
+            return port == 8742 ? reed : nil
+        }
         await monitor.reloadConfigs()
         await monitor.refreshNow(force: true)
         XCTAssertEqual(monitor.learnedHostPorts[8742], "/Applications/Reed.app")
+        // lsof never runs on the main thread (Argon 2026-10-17 #7).
+        XCTAssertEqual(onMain.names, ["background"])
+        await monitor.refreshNow(force: true)
+        XCTAssertEqual(onMain.names.count, 1, "once per port")
         XCTAssertEqual(HealthMonitor(defaults: defaults).learnedHostPorts[8742], "/Applications/Reed.app", "kept")
     }
 
@@ -155,4 +163,11 @@ private final class AppRunning: @unchecked Sendable {
         get { lock.withLock { on } }
         set { lock.withLock { on = newValue } }
     }
+}
+
+private final class CallNames: @unchecked Sendable {
+    private let lock = NSLock()
+    private var list: [String] = []
+    var names: [String] { lock.withLock { list } }
+    func add(_ name: String) { lock.withLock { list.append(name) } }
 }

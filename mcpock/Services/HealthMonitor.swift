@@ -85,30 +85,50 @@ final class HealthMonitor {
     /// Ports already looked up this session (a command-line listener stays unknown).
     @ObservationIgnored private var lookedUpPorts: Set<Int> = []
 
-    /// The app a config belongs to. Swapped in tests.
-    @ObservationIgnored lazy var hostAppOf: (ServerConfig) -> HostApp? = { [unowned self] config in
-        HostApps.app(for: config, learnedPorts: self.learnedHostPorts)
+    /// The app a config belongs to, given the ports learned so far. Runs off
+    /// the main thread, inside a probe. Swapped in tests.
+    @ObservationIgnored var hostAppOf: @Sendable (ServerConfig, [Int: String]) -> HostApp? = {
+        HostApps.app(for: $0, learnedPorts: $1)
     }
     /// Whether that app runs. Swapped in tests.
     @ObservationIgnored var appIsRunning: (HostApp) -> Bool = { HostApps.isRunning($0) }
-    /// Which app listens on a local port. Swapped in tests.
-    @ObservationIgnored var listeningApp: (Int) -> HostApp? = { HostApps.listeningApp(port: $0) }
+    /// Which app listens on a local port (lsof). Runs off the main thread,
+    /// inside a probe. Swapped in tests.
+    @ObservationIgnored var listeningApp: @Sendable (Int) -> HostApp? = { HostApps.listeningApp(port: $0) }
+    /// The app behind each probe target, as its last probe found it. The
+    /// lookup reads files and runs lsof, so it happens in the probe, never on
+    /// the main thread (Argon 2026-10-17 #7: the panel froze during a check).
+    @ObservationIgnored private var hostAppBySpec: [ProbeSpec: HostApp] = [:]
 
     /// The closed app a healthy-or-failing server waits for, or nil when it
     /// has no app or the app runs.
     func closedHostApp(of config: ServerConfig) -> HostApp? {
-        guard let app = hostAppOf(config), !appIsRunning(app) else { return nil }
+        guard let app = hostAppBySpec[Self.probeSpec(config)], !appIsRunning(app) else { return nil }
         return app
     }
 
-    /// Remember which app serves a local port, once per port per session.
-    private func learnHostPorts(of config: ServerConfig) {
-        for port in HostApps.localPorts(of: config) where learnedHostPorts[port] == nil && !lookedUpPorts.contains(port) {
-            lookedUpPorts.insert(port)
-            guard let app = listeningApp(port) else { continue }
-            learnedHostPorts[port] = app.bundlePath
+    /// `probe`, then the host-app lookup (`HostApps.lookUp`), both off the
+    /// main thread.
+    private func probeWithHostApp() -> @Sendable (ServerConfig, Bool) async -> (ProbeResult, HostLookup) {
+        let probe = self.probe, hostAppOf = self.hostAppOf, listeningApp = self.listeningApp
+        let learned = learnedHostPorts, skip = lookedUpPorts
+        return { config, fetchTools in
+            let result = await probe(config, fetchTools)
+            let lookup = HostApps.lookUp(config, healthy: result.state == .healthy, learned: learned, skip: skip,
+                                         hostAppOf: hostAppOf, listeningApp: listeningApp)
+            return (result, lookup)
+        }
+    }
+
+    /// Keep what a probe's lookup found: ports learned (each looked up once
+    /// per session) and the config's app.
+    private func record(_ lookup: HostLookup, for config: ServerConfig) {
+        lookedUpPorts.formUnion(lookup.lookedUp)
+        if !lookup.learned.isEmpty {
+            learnedHostPorts.merge(lookup.learned) { _, new in new }
             AppPreferences.saveHostAppPorts(learnedHostPorts, to: defaults)
         }
+        hostAppBySpec[Self.probeSpec(config)] = lookup.app
     }
 
     /// An app just opened: check at once the servers that waited for it, after
@@ -501,15 +521,15 @@ final class HealthMonitor {
 
             let targets = self.servers.filter { ids.contains($0.id) }
             let specGroups = Dictionary(grouping: targets, by: { Self.probeSpec($0.config) })
-            let probe = self.probe
-            let results = await withTaskGroup(of: ([String], ProbeResult).self) { group in
+            let probe = self.probeWithHostApp()
+            let results = await withTaskGroup(of: ([String], (ProbeResult, HostLookup)).self) { group in
                 for instances in specGroups.values {
                     let config = instances[0].config
                     // Check again always re-reads the tool list (review, 2026-10-14).
                     let ids = instances.map(\.id)
                     group.addTask { (ids, await probe(config, true)) }
                 }
-                var out: [String: ProbeResult] = [:]
+                var out: [String: (ProbeResult, HostLookup)] = [:]
                 for await (ids, r) in group {
                     for id in ids { out[id] = r }
                 }
@@ -517,8 +537,8 @@ final class HealthMonitor {
             }
 
             for index in self.servers.indices where ids.contains(self.servers[index].id) {
-                guard let result = results[self.servers[index].id] else { continue }
-                self.apply(result, at: index)
+                guard let (result, lookup) = results[self.servers[index].id] else { continue }
+                self.apply(result, at: index, lookup: lookup)
             }
         }
         probeTask = task
@@ -530,7 +550,8 @@ final class HealthMonitor {
     /// Fold one probe result into the snapshot at `index`: smoothing, tools cache,
     /// and failure reason. Shared by the full cycle and per-group refresh so the two
     /// paths cannot drift.
-    private func apply(_ result: ProbeResult, at index: Int) {
+    private func apply(_ result: ProbeResult, at index: Int, lookup: HostLookup) {
+        record(lookup, for: servers[index].config)
         // A pause issued while this probe was in flight wins: never overwrite
         // `.paused` with a stale result.
         guard !isPaused(servers[index].config.name) else { return }
@@ -547,7 +568,6 @@ final class HealthMonitor {
             return
         }
         servers[index].hostApp = nil
-        if result.state == .healthy { learnHostPorts(of: servers[index].config) }
         let smoothed = Self.smoothedState(
             probe: result.state,
             transientFailure: result.transientFailure,
@@ -770,8 +790,8 @@ final class HealthMonitor {
         // answer. Cuts a full cycle's spawn count roughly in half on real setups.
         let specGroups = Dictionary(grouping: due, by: { Self.probeSpec($0.config) })
 
-        let probe = self.probe
-        await withTaskGroup(of: ([String], ProbeResult).self) { group in
+        let probe = self.probeWithHostApp()
+        await withTaskGroup(of: ([String], (ProbeResult, HostLookup)).self) { group in
             for instances in specGroups.values {
                 let config = instances[0].config
                 // Fetch tools if ANY instance needs them (a timer round re-fetches
@@ -787,14 +807,14 @@ final class HealthMonitor {
             // Apply each result the moment it arrives, so the header count and the
             // dots update live during the cycle instead of freezing until the
             // slowest probe (a full cycle takes ~10-25s on a large setup) finishes.
-            for await (ids, result) in group {
+            for await (ids, (result, lookup)) in group {
                 if Task.isCancelled { break }
                 for id in ids {
                     // A result for a config that changed meanwhile describes the
                     // old setup: never apply it (Argon 2026-10-16 #8).
                     guard let index = servers.firstIndex(where: { $0.id == id }),
                           Self.probeSpec(servers[index].config) == specs[id] else { continue }
-                    apply(result, at: index)
+                    apply(result, at: index, lookup: lookup)
                 }
             }
         }

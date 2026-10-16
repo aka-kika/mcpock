@@ -5,6 +5,16 @@ import Foundation
 /// `.app` bundle (symbolic links followed), a launcher script that names one,
 /// or a local port an app was seen listening on. Anything else stays a normal
 /// check.
+/// What a probe found out about a server's app (`HostApps.lookUp`).
+struct HostLookup: Sendable {
+    /// The app the config belongs to, or nil.
+    var app: HostApp?
+    /// Ports looked up with lsof this time.
+    var lookedUp: Set<Int> = []
+    /// Of those, the ones an app listens on: port -> bundle path.
+    var learned: [Int: String] = [:]
+}
+
 enum HostApps {
     // MARK: - Pure parts (tests pin them)
 
@@ -50,10 +60,28 @@ enum HostApps {
 
     // MARK: - This Mac
 
+    /// What a probe learns about a config's app, off the main thread (Argon
+    /// 2026-10-17 #7: lsof and file reads on the main thread froze the panel).
+    /// A healthy server's local ports are looked up first (once per port per
+    /// session), so a port learned now already names the app.
+    nonisolated static func lookUp(
+        _ config: ServerConfig, healthy: Bool, learned: [Int: String], skip: Set<Int>,
+        hostAppOf: (ServerConfig, [Int: String]) -> HostApp?, listeningApp: (Int) -> HostApp?
+    ) -> HostLookup {
+        var lookup = HostLookup()
+        if healthy {
+            for port in localPorts(of: config) where learned[port] == nil && !skip.contains(port) {
+                lookup.lookedUp.insert(port)
+                if let app = listeningApp(port) { lookup.learned[port] = app.bundlePath }
+            }
+        }
+        lookup.app = hostAppOf(config, learned.merging(lookup.learned) { _, new in new })
+        return lookup
+    }
+
     /// The app `config` belongs to, or nil. `learnedPorts`: port -> bundle
-    /// path, from apps seen listening (`learnListeningApp`).
-    @MainActor
-    static func app(for config: ServerConfig, learnedPorts: [Int: String]) -> HostApp? {
+    /// path, from apps seen listening (`listeningApp`).
+    nonisolated static func app(for config: ServerConfig, learnedPorts: [Int: String]) -> HostApp? {
         var ports: [Int] = []
         switch config.transport {
         case .stdio:
@@ -95,8 +123,7 @@ enum HostApps {
 
     /// The `.app` listening on a local port right now, or nil (a command-line
     /// server, or nothing listening).
-    @MainActor
-    static func listeningApp(port: Int) -> HostApp? {
+    nonisolated static func listeningApp(port: Int) -> HostApp? {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
         task.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
@@ -115,8 +142,7 @@ enum HostApps {
     }
 
     /// The local ports a config talks to (for learning which app serves them).
-    @MainActor
-    static func localPorts(of config: ServerConfig) -> [Int] {
+    nonisolated static func localPorts(of config: ServerConfig) -> [Int] {
         switch config.transport {
         case .http, .sse:
             return config.url.flatMap(localPort(inURL:)).map { [$0] } ?? []
@@ -128,7 +154,7 @@ enum HostApps {
         }
     }
 
-    private static func hostApp(atBundlePath path: String) -> HostApp? {
+    nonisolated private static func hostApp(atBundlePath path: String) -> HostApp? {
         guard FileManager.default.fileExists(atPath: path), let bundle = Bundle(path: path) else { return nil }
         // mcpock's own helper: mcpock is always running when it checks.
         if bundle.bundleIdentifier?.hasPrefix("com.mcpock.app") == true { return nil }
@@ -139,7 +165,7 @@ enum HostApps {
     }
 
     /// A small text launcher (`#!`), read only to find what it points at.
-    private static func launcherScript(atPath path: String) -> String? {
+    nonisolated private static func launcherScript(atPath path: String) -> String? {
         guard path.hasPrefix("/"),
               let attrs = try? FileManager.default.attributesOfItem(atPath: path),
               attrs[.type] as? FileAttributeType == .typeRegular,
