@@ -222,8 +222,12 @@ final class HealthMonitor {
         statusDidChange()
     }
 
+    /// The icon follows what the panel lists (Argon 2026-10-16 #5): a hidden
+    /// server counts only while it is broken, and then the panel lists it too.
     var aggregate: AggregateState {
-        Self.iconState(servers.map(\.state), anyDiffers: groups.contains(where: \.differsNeedsAttention))
+        let shown = visibleGroups
+        if shown.isEmpty && !groups.isEmpty { return .allHealthy }
+        return Self.iconState(shown.map(\.state), anyDiffers: shown.contains(where: \.differsNeedsAttention))
     }
 
     /// Menu-bar icon verdict across all servers. Pure — safe to unit-test.
@@ -597,10 +601,17 @@ final class HealthMonitor {
         var visible: [ServerGroup] = []
         var hiddenGroups: [ServerGroup] = []
         for group in groups {
-            if isHidden(group.name, in: hidden) { hiddenGroups.append(group) }
+            if staysHidden(group, isHidden: isHidden(group.name, in: hidden)) { hiddenGroups.append(group) }
             else { visible.append(group) }
         }
         return (visible, hiddenGroups)
+    }
+
+    /// A hidden server leaves the panel, except while it is broken: Settings
+    /// promises mcpock "tells you if they break", and the red icon needs a row
+    /// that explains it (Argon 2026-10-16 #5). Shared with the status file.
+    nonisolated static func staysHidden(_ group: ServerGroup, isHidden: Bool) -> Bool {
+        isHidden && group.state != .broken
     }
 
     /// IDs of the snapshots that belong to a display group (matched by normalized name).

@@ -412,7 +412,8 @@ the menu bar). It starts checking at launch and writes the status file once the
 first check is done, then ask again.
 
 **Hidden servers?**
-Still checked, just not listed. Change it in Settings > Servers.
+Still checked, just not listed. A hidden server that breaks comes back to the
+panel until it works again. Change it in Settings > Servers.
 
 ## Thanks
 

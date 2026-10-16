@@ -13,7 +13,7 @@ struct SettingsServersPane: View {
     let theme: ThemeColors
 
     static let intro = "Pin a server to keep it at the top of the panel, or hide it. Hidden servers leave "
-        + "the panel, but mcpock still checks them and tells you if they break."
+        + "the panel, but mcpock still checks them and brings one back while it is broken."
 
     static let showAsWidth: CGFloat = 96
 

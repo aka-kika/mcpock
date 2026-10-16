@@ -143,6 +143,17 @@ final class ServerGroupingTests: XCTestCase {
         XCTAssertEqual(hidden.map(\.name), ["eventkit"])
     }
 
+    /// Argon 2026-10-16 #5: a hidden server comes back while it is broken, so
+    /// the red icon always has a row that explains it.
+    func testHiddenBrokenServerComesBack() {
+        let groups = HealthMonitor.groupByName(
+            [named("pieces", .code, .broken), named("eventkit", .cursor, .degraded)])
+        let hidden: Set<String> = [HealthMonitor.normalizedName("pieces"), HealthMonitor.normalizedName("eventkit")]
+        let (visible, stillHidden) = HealthMonitor.partition(groups, hidden: hidden)
+        XCTAssertEqual(visible.map(\.name), ["pieces"])
+        XCTAssertEqual(stillHidden.map(\.name), ["eventkit"])
+    }
+
     /// The copied error report opens with LLM-facing framing so a paste is self-explanatory.
     func testCopyTextHasFramingPreamble() {
         let snaps = [snap(.cursor, .broken, reason: "Timed out after 10s")]
