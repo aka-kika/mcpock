@@ -209,6 +209,10 @@ struct GroupSource: Sendable, Hashable, Identifiable {
     let headerKeys: [String]
     let state: HealthState
     let failureReason: String?
+    /// What "set up differently" compares (`Differs.launchTarget`, joined), so
+    /// the card's wording groups agents the same way the check does. Empty in
+    /// fixtures that don't care: `target` stands in.
+    var compareKey: String = ""
 }
 
 /// A display row: all instances that share a server **name**, collapsed into one.

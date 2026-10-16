@@ -56,6 +56,22 @@ final class DiffersTests: XCTestCase {
         XCTAssertEqual(notes.first?.target, "npx -y reed-md --api-key \(SecretMask.dots)")
     }
 
+    /// Argon 2026-10-16 #9: each agent passing its own key is the same server.
+    func testOwnKeysPerAgentGiveNoDiff() {
+        XCTAssertTrue(Differs.detect([
+            stdio(.code, args: ["-y", "firecrawl-mcp", "--api-key", "fc-aaaaaaaaaaaaaaaaaaaa1"]),
+            stdio(.cursor, args: ["-y", "firecrawl-mcp", "--api-key", "fc-bbbbbbbbbbbbbbbbbbbb2"]),
+        ]).isEmpty)
+        XCTAssertTrue(Differs.detect([
+            http(.code, url: "https://mcp.example.com/mcp?apiKey=one111"),
+            http(.cursor, url: "https://mcp.example.com/mcp?apiKey=two222"),
+        ]).isEmpty)
+        XCTAssertEqual(Differs.detect([
+            http(.code, url: "https://mcp.example.com/mcp?apiKey=one111"),
+            http(.cursor, url: "https://other.example.com/mcp?apiKey=one111"),
+        ]).count, 2, "a different host still differs")
+    }
+
     func testEnvOnlyDifferencesGiveNoDiff() {
         let notes = Differs.detect([
             stdio(.code, env: ["API_KEY": "one"]),

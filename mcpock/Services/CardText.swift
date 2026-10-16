@@ -155,9 +155,10 @@ enum CardText {
         var byTarget: [String: [String]] = [:]
         for source in sources {
             let label = AgentBadge.displayLabel(source.label)
-            if byTarget[source.target] == nil { order.append(source.target) }
-            if !(byTarget[source.target] ?? []).contains(label) {
-                byTarget[source.target, default: []].append(label)
+            let key = source.compareKey.isEmpty ? source.target : source.compareKey
+            if byTarget[key] == nil { order.append(key) }
+            if !(byTarget[key] ?? []).contains(label) {
+                byTarget[key, default: []].append(label)
             }
         }
         return order.compactMap { byTarget[$0] }

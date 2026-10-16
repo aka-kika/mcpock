@@ -57,16 +57,24 @@ enum Differs {
         return launchers.contains(name) ? name : normalized
     }
 
+    /// Secrets are masked before comparing (Argon 2026-10-16 #9): two agents
+    /// that pass their own API key (`--api-key`, `?apiKey=`) launch the same
+    /// server, and Compare shows both as the same masked line.
     static func launchTarget(_ config: ServerConfig) -> LaunchTarget {
+        let known = SecretMask.knownSecrets(env: config.env, headers: config.headers)
         switch config.transport {
         case .stdio:
             let command = comparedCommand(config.command ?? "")
-            let args = config.args.map { PathResolver.expandTilde($0) }
+            var previous: String?
+            let args = config.args.map { arg -> String in
+                defer { previous = arg }
+                return SecretMask.maskArgument(PathResolver.expandTilde(arg), after: previous, known: known)
+            }
             return LaunchTarget(parts: ["stdio", command] + args)
         case .http, .sse:
             // http and sse share one key: the same URL is the same server even
             // when one agent spells the transport differently.
-            return LaunchTarget(parts: ["url", normalizedURL(config.url ?? "")])
+            return LaunchTarget(parts: ["url", normalizedURL(SecretMask.url(config.url ?? "", known: known))])
         }
     }
 

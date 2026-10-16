@@ -565,7 +565,8 @@ final class HealthMonitor {
                     envKeys: v.config.env.keys.sorted(),
                     headerKeys: v.config.headers.keys.sorted(),
                     state: v.state,
-                    failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) }
+                    failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) },
+                    compareKey: Differs.launchTarget(v.config).parts.joined(separator: "\u{1F}")
                 )
             }
             let configs = variants.map(\.config)
