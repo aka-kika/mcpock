@@ -18,6 +18,9 @@ enum SettingsLauncher {
     /// too rather than holding a second weak reference to the same object.
     static weak var updateController: UpdateController?
 
+    /// The usage counter, so turning Usage on in Settings reads at once.
+    static weak var usageStore: UsageStore?
+
     /// Which pane the window shows. Kept here, not in the view, so `open(tab:)`
     /// can switch a window that is already open and a reopened window keeps
     /// its last pane.

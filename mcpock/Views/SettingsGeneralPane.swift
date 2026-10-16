@@ -189,6 +189,10 @@ struct SettingsGeneralPane: View {
         .onChange(of: probeIntervalRaw) { _, _ in
             monitor?.probeIntervalChanged()
         }
+        .onChange(of: usageWindowRaw) { _, _ in
+            guard let monitor else { return }
+            SettingsLauncher.usageStore?.usageWindowChanged(knownServers: MCPockApp.knownServerNames(monitor))
+        }
     }
 
     // MARK: - Status texts

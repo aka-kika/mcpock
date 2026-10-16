@@ -37,6 +37,9 @@ final class UsageStore {
     private var cursors: [String: UsageCursor] = [:]
 
     private var hasLoaded = false
+    /// True once real counts exist: a saved file was read, or a scan finished.
+    /// Until then `count` says nil (a dash), never a fake 0 (Argon 2026-10-16 #13).
+    private(set) var hasCounts = false
     /// Whether `start` has run. The app starts the store only once discovery
     /// has named the servers (see `MCPockApp`).
     var isStarted: Bool { hasLoaded }
@@ -101,12 +104,21 @@ final class UsageStore {
     /// differs from the base agent: a Hermes profile's own calls are
     /// "Hermes · scribe", not "Hermes".
     func count(agent: String, server: String, window: UsageWindow, recordedAs: String? = nil, now: Date = Date()) -> Int? {
-        guard hasReader(for: agent) else { return nil }
+        guard hasReader(for: agent), hasCounts else { return nil }
         let key = BucketKey(agent: recordedAs ?? agent, server: HealthMonitor.normalizedName(server))
         let days = buckets[key] ?? [:]
         guard let windowSize = window.days else { return days.values.reduce(0, +) } // All time
         let cutoff = Self.dayIndex(for: now) - (windowSize - 1)
         return days.reduce(0) { sum, entry in entry.key >= cutoff ? sum + entry.value : sum }
+    }
+
+    /// Settings changed the Usage window. Turning Usage on reads at once,
+    /// not at the next (throttled) cycle end, which in Manual mode never came.
+    @discardableResult
+    func usageWindowChanged(knownServers: Set<String>) -> Task<Void, Never>? {
+        guard !knownServers.isEmpty else { return nil } // the first cycle's end starts it
+        guard hasLoaded else { return start(knownServers: knownServers) }
+        return refresh(knownServers: knownServers)
     }
 
     // MARK: - Refresh
@@ -137,6 +149,7 @@ final class UsageStore {
             guard let self else { return }
             self.buckets = newBuckets
             self.cursors = newCursors
+            self.hasCounts = true
             self.refreshTask = nil
         }
         refreshTask = task
@@ -214,6 +227,7 @@ final class UsageStore {
         }
         buckets = loaded
         cursors = decoded.cursors
+        hasCounts = true
         // Saved before 1.10.6: the counts are kept as they are, and every
         // source read back then counts as read up to when the file was last
         // saved, so one that starts over later never adds those calls again.

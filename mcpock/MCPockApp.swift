@@ -79,6 +79,7 @@ struct MCPockApp: App {
         }
         #endif
         SettingsLauncher.monitor = monitor
+        SettingsLauncher.usageStore = usageStore
         // In-app updates (round 10): never started while hosting tests (the
         // guard above already returned by then), so a test run never reaches
         // the network or shows Sparkle's permission prompt.
@@ -135,7 +136,7 @@ struct MCPockApp: App {
     /// Every server mcpock currently knows about, normalized — what the
     /// readers use to resolve a call name that can't be split on its own
     /// (a plugin's combined `<plugin>_<server>`, Cursor's dashes-both-ways).
-    private static func knownServerNames(_ monitor: HealthMonitor) -> Set<String> {
+    static func knownServerNames(_ monitor: HealthMonitor) -> Set<String> {
         Set(monitor.groups.map { HealthMonitor.normalizedName($0.name) })
     }
 }

@@ -380,6 +380,24 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
     }
 
+    /// Argon 2026-10-16 #13: before the first scan ends there are no counts
+    /// yet, so a dash, never a fake 0; turning Usage on reads at once.
+    func testNoFakeZeroBeforeTheFirstScanAndOnTurningUsageOn() async {
+        let suite = "mcpock.tests.usagestore.on.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        AppPreferences.saveUsageWindow(.off, to: defaults)
+        let store = UsageStore(
+            readers: [FakeReader(agent: "Code", events: [])], directory: directory, isHostingTests: true, defaults: defaults
+        )
+        XCTAssertNil(store.start(knownServers: ["reed-md"]))
+        XCTAssertNil(store.count(agent: "Code", server: "reed-md", window: .thirtyDays), "nothing counted yet: a dash")
+
+        AppPreferences.saveUsageWindow(.thirtyDays, to: defaults)
+        await store.usageWindowChanged(knownServers: ["reed-md"])?.value
+        XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .thirtyDays), 0, "counted at once: a real 0")
+    }
+
     func testOffStopsReadingEntirely() {
         let suite = "mcpock.tests.usagestore.off.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
