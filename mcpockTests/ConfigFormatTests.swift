@@ -60,6 +60,15 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertEqual(env?["LIBRARIAN_EMBED_MODEL"], "nomic-embed-text")
     }
 
+    /// Argon 2026-10-16 #2: the same file saved with Windows line endings.
+    func testGrokParsesCRLFConfig() {
+        let servers = MCPServersTOML.servers(fromTOML: grokSample.replacingOccurrences(of: "\n", with: "\r\n"))
+        XCTAssertEqual(servers["skill-librarian"]?["command"] as? String, "/opt/py/bin/python")
+        XCTAssertEqual(servers["desktop-commander"]?["args"] as? [String],
+                       ["-y", "@wonderwhy-er/desktop-commander@latest"])
+        XCTAssertEqual(Set(servers.keys), Set(MCPServersTOML.servers(fromTOML: grokSample).keys))
+    }
+
     func testGrokParsesMultiLineArray() {
         let servers = MCPServersTOML.servers(fromTOML: grokSample)
         XCTAssertEqual(servers["desktop-commander"]?["args"] as? [String],

@@ -41,6 +41,10 @@ enum MCPServersTOML {
             entries[name] = e
         }
 
+        // A config saved with Windows line endings left `\r` on every line, so
+        // `enabled = true\r` read as disabled and `"npx"\r` kept its quotes
+        // (Argon 2026-10-16 #2). Same normalization as YAMLBlock.
+        let text = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         for rawTextLine in text.components(separatedBy: "\n") {
             // Strip inline comments up front — `enabled = true  # keep` is legal TOML,
             // and an unstripped comment corrupts every value comparison below (it even
