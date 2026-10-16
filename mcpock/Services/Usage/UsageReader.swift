@@ -31,11 +31,16 @@ struct UsageCursor: Codable, Equatable, Sendable {
     /// `newest`: when that file was last saved, so every source read back
     /// then counts as read up to that time.
     var countedBefore: Int64?
+    /// Per file that started over: the cutoff from that moment, kept. A
+    /// rewritten file can be written (and read) in several pieces, and only
+    /// the first read sees it shrink; the later pieces still hold old calls,
+    /// so every later read of it filters by this too (Argon 2026-10-17 #13).
+    var restartCutoff: [String: Int64] = [:]
 
     static let empty = UsageCursor(values: [:])
 
     private enum CodingKeys: String, CodingKey {
-        case values, newest, countedBefore
+        case values, newest, countedBefore, restartCutoff
     }
 
     /// A call's time as `newest` stores it.
@@ -48,6 +53,21 @@ struct UsageCursor: Codable, Equatable, Sendable {
     func uncounted(_ events: [UsageEvent], from source: String) -> [UsageEvent] {
         let cutoff = [newest[source], countedBefore].compactMap { $0 }.max()
         guard let cutoff else { return events }
+        return events.filter { Self.millis($0.date) > cutoff }
+    }
+
+    /// A file `source` starts over: from now on only calls newer than
+    /// everything already counted from it count, on this read and every later
+    /// one (`uncountedAfterRestart`).
+    mutating func startOver(_ source: String) {
+        guard let cutoff = [newest[source], countedBefore, restartCutoff[source]].compactMap({ $0 }).max() else { return }
+        restartCutoff[source] = cutoff
+    }
+
+    /// The events of a file that are newer than its cutoff from when it
+    /// started over; all of them for a file that never did.
+    func uncountedAfterRestart(_ events: [UsageEvent], from source: String) -> [UsageEvent] {
+        guard let cutoff = restartCutoff[source] else { return events }
         return events.filter { Self.millis($0.date) > cutoff }
     }
 
@@ -66,6 +86,7 @@ extension UsageCursor {
         values = try container.decode([String: Int64].self, forKey: .values)
         newest = try container.decodeIfPresent([String: Int64].self, forKey: .newest) ?? [:]
         countedBefore = try container.decodeIfPresent(Int64.self, forKey: .countedBefore)
+        restartCutoff = try container.decodeIfPresent([String: Int64].self, forKey: .restartCutoff) ?? [:]
     }
 }
 

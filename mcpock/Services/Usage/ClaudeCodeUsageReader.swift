@@ -38,12 +38,16 @@ struct ClaudeCodeUsageReader: UsageReader {
             var offset = cursor.values[path] ?? 0
             // Shrank or was replaced with something shorter: nothing at the
             // old offset can still be valid, so start this file over,
-            // counting only calls newer than the ones it already gave.
+            // counting only calls newer than the ones it already gave, now
+            // and on the reads of its later pieces.
             let restarted = size < offset
-            if restarted { offset = 0 }
+            if restarted {
+                offset = 0
+                nextCursor.startOver(path)
+            }
             guard size > offset else { continue }
             var (found, newOffset) = scan(file, from: offset, knownServers: knownServers)
-            if restarted { found = nextCursor.uncounted(found, from: path) }
+            found = nextCursor.uncountedAfterRestart(found, from: path)
             nextCursor.noteCounted(found, from: path)
             events.append(contentsOf: found)
             nextCursor.values[path] = newOffset

@@ -124,6 +124,44 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         XCTAssertEqual(second.map(\.server), ["pieces"], "the call counted before is not counted again")
     }
 
+    /// Argon 2026-10-17 #13: a rewritten transcript written in pieces. Only
+    /// the first read sees it shrink; the old calls in the later pieces are
+    /// still never counted again.
+    func testRewrittenFileReadInPiecesNeverCountsOldCallsTwice() {
+        let old = [
+            line(name: "mcp__skill-librarian__librarian_find", timestamp: "2026-01-01T10:00:00.000Z"),
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T11:00:00.000Z"),
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T12:00:00.000Z"),
+        ]
+        let url = write(old)
+        let reader = ClaudeCodeUsageReader(root: root)
+        let (first, cursor) = reader.read(since: .empty, knownServers: [])
+        XCTAssertEqual(first.count, 3)
+
+        // Rewritten: the first piece has no MCP call at all.
+        try! Data((line(name: "Bash", timestamp: "2026-01-01T09:00:00.000Z") + "\n").utf8).write(to: url)
+        let (second, afterFirstPiece) = reader.read(since: cursor, knownServers: [])
+        XCTAssertTrue(second.isEmpty)
+
+        // The rest arrives: the old calls again, then one new call.
+        let handle = try! FileHandle(forWritingTo: url)
+        handle.seekToEndOfFile()
+        handle.write(Data((old + [line(name: "mcp__pieces__ask_pieces_ltm", timestamp: "2026-01-01T13:00:00.000Z")])
+            .map { $0 + "\n" }.joined().utf8))
+        try? handle.close()
+        let (third, afterRest) = reader.read(since: afterFirstPiece, knownServers: [])
+        XCTAssertEqual(third.map(\.server), ["pieces"], "only the new call")
+
+        // Kept across launches, and later calls still count.
+        let saved = try! JSONDecoder().decode(UsageCursor.self, from: JSONEncoder().encode(afterRest))
+        XCTAssertEqual(saved, afterRest)
+        let more = try! FileHandle(forWritingTo: url)
+        more.seekToEndOfFile()
+        more.write(Data((line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-01T14:00:00.000Z") + "\n").utf8))
+        try? more.close()
+        XCTAssertEqual(reader.read(since: saved, knownServers: []).events.map(\.server), ["eventkit"])
+    }
+
     func testIncompleteTrailingLineIsNotConsumedYet() {
         let directory = root!
         let url = directory.appendingPathComponent("live.jsonl")

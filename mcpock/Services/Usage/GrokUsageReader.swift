@@ -70,14 +70,17 @@ struct GrokUsageReader: UsageReader {
             if startOffset > size {
                 restarted = true
             }
-            if restarted { startOffset = 0 }
+            if restarted {
+                startOffset = 0
+                next.startOver(key)
+            }
 
             if startOffset < size {
                 var (newEvents, consumedOffset) = GrokUsageReader.readNewLines(
                     atPath: path,
                     from: startOffset
                 )
-                if restarted { newEvents = next.uncounted(newEvents, from: key) }
+                newEvents = next.uncountedAfterRestart(newEvents, from: key)
                 next.noteCounted(newEvents, from: key)
                 events.append(contentsOf: newEvents)
                 values[offsetKey] = consumedOffset
