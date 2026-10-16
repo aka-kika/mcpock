@@ -80,6 +80,32 @@ final class PanelStateTests: XCTestCase {
         state.panelClosed()
     }
 
+    /// Argon 2026-10-16 #11: the automatic jump to Needs you is not her
+    /// choice, so once nothing is broken the next open shows her own filter.
+    func testAutoJumpDoesNotStickAfterRecovery() async {
+        let monitor = HealthMonitor(defaults: defaults)
+        let config = ServerConfig(id: "Test:a", name: "a", source: ServerSource(label: "Test"), projectPath: nil,
+                                  transport: .stdio, command: "a", args: [], env: [:], url: nil, headers: [:])
+        let broken = BrokenSwitch()
+        monitor.discover = { [config] }
+        monitor.probe = { _, _ in
+            broken.isOn ? ProbeResult(state: .broken, failureReason: "down", tools: nil)
+                        : ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        await monitor.reloadConfigs()
+        for _ in 0..<HealthMonitor.failureThreshold { await monitor.refreshNow(force: true) }
+        let state = PanelState(monitor: monitor, defaults: defaults)
+        state.panelOpened()
+        XCTAssertEqual(state.filter, .problems, "jumps while something is broken")
+        state.panelClosed()
+
+        broken.isOn = false
+        await monitor.refreshNow(force: true)
+        state.panelOpened()
+        XCTAssertEqual(state.filter, .all, "back to her own filter once it recovered")
+        state.panelClosed()
+    }
+
     /// Round 8: the Agents tab starts with every agent closed; the one she
     /// opens stays open across panel closes and opens (this app session).
     func testOpenAgentIsKeptBetweenPanelOpens() {
@@ -229,5 +255,14 @@ final class PanelStateTests: XCTestCase {
     /// picks lasts until the app quits.
     func testThePanelOpensOnTheAgentsTab() {
         XCTAssertEqual(makeState().tab, .agents)
+    }
+}
+
+private final class BrokenSwitch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var on = true
+    var isOn: Bool {
+        get { lock.withLock { on } }
+        set { lock.withLock { on = newValue } }
     }
 }

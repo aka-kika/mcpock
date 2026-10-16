@@ -271,6 +271,15 @@ final class PanelState {
         installKeyMonitor()
         isPanelOpen = true
         userPickedFilter = false
+        // Start from her own saved choice: an earlier automatic jump to Needs
+        // you is not remembered, so without this the panel stayed on it after
+        // every server recovered (Argon 2026-10-16 #11).
+        let saved = defaults.string(forKey: AppPreferences.panelFilterKey).flatMap(PanelFilter.init(rawValue:)) ?? .all
+        if filter != saved {
+            isAutoFiltering = true
+            filter = saved
+            isAutoFiltering = false
+        }
         jumpToNeedsYouIfBroken()
         // The open agent is kept (round 8): she comes back to where she was.
         if let selectedName, !orderedNames.contains(selectedName) {
