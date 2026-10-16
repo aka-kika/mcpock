@@ -349,6 +349,11 @@ extension GlassPanelController: @preconcurrency NSStatusItemExpandedInterfaceDel
             session.cancel()
             return
         }
+        if GlassPanelStyle.itemClickCloses(isShown: isShown, hasSession: self.session != nil) {
+            hide()
+            session.cancel()
+            return
+        }
         self.session = session
         present(from: button)
     }
@@ -363,6 +368,13 @@ extension GlassPanelController: @preconcurrency NSStatusItemExpandedInterfaceDel
 /// The glass panel's measures and the one rule for when it is used. Not tied
 /// to macOS 27 like the controller, so the panel view and the app can read it.
 enum GlassPanelStyle {
+    /// A click on the item while the panel is open without a session (opened
+    /// with ⌃⌥M) closes it, as a second click does when a click opened it.
+    /// Before, it showed the open panel again (Argon 2026-10-17 #15).
+    nonisolated static func itemClickCloses(isShown: Bool, hasSession: Bool) -> Bool {
+        isShown && !hasSession
+    }
+
     /// The corner of the macOS 27 menu-bar dropdowns, near enough.
     nonisolated static let cornerRadius: CGFloat = 16
     /// Gap between the menu bar and the panel's top edge.

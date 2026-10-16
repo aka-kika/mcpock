@@ -6,6 +6,12 @@ import XCTest
 /// The window itself needs a real menu bar; these cover the pure parts.
 final class GlassPanelTests: XCTestCase {
     /// Only Glass uses it, and only where the expanded-interface API exists.
+    /// Argon 2026-10-17 #15: opened with ⌃⌥M, a click on the item closes it.
+    func testItemClickClosesAPanelOpenedByTheShortcut() {
+        XCTAssertTrue(GlassPanelStyle.itemClickCloses(isShown: true, hasSession: false))
+        XCTAssertFalse(GlassPanelStyle.itemClickCloses(isShown: false, hasSession: false), "closed: the click opens it")
+    }
+
     func testOnlyGlassUsesTheGlassPanel() {
         for theme in [AppTheme.system, .dark, .light] {
             XCTAssertFalse(GlassPanelStyle.usesGlassPanel(themeRaw: theme.rawValue), "\(theme) keeps MenuBarExtra")
