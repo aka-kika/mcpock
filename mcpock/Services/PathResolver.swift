@@ -76,17 +76,19 @@ enum PathResolver {
     }
 
     /// Build environment for a child process: base process env, common PATH prepend, then config env.
-    static func processEnvironment(configEnv: [String: String]) -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
+    /// A PATH from the config comes first as written (`~` expanded in each
+    /// entry), with the common bins only appended as fallbacks: a server set
+    /// to a specific nvm Node or Python venv keeps it (Argon 2026-10-17 #5).
+    static func processEnvironment(configEnv: [String: String], base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        var env = base
         env["PATH"] = prependingCommonBins(to: env["PATH"] ?? "")
 
         for (key, value) in configEnv {
             env[key] = expandTilde(value)
         }
 
-        // Ensure PATH from config still has common bins if the config overwrote it.
-        if configEnv.keys.contains("PATH"), let path = env["PATH"] {
-            env["PATH"] = prependingCommonBins(to: path)
+        if let path = configEnv["PATH"] {
+            env["PATH"] = appendingCommonBins(to: path)
         }
 
         return env
@@ -97,6 +99,15 @@ enum PathResolver {
         var parts = path.split(separator: ":").map(String.init)
         for p in commonBinPaths.reversed() where !parts.contains(p) {
             parts.insert(p, at: 0)
+        }
+        return parts.joined(separator: ":")
+    }
+
+    /// `path` with `~` expanded in each entry, then any missing `commonBinPaths` after it.
+    static func appendingCommonBins(to path: String) -> String {
+        var parts = path.split(separator: ":").map { expandTilde(String($0)) }
+        for p in commonBinPaths where !parts.contains(p) {
+            parts.append(p)
         }
         return parts.joined(separator: ":")
     }

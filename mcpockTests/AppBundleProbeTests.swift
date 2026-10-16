@@ -125,3 +125,25 @@ final class AppBundleProbeTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 }
+
+/// Argon 2026-10-17 #5: a server's own PATH wins over the common bins.
+final class PathResolverEnvironmentTests: XCTestCase {
+    func testTheServersPathComesFirst() {
+        let env = PathResolver.processEnvironment(
+            configEnv: ["PATH": "~/.nvm/versions/node/v18.20.0/bin:/usr/bin"],
+            base: ["PATH": "/usr/bin:/bin"]
+        )
+        let parts = env["PATH"]!.split(separator: ":").map(String.init)
+        XCTAssertEqual(parts.first, NSHomeDirectory() + "/.nvm/versions/node/v18.20.0/bin", "first, with ~ expanded")
+        XCTAssertEqual(parts[1], "/usr/bin", "its own order kept")
+        XCTAssertLessThan(parts.firstIndex(of: NSHomeDirectory() + "/.nvm/versions/node/v18.20.0/bin")!,
+                          parts.firstIndex(of: "/opt/homebrew/bin")!, "Homebrew never shadows it")
+        XCTAssertEqual(Set(parts).count, parts.count, "no duplicates")
+        XCTAssertTrue(parts.contains("/bin"), "common bins still there as fallbacks")
+    }
+
+    func testWithoutItsOwnPathTheCommonBinsComeFirst() {
+        let env = PathResolver.processEnvironment(configEnv: [:], base: ["PATH": "/usr/bin:/bin"])
+        XCTAssertTrue(env["PATH"]!.hasPrefix("/opt/homebrew/bin:"), env["PATH"]!)
+    }
+}
