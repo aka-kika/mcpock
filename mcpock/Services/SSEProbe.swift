@@ -10,10 +10,16 @@ import Foundation
 /// `tools/list` and wait again, then drop the stream.
 enum SSEProbe {
     static let probeTimeout: Duration = .seconds(10)
+    /// How long the stream may stay silent before its `endpoint` event. A
+    /// legacy SSE server sends it at once; a streamable-HTTP server labelled
+    /// `sse` may answer the GET with an event stream and never send one, and
+    /// then the caller falls back to the streamable probe (Argon 2026-10-17 #3).
+    static let endpointTimeout: Duration = .seconds(3)
 
     /// `nil` when the URL is not a legacy SSE endpoint (no 2xx `text/event-stream`
-    /// answer to the GET) — the caller then tries the streamable-HTTP probe instead,
-    /// because configs routinely label streamable servers `sse`.
+    /// answer to the GET, or a stream that never announces an endpoint) — the
+    /// caller then tries the streamable-HTTP probe instead, because configs
+    /// routinely label streamable servers `sse`.
     static func probe(url: URL, headers: [String: String], fetchTools: Bool) async -> ProbeResult? {
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -42,11 +48,16 @@ enum SSEProbe {
             return nil
         }
 
+        let endpoint = EndpointSeen()
         do {
             let result = try await withThrowingTaskGroup(of: ProbeResult.self) { group in
-                group.addTask { try await handshake(stream: bytes, base: url, headers: headers, fetchTools: fetchTools) }
                 group.addTask {
-                    try await Task.sleep(for: probeTimeout)
+                    try await handshake(stream: bytes, base: url, headers: headers, fetchTools: fetchTools, endpoint: endpoint)
+                }
+                group.addTask {
+                    try await Task.sleep(for: endpointTimeout)
+                    if !endpoint.seen { throw ProbeError.protocolError("SSE stream sent no endpoint event") }
+                    try await Task.sleep(for: probeTimeout - endpointTimeout)
                     throw ProbeError.timeout(probeTimeout)
                 }
                 let first = try await group.next()!
@@ -55,6 +66,8 @@ enum SSEProbe {
             }
             return result
         } catch {
+            // An event stream with no endpoint is not a legacy SSE server.
+            if !endpoint.seen { return nil }
             return ProbeResult(
                 state: .broken,
                 failureReason: (error as? ProbeError)?.localizedDescription ?? error.localizedDescription,
@@ -69,14 +82,25 @@ enum SSEProbe {
 
     private typealias Lines = AsyncLineSequence<URLSession.AsyncBytes>.AsyncIterator
 
+    /// Set once the stream announced its POST endpoint.
+    private final class EndpointSeen: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        var seen: Bool {
+            get { lock.withLock { value } }
+            set { lock.withLock { value = newValue } }
+        }
+    }
+
     private static func handshake(
-        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool
+        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool, endpoint seen: EndpointSeen
     ) async throws -> ProbeResult {
         var lines = stream.lines.makeAsyncIterator()
 
         guard let endpointText = try await nextEvent(&lines, named: "endpoint")?.data else {
             throw ProbeError.protocolError("SSE stream sent no endpoint event")
         }
+        seen.seen = true
         guard let endpoint = URL(string: endpointText.trimmingCharacters(in: .whitespaces), relativeTo: base)?.absoluteURL
         else { throw ProbeError.invalidURL(endpointText) }
 

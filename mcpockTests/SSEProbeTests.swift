@@ -50,10 +50,10 @@ final class SSEProbeTests: XCTestCase {
         httpd.serve_forever()
     """
 
-    private func startMock() throws -> (Process, String) {
+    private func startMock(_ script: String? = nil) throws -> (Process, String) {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("mcpock-sse-mock-\(UUID().uuidString).py")
-        try mock.write(to: tmp, atomically: true, encoding: .utf8)
+        try (script ?? mock).write(to: tmp, atomically: true, encoding: .utf8)
         let server = Process()
         server.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         server.arguments = [tmp.path]
@@ -96,5 +96,59 @@ final class SSEProbeTests: XCTestCase {
         let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/not-a-stream")!,
                                           headers: [:], fetchTools: false)
         XCTAssertNil(result, "a 404 without text/event-stream is 'not SSE', not 'broken'")
+    }
+
+    /// Argon 2026-10-17 #3: a streamable-HTTP server may answer the GET with
+    /// an event stream that never announces an endpoint. Labelled `sse`, it
+    /// still probes healthy through the streamable probe.
+    func testStreamWithoutEndpointFallsBackToStreamableProbe() async throws {
+        let streamable = """
+        import sys, json, time, http.server, socketserver
+
+        class H(http.server.BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+            def log_message(self, *a): pass
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.end_headers()
+                try:
+                    while True:
+                        self.wfile.write(b': ping\\n\\n'); self.wfile.flush(); time.sleep(1)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                msg = json.loads(self.rfile.read(length)) if length else {}
+                mid = msg.get('id')
+                if mid is None:
+                    self.send_response(202); self.send_header('Content-Length', '0'); self.end_headers(); return
+                result = {'protocolVersion':'2025-06-18','capabilities':{},'serverInfo':{'name':'s','version':'0'}}
+                if msg.get('method') == 'tools/list':
+                    result = {'tools':[{'name':'echo','description':'Echo'}]}
+                body = json.dumps({'jsonrpc':'2.0','id':mid,'result':result}).encode()
+                self.send_response(200); self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+            def do_DELETE(self):
+                self.send_response(405); self.send_header('Content-Length', '0'); self.end_headers()
+
+        class S(socketserver.ThreadingMixIn, http.server.HTTPServer):
+            daemon_threads = True
+
+        with S(('127.0.0.1', 0), H) as httpd:
+            sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
+            httpd.serve_forever()
+        """
+        let (server, port) = try startMock(streamable)
+        defer { server.terminate(); server.waitUntilExit() }
+        let url = "http://127.0.0.1:\(port)/mcp"
+        let none = await SSEProbe.probe(url: URL(string: url)!, headers: [:], fetchTools: false)
+        XCTAssertNil(none, "no endpoint: not SSE")
+        let config = ServerConfig(
+            id: "test:sse", name: "labelled-sse", source: .code, projectPath: nil,
+            transport: .sse, command: nil, args: [], env: [:], url: url, headers: [:])
+        let result = await HTTPProbe.probe(config: config, fetchTools: true)
+        XCTAssertEqual(result.state, .healthy, "got \(result.state): \(result.failureReason ?? "")")
+        XCTAssertEqual(result.tools?.map(\.name), ["echo"])
     }
 }
