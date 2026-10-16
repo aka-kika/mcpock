@@ -93,6 +93,10 @@ struct MCPockApp: App {
         // hosting tests (returned above): a test run must not take the key.
         // Read from the same store as the theme, since Settings writes it there.
         GlobalHotKey.shared.start(defaults: AppPreferences.store) { PanelToggle.toggle() }
+        // The right-click menu (Settings, Quit) from launch: the MenuBarExtra
+        // mounts its panel view only on the first left-click, so installing it
+        // there left right-click dead until then (Argon 2026-10-16 #12).
+        StatusItemRightClick.install()
         // A full check cycle just finished. The usage store starts only once
         // discovery has named the servers: the Cursor and Hermes readers split
         // call names against them, and a reader's cursor never goes back, so a
@@ -122,9 +126,6 @@ struct MCPockApp: App {
             !Self.isHostingTests && !GlassPanelStyle.usesGlassPanel(themeRaw: themeRaw)
         )) {
             MenuBarPanelView(monitor: monitor, panel: panel)
-                .onAppear {
-                    StatusItemRightClick.install()
-                }
         } label: {
             StatusIconView(aggregate: monitor.aggregate)
         }
