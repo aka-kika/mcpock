@@ -252,6 +252,85 @@ final class RefreshTests: XCTestCase {
         XCTAssertEqual(probed.items.last, "new-launcher")
     }
 
+    /// Argon 2026-10-16 #7: a timer round that found one row's Check again
+    /// in flight used to wait for it and then skip the whole round.
+    @MainActor
+    func testTimerRoundDoesNotRideARowCheck() async throws {
+        let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        let monitor = HealthMonitor(defaults: defaults)
+        func cfg(_ name: String) -> ServerConfig {
+            ServerConfig(id: "Test:\(name)", name: name, source: ServerSource(label: "Test"), projectPath: nil,
+                         transport: .stdio, command: name, args: [], env: [:], url: nil, headers: [:])
+        }
+        let release = LockedFlag()
+        let probed = LockedList()
+        monitor.probe = { config, _ in
+            probed.append(config.command ?? "")
+            if config.command == "slow" {
+                for _ in 0..<500 where !release.value { try? await Task.sleep(for: .milliseconds(5)) }
+            }
+            return ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        let both = [cfg("slow"), cfg("other")]
+        monitor.discover = { both }
+        await monitor.reloadConfigs()
+
+        let rowCheck = Task { await monitor.refresh(groupName: "slow") }
+        for _ in 0..<500 where !probed.items.contains("slow") { try? await Task.sleep(for: .milliseconds(5)) }
+        let tick = Task { await monitor.timerTick() }
+        try? await Task.sleep(for: .milliseconds(50))
+        release.set(true)
+        await rowCheck.value
+        await tick.value
+
+        XCTAssertTrue(probed.items.contains("other"), "the timer round still checks every other server")
+    }
+
+    /// Argon 2026-10-16 #8: a config fixed while a cycle was in flight got
+    /// the old cycle's broken result (and its backoff).
+    @MainActor
+    func testOldCycleNeverOverwritesAFixedConfig() async throws {
+        let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        let monitor = HealthMonitor(defaults: defaults)
+        func cfg(_ command: String) -> ServerConfig {
+            ServerConfig(id: "Test:postiz", name: "postiz", source: ServerSource(label: "Test"), projectPath: nil,
+                         transport: .stdio, command: command, args: [], env: [:], url: nil, headers: [:])
+        }
+        let release = LockedFlag()
+        let started = LockedFlag()
+        monitor.probe = { config, _ in
+            if config.command == "typo" {
+                started.set(true)
+                for _ in 0..<500 where !release.value { try? await Task.sleep(for: .milliseconds(5)) }
+                return ProbeResult(state: .broken, failureReason: "not found", tools: nil)
+            }
+            return ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        let typo = cfg("typo"), fixed = cfg("fixed")
+        monitor.discover = { [typo] }
+        await monitor.reloadConfigs()
+        let cycle = Task { await monitor.refreshNow(force: true) }
+        for _ in 0..<500 where !started.value { try? await Task.sleep(for: .milliseconds(5)) }
+
+        // She fixes the file while that cycle still runs; the timer fires.
+        monitor.discover = { [fixed] }
+        let tick = Task { await monitor.timerTick() }
+        try? await Task.sleep(for: .milliseconds(50))
+        release.set(true)
+        await cycle.value
+        await tick.value
+        XCTAssertFalse(monitor.servers.contains { $0.config.command == "fixed" && $0.state == .broken },
+                       "the old result never lands on the fixed config")
+
+        await monitor.timerTick()
+        XCTAssertEqual(monitor.servers.first?.config.command, "fixed")
+        XCTAssertEqual(monitor.servers.first?.state, .healthy)
+    }
+
     /// Review 2026-10-14: a healthy server's tool list was never asked for
     /// again, so tools it gained later never showed. A timer round still
     /// skips it (cheap); Refresh and Check again always ask.

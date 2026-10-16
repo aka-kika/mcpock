@@ -248,6 +248,10 @@ final class HealthMonitor {
 
     private var timerTask: Task<Void, Never>?
     private var probeTask: Task<Void, Never>?
+    /// True while `probeTask` is a full cycle, false for one row's Check again.
+    /// An unforced cycle rides only a *full* cycle in flight: riding a single
+    /// row's check made the timer skip every other server (Argon 2026-10-16 #7).
+    private var probeTaskIsFullCycle = false
 
     /// Discovery (registry + scan + aka). Replaceable so tests can run a full
     /// Refresh without scanning this Mac or launching its real servers.
@@ -294,6 +298,7 @@ final class HealthMonitor {
         hasStarted = true
         restartTimer()
         Task {
+            await awaitInFlightCycle()
             await reloadConfigs()
             await refreshNow()
         }
@@ -357,16 +362,18 @@ final class HealthMonitor {
     /// degraded into that tick, backoff and all, and a server the user was staring
     /// at stayed red with nothing re-checked.
     func refreshNow(force: Bool = false) async {
-        let waited = await awaitInFlightCycle()
-        if waited && !force { return }
+        let waitedForFullCycle = await awaitInFlightCycle()
+        if waitedForFullCycle && !force { return }
         let task = Task { await self.runProbeCycle(force: force) }
         probeTask = task
+        probeTaskIsFullCycle = true
         await task.value
         if probeTask == task { probeTask = nil }
     }
 
     /// Wait for whichever cycle is in flight, then make sure `probeTask` no longer
-    /// points at a finished task. Returns true when it actually waited for one.
+    /// points at a finished task. Returns true when it waited for a full cycle
+    /// (a single row's Check again doesn't count).
     /// **Whoever wakes first must clear the finished task** — the original
     /// caller's own `probeTask = nil` runs only after *its* continuation gets a
     /// turn, and awaiting an already-completed task returns without suspending,
@@ -376,8 +383,9 @@ final class HealthMonitor {
     private func awaitInFlightCycle() async -> Bool {
         var waited = false
         while let existing = probeTask {
+            let full = probeTaskIsFullCycle
             await existing.value
-            waited = true
+            if full { waited = true }
             if probeTask == existing { probeTask = nil }
             await Task.yield()
         }
@@ -393,6 +401,10 @@ final class HealthMonitor {
     func refreshAll() async {
         refreshHolds += 1
         defer { refreshHolds -= 1 }
+        // Read the configs only once no cycle is in flight: an old cycle that
+        // finished after the reload wrote its result over a server just fixed
+        // (Argon 2026-10-16 #8).
+        await awaitInFlightCycle()
         await reloadConfigs()
         await refreshNow(force: true)
     }
@@ -460,6 +472,7 @@ final class HealthMonitor {
             }
         }
         probeTask = task
+        probeTaskIsFullCycle = false
         await task.value
         if probeTask == task { probeTask = nil }
     }
@@ -661,6 +674,10 @@ final class HealthMonitor {
     /// old entries). `merged` restarts a changed server from `.unknown`, so the
     /// probe below checks the new config at once instead of waiting out a backoff.
     func timerTick() async {
+        // A full cycle that was in flight already covered this round; reading
+        // the configs while it ran let its old result overwrite a fixed server
+        // (Argon 2026-10-16 #8).
+        if await awaitInFlightCycle() { return }
         await reloadConfigs()
         await refreshNow()
     }
@@ -700,13 +717,17 @@ final class HealthMonitor {
                     (ids, await probe(config, fetchTools))
                 }
             }
+            let specs = Dictionary(due.map { ($0.id, Self.probeSpec($0.config)) }, uniquingKeysWith: { first, _ in first })
             // Apply each result the moment it arrives, so the header count and the
             // dots update live during the cycle instead of freezing until the
             // slowest probe (a full cycle takes ~10-25s on a large setup) finishes.
             for await (ids, result) in group {
                 if Task.isCancelled { break }
                 for id in ids {
-                    guard let index = servers.firstIndex(where: { $0.id == id }) else { continue }
+                    // A result for a config that changed meanwhile describes the
+                    // old setup: never apply it (Argon 2026-10-16 #8).
+                    guard let index = servers.firstIndex(where: { $0.id == id }),
+                          Self.probeSpec(servers[index].config) == specs[id] else { continue }
                     apply(result, at: index)
                 }
             }
