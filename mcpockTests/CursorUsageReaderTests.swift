@@ -232,4 +232,13 @@ final class CursorUsageReaderTests: XCTestCase {
         let reader = CursorUsageReader(databasePath: root.appendingPathComponent("state.vscdb").path)
         XCTAssertEqual(reader.agent, "Cursor")
     }
+
+    /// Argon 2026-10-17 #14: `memory`'s `search` is not the server `memory-search`.
+    func testSplitLeavesTheToolAtLeastOneSegment() {
+        let split = CursorUsageReader.split("mcp-memory-search", knownServers: ["memory", "memorysearch"])
+        XCTAssertEqual(split?.server, "memory")
+        XCTAssertEqual(split?.tool, "search")
+        XCTAssertEqual(HermesUsageReader.serverName(from: "mcp_memory_search", knownServers: ["memory", "memorysearch"]),
+                       "memory")
+    }
 }

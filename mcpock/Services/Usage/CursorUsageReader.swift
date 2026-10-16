@@ -220,8 +220,8 @@ struct CursorUsageReader: UsageReader {
     // MARK: - Splitting `mcp-<server>-<tool>`
 
     /// Splits an MCP tool-call name into its server and tool halves. Tries
-    /// the longest dash-joined prefix (after `mcp-`) whose normalized form
-    /// is a known server first, then shorter ones, and falls back to the
+    /// the longest dash-joined prefix (after `mcp-`, leaving the tool at
+    /// least one segment) whose normalized form is a known server first, then shorter ones, and falls back to the
     /// first segment up to the next dash when nothing matches. Returns nil
     /// for a name that isn't `mcp-` at all, or whose server half would be
     /// empty.
@@ -233,7 +233,8 @@ struct CursorUsageReader: UsageReader {
 
         var matchLength = 1
         if parts.count > 1 {
-            for length in stride(from: parts.count, through: 1, by: -1) {
+            // At least one segment stays for the tool (Argon 2026-10-17 #14).
+            for length in stride(from: parts.count - 1, through: 1, by: -1) {
                 let candidate = parts[0..<length].joined(separator: "-")
                 if knownServers.contains(HealthMonitor.normalizedName(candidate)) {
                     matchLength = length

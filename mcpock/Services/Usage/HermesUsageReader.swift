@@ -141,7 +141,8 @@ struct HermesUsageReader: UsageReader {
 
     /// Splits `mcp_<server>_<tool>` (or `mcp__<server>__<tool>`) against
     /// `knownServers` (already normalized with `HealthMonitor.normalizedName`):
-    /// tries the longest run of words after `mcp` as the server, then one
+    /// tries the longest run of words after `mcp` as the server (leaving the
+    /// tool at least one word), then one
     /// shorter, and so on, returning the first that normalizes to a known
     /// server. Falls back to the first word when nothing matches. `nil` for a
     /// non-MCP name, or `mcp` with nothing after it.
@@ -151,7 +152,8 @@ struct HermesUsageReader: UsageReader {
         let remainder = Array(parts.dropFirst())
         guard !remainder.isEmpty else { return nil }
 
-        for count in stride(from: remainder.count, through: 1, by: -1) {
+        // At least one word stays for the tool (Argon 2026-10-17 #14).
+        for count in stride(from: remainder.count - 1, through: 1, by: -1) {
             let candidate = remainder[0..<count]
             let normalized = candidate.joined().lowercased().filter { $0.isLetter || $0.isNumber }
             if knownServers.contains(normalized) {
