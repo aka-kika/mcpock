@@ -97,7 +97,7 @@ enum Differs {
         var seen = Set<String>()
         for (config, target) in zip(configs, targets) where target != majority {
             guard seen.insert(config.displaySource).inserted else { continue }
-            notes.append(DiffNote(label: config.displaySource, target: config.commandLine))
+            notes.append(DiffNote(label: config.displaySource, target: SecretMask.target(of: config)))
         }
         return notes
     }

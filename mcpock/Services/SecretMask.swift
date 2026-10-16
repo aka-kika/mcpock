@@ -124,11 +124,10 @@ enum SecretMask {
         guard var parts = URLComponents(string: text), parts.scheme != nil else {
             return scrub(text, known: known)
         }
-        if parts.password != nil {
-            parts.password = dots
-        } else if let user = parts.user, !user.isEmpty {
-            parts.user = dots
-        }
+        // Both, each on its own: `https://sk_live_…:x-oauth-basic@host` puts
+        // the key in the user name (Argon 2026-10-16 #10).
+        if parts.password != nil { parts.password = dots }
+        if let user = parts.user, !user.isEmpty { parts.user = dots }
         if let items = parts.queryItems, !items.isEmpty {
             parts.queryItems = items.map { URLQueryItem(name: $0.name, value: $0.value == nil ? nil : dots) }
         }
@@ -177,6 +176,9 @@ enum SecretMask {
         for (name, value) in env {
             let trimmed = value.trimmingCharacters(in: .whitespaces)
             guard isKnown(trimmed) else { continue }
+            // A URL value (`WEBHOOK_URL=https://user:pass@host/?key=…`): its
+            // secret parts count wherever they turn up (Argon 2026-10-16 #10).
+            if trimmed.contains("://") { values += urlSecrets(trimmed) }
             if isSecretName(name) || looksLikeToken(trimmed)
                 || !(trimmed.hasPrefix("/") || trimmed.hasPrefix("~") || trimmed.contains("://")) {
                 values.append(trimmed)
@@ -191,6 +193,25 @@ enum SecretMask {
             }
         }
         return values
+    }
+
+    /// The parts of a URL that can hold a credential: user, password, query
+    /// values and token-like path segments.
+    static func urlSecrets(_ text: String) -> [String] {
+        guard let parts = URLComponents(string: text), parts.scheme != nil else { return [] }
+        var found = [parts.user, parts.password].compactMap { $0 }
+        found += (parts.queryItems ?? []).compactMap(\.value)
+        found += parts.path.split(separator: "/").map(String.init).filter(looksLikeToken)
+        return found.filter(isKnown)
+    }
+
+    /// What a config launches, as safe to show and copy: its command line
+    /// (stdio) or URL (http/sse) with every secret masked.
+    static func target(of config: ServerConfig) -> String {
+        let known = knownSecrets(env: config.env, headers: config.headers)
+        return config.transport == .stdio
+            ? commandLine(command: config.command, args: config.args, known: known)
+            : url(config.url ?? "", known: known)
     }
 
     /// Long enough and not a plain word mcpock would otherwise blank everywhere.

@@ -84,4 +84,25 @@ final class SecretMaskTests: XCTestCase {
             XCTAssertEqual(SecretMask.scrub(reason), reason)
         }
     }
+
+    /// Argon 2026-10-16 #10: a key in the URL's user name was kept whenever a
+    /// password was there too.
+    func testURLUserIsMaskedEvenWithAPassword() {
+        let masked = SecretMask.url("https://sk_live_abcdef1234567890:x-oauth-basic@api.example.com/mcp")
+        XCTAssertFalse(masked.contains("sk_live_abcdef1234567890"))
+        XCTAssertFalse(masked.contains("x-oauth-basic"))
+        XCTAssertTrue(masked.contains("api.example.com/mcp"))
+    }
+
+    /// A URL-valued env var (`WEBHOOK_URL`) carries its secrets into places
+    /// where the URL itself never appears.
+    func testURLEnvValuesYieldTheirSecretParts() {
+        let known = SecretMask.knownSecrets(
+            env: ["WEBHOOK_URL": "https://hooks.example.com/in?sig=s1gn4ture99", "DB": "postgres://admin:pa55w0rdX@db/x"],
+            headers: [:]
+        )
+        let text = SecretMask.scrub("posted s1gn4ture99, then pa55w0rdX failed", known: known)
+        XCTAssertFalse(text.contains("s1gn4ture99"))
+        XCTAssertFalse(text.contains("pa55w0rdX"))
+    }
 }

@@ -45,6 +45,17 @@ final class DiffersTests: XCTestCase {
         XCTAssertEqual(notes.first?.target, "https://old.example.com/mcp")
     }
 
+    /// Argon 2026-10-16 #10: the note is shown and copied, so its command line
+    /// is masked.
+    func testDiffNoteTargetIsMasked() {
+        let notes = Differs.detect([
+            stdio(.code), stdio(.cursor),
+            stdio(.grok, args: ["-y", "reed-md", "--api-key", "sk-abcdef1234567890abcd"]),
+        ])
+        XCTAssertEqual(notes.map(\.label), ["Grok"])
+        XCTAssertEqual(notes.first?.target, "npx -y reed-md --api-key \(SecretMask.dots)")
+    }
+
     func testEnvOnlyDifferencesGiveNoDiff() {
         let notes = Differs.detect([
             stdio(.code, env: ["API_KEY": "one"]),
