@@ -369,8 +369,7 @@ final class HealthMonitor {
         restartTimer()
         Task {
             await awaitInFlightCycle()
-            await reloadConfigs()
-            await refreshNow()
+            await reloadThenProbe(force: false)
         }
     }
 
@@ -441,6 +440,22 @@ final class HealthMonitor {
         if probeTask == task { probeTask = nil }
     }
 
+    /// Read the configs, then probe, as ONE tracked cycle (Argon 2026-10-17 #6).
+    /// The read used to run before `probeTask` was set, so a second caller in
+    /// that window saw no cycle in flight, read the configs again and replaced
+    /// `servers` while the first cycle probed, and both probed at once. Call it
+    /// right after `awaitInFlightCycle()`, with no suspension in between.
+    private func reloadThenProbe(force: Bool) async {
+        let task = Task {
+            await self.reloadConfigs()
+            await self.runProbeCycle(force: force)
+        }
+        probeTask = task
+        probeTaskIsFullCycle = true
+        await task.value
+        if probeTask == task { probeTask = nil }
+    }
+
     /// Wait for whichever cycle is in flight, then make sure `probeTask` no longer
     /// points at a finished task. Returns true when it waited for a full cycle
     /// (a single row's Check again doesn't count).
@@ -475,8 +490,7 @@ final class HealthMonitor {
         // finished after the reload wrote its result over a server just fixed
         // (Argon 2026-10-16 #8).
         await awaitInFlightCycle()
-        await reloadConfigs()
-        await refreshNow(force: true)
+        await reloadThenProbe(force: true)
     }
 
     /// The footer's Refresh button. Synchronous on purpose: `isRefreshing` turns
@@ -764,8 +778,7 @@ final class HealthMonitor {
         // the configs while it ran let its old result overwrite a fixed server
         // (Argon 2026-10-16 #8).
         if await awaitInFlightCycle() { return }
-        await reloadConfigs()
-        await refreshNow()
+        await reloadThenProbe(force: false)
     }
 
     private func runProbeCycle(force: Bool) async {

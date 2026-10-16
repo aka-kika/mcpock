@@ -360,6 +360,41 @@ final class RefreshTests: XCTestCase {
     }
 }
 
+/// Argon 2026-10-17 #6: reading the configs is part of the tracked cycle, so
+/// a second check that starts while the first one reads them waits, instead
+/// of reading them again and replacing the servers while the first probes.
+final class SingleFlightReloadTests: XCTestCase {
+    @MainActor
+    func testATimerRoundDuringARefreshsConfigReadWaits() async throws {
+        let suite = "mcpock.tests.refresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+        let monitor = HealthMonitor(defaults: defaults)
+        let config = ServerConfig(id: "Test:a", name: "a", source: ServerSource(label: "Test"), projectPath: nil,
+                                  transport: .stdio, command: "x", args: [], env: [:], url: nil, headers: [:])
+        let log = LockedList()
+        monitor.discover = {
+            log.append("read start")
+            try? await Task.sleep(for: .milliseconds(150))
+            log.append("read end")
+            return [config]
+        }
+        monitor.probe = { _, _ in
+            log.append("probe start")
+            try? await Task.sleep(for: .milliseconds(150))
+            log.append("probe end")
+            return ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        let refresh = Task { await monitor.refreshAll() }
+        try await Task.sleep(for: .milliseconds(50))   // the Refresh is reading the configs
+        let tick = Task { await monitor.timerTick() }
+        await refresh.value
+        await tick.value
+        XCTAssertEqual(log.items, ["read start", "read end", "probe start", "probe end"],
+                       "the timer round rode the Refresh: one read, one probe, never overlapping")
+    }
+}
+
 /// A Bool that a `@Sendable` closure can set.
 private final class LockedFlag: @unchecked Sendable {
     private let lock = NSLock()
