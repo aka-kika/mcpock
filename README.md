@@ -46,7 +46,7 @@ them, checks every server, and shows you what needs attention and why, so you
   | Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
   | Ring (grey) | Still checking |
   | Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
-  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside |
+  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens) |
 
 - **Spots servers set up differently.** When one agent launches a different
   command or address than the others (often an old path), the row says so, and
