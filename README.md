@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.10.7](https://img.shields.io/badge/version-1.10.7-7a8fb0)](docs/release-notes/1.10.7.md)
+[![Version 1.10.8](https://img.shields.io/badge/version-1.10.8-7a8fb0)](docs/release-notes/1.10.8.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -283,7 +283,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-645 unit tests at v1.10.7, and the build keeps zero warnings. They cover the
+676 unit tests at v1.10.8, and the build keeps zero warnings. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
