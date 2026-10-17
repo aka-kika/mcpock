@@ -209,6 +209,41 @@ final class DifferentOnPurposeTests: XCTestCase {
         XCTAssertTrue(marks.allSatisfy { $0.hasSuffix(":Code") || $0.hasSuffix(":Cursor") || $0.hasSuffix(":Grok") })
     }
 
+    /// Argon 2026-10-17 #14: marking again replaced nothing, so an agent's
+    /// old setup stayed marked; going back to it must bring the note back.
+    func testMarkingAgainReplacesThatAgentsOldSetup() {
+        let servers = feedSetups()
+        let first = Differs.marking(servers.map(\.config), over: nil)
+        var changed = servers
+        changed[2] = feed("Grok", script: "/Users/k/feed/grok-v2.sh")
+        let second = Differs.marking(changed.map(\.config), over: first)
+        XCTAssertEqual(second, Differs.acknowledgements(changed.map(\.config)), "Grok's v1 entry is gone")
+
+        let back = HealthMonitor.groupByName(servers, acknowledged: ["feed": second]).first!
+        XCTAssertEqual(back.differs.map(\.label), ["Grok"], "back on the old setup: not what she marked last")
+    }
+
+    /// Argon 2026-10-17 #14: the majority moved to a new setup while one
+    /// agent kept its marked one; it differs from something she never saw.
+    func testANewMajorityBringsTheNoteBack() {
+        let marked = [
+            feed("Code", script: "/Users/k/feed/main.sh"),
+            feed("Cursor", script: "/Users/k/feed/main.sh"),
+            feed("Grok", script: "/Users/k/feed/grok.sh"),
+        ]
+        let ack = acknowledged(marked)
+        XCTAssertTrue(HealthMonitor.groupByName(marked, acknowledged: ack).first!.isDifferentOnPurpose)
+
+        let moved = [
+            feed("Code", script: "/Users/k/feed/main-v2.sh"),
+            feed("Cursor", script: "/Users/k/feed/main-v2.sh"),
+            feed("Grok", script: "/Users/k/feed/grok.sh"),
+        ]
+        let group = HealthMonitor.groupByName(moved, acknowledged: ack).first!
+        XCTAssertEqual(group.differs.map(\.label), ["Grok"])
+        XCTAssertFalse(group.isDifferentOnPurpose)
+    }
+
     func testANewAgentCopyingAnAcknowledgedSetupKeepsIt() {
         let servers = feedSetups()
         let copied = servers + [feed("Goose", script: "/Users/k/feed/code.sh", env: ["FEED_KEY": "goose"])]

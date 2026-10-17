@@ -93,13 +93,8 @@ enum Differs {
         let configs = compared(allConfigs)
         guard configs.count > 1 else { return [] }
         let targets = configs.map(launchTarget)
-        var counts: [LaunchTarget: Int] = [:]
-        for target in targets { counts[target, default: 0] += 1 }
-        guard counts.count > 1 else { return [] }
-
-        let top = counts.values.max() ?? 0
-        let leaders = counts.filter { $0.value == top }.map(\.key)
-        let majority: LaunchTarget? = leaders.count == 1 ? leaders[0] : nil
+        guard Set(targets).count > 1 else { return [] }
+        let majority = majorityTarget(targets)
 
         var notes: [DiffNote] = []
         var seen = Set<String>()
@@ -108,6 +103,15 @@ enum Differs {
             notes.append(DiffNote(label: config.displaySource, target: SecretMask.target(of: config)))
         }
         return notes
+    }
+
+    /// The one target most declarations share, or nil on a tie.
+    static func majorityTarget(_ targets: [LaunchTarget]) -> LaunchTarget? {
+        var counts: [LaunchTarget: Int] = [:]
+        for target in targets { counts[target, default: 0] += 1 }
+        let top = counts.values.max() ?? 0
+        let leaders = counts.filter { $0.value == top }.map(\.key)
+        return leaders.count == 1 ? leaders[0] : nil
     }
 
     // MARK: - Marked as intended (1.5.2)
@@ -155,7 +159,10 @@ enum Differs {
     /// Splits `detect`'s notes into the ones still open and the ones she marked
     /// as intended. A note is marked when every declaration behind its label
     /// is in `saved`, as "<fingerprint>:<label>" or, for a mark saved before
-    /// 1.9.0 (bare fingerprints, no label), by its fingerprint alone.
+    /// 1.9.0 (bare fingerprints, no label), by its fingerprint alone, and the
+    /// setup it differs from (the majority) is one she saw when marking: an
+    /// agent that kept its old setup while the others moved to a new one used
+    /// to stay quiet (Argon 2026-10-17 #14).
     static func split(
         _ notes: [DiffNote],
         configs: [ServerConfig],
@@ -164,11 +171,14 @@ enum Differs {
         guard let saved, !saved.isEmpty, !notes.isEmpty else { return (notes, []) }
         let savedSet = Set(saved)
         let compared = Self.compared(configs)
+        let savedFingerprints = Set(saved.map { $0.split(separator: ":", maxSplits: 1).first.map(String.init) ?? $0 })
+        let majorityKnown = majorityTarget(compared.map(launchTarget))
+            .map { savedFingerprints.contains(fingerprint($0)) } ?? true
         var open: [DiffNote] = []
         var acknowledged: [DiffNote] = []
         for note in notes {
             let mine = compared.filter { $0.displaySource == note.label }
-            let marked = !mine.isEmpty && mine.allSatisfy {
+            let marked = majorityKnown && !mine.isEmpty && mine.allSatisfy {
                 savedSet.contains(acknowledgement($0)) || savedSet.contains(fingerprint(launchTarget($0)))
             }
             if marked { acknowledged.append(note) } else { open.append(note) }
@@ -176,12 +186,18 @@ enum Differs {
         return (open, acknowledged)
     }
 
-    /// What marking a row saves: today's acknowledgements added to the ones
-    /// already saved for it, so an agent that is away right now (an app not
-    /// installed on this Mac today) keeps its mark. Pre-1.9.0 bare
+    /// What marking a row saves: today's acknowledgements, plus the saved
+    /// ones of agents that are away right now (an app not installed on this
+    /// Mac today), so they keep their mark. An agent here now gets only its
+    /// setup of today: its older ones are replaced, so going back to an old
+    /// setup brings the note back (Argon 2026-10-17 #14). Pre-1.9.0 bare
     /// fingerprints are dropped: the new entries cover what is there now.
     static func marking(_ configs: [ServerConfig], over saved: [String]?) -> [String] {
-        let kept = (saved ?? []).filter { $0.contains(":") }
+        let present = Set(compared(configs).map(\.displaySource))
+        let kept = (saved ?? []).filter { entry in
+            guard let colon = entry.firstIndex(of: ":") else { return false }
+            return !present.contains(String(entry[entry.index(after: colon)...]))
+        }
         return Set(kept + acknowledgements(configs)).sorted()
     }
 }
