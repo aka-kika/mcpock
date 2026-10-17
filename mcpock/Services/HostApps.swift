@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 
-/// Finds a server's app, honestly: only a command or argument inside an
-/// `.app` bundle (symbolic links followed), a launcher script that names one,
+/// Finds a server's app, honestly: only a command inside an `.app` bundle
+/// (symbolic links followed; not a developer tool), a launcher script that names one,
 /// or a local port an app was seen listening on. Anything else stays a normal
 /// check.
 /// What a probe found out about a server's app (`HostApps.lookUp`).
@@ -13,10 +13,21 @@ struct HostLookup: Sendable {
     var lookedUp: Set<Int> = []
     /// Of those, the ones an app listens on: port -> bundle path.
     var learned: [Int: String] = [:]
+    /// Learned before, but a working server there is not that app's any
+    /// more: forget them.
+    var forgotten: Set<Int> = []
 }
 
 enum HostApps {
     // MARK: - Pure parts (tests pin them)
+
+    /// The app a server's own program sits in, or nil. Developer tools that
+    /// only ship inside an app (Xcode's `python3`, `git`) run without it, so
+    /// they never make a server wait for that app (Argon 2026-10-17 #9).
+    nonisolated static func bundlePath(ofExecutable path: String) -> String? {
+        guard !path.contains(".app/Contents/Developer/") else { return nil }
+        return bundlePath(inPath: path)
+    }
 
     /// "/Applications/Wake.app" for any path inside it, or nil.
     nonisolated static func bundlePath(inPath path: String) -> String? {
@@ -70,12 +81,21 @@ enum HostApps {
     ) -> HostLookup {
         var lookup = HostLookup()
         if healthy {
-            for port in localPorts(of: config) where learned[port] == nil && !skip.contains(port) {
+            // Learned ports are checked again once per session too: a port an
+            // app once served may now belong to a plain server, which must
+            // read broken when it fails, not "Needs <App> open" (Argon
+            // 2026-10-17 #9).
+            for port in localPorts(of: config) where !skip.contains(port) {
                 lookup.lookedUp.insert(port)
-                if let app = listeningApp(port) { lookup.learned[port] = app.bundlePath }
+                if let app = listeningApp(port) {
+                    lookup.learned[port] = app.bundlePath
+                } else if learned[port] != nil {
+                    lookup.forgotten.insert(port)
+                }
             }
         }
-        lookup.app = hostAppOf(config, learned.merging(lookup.learned) { _, new in new })
+        let known = learned.merging(lookup.learned) { _, new in new }.filter { !lookup.forgotten.contains($0.key) }
+        lookup.app = hostAppOf(config, known)
         return lookup
     }
 
@@ -87,13 +107,15 @@ enum HostApps {
         case .stdio:
             let env = PathResolver.processEnvironment(configEnv: config.env)
             let command = PathResolver.resolveCommand(config.command ?? "", env: env)
-            for path in [command] + config.args where path.hasPrefix("/") {
-                let real = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
-                if let bundle = bundlePath(inPath: real), let app = hostApp(atBundlePath: bundle) { return app }
+            // The program itself only: a file an argument names inside an app
+            // (a script, a data file) works without the app running.
+            if command.hasPrefix("/") {
+                let real = URL(fileURLWithPath: command).resolvingSymlinksInPath().path
+                if let bundle = bundlePath(ofExecutable: real), let app = hostApp(atBundlePath: bundle) { return app }
             }
             if let script = launcherScript(atPath: command) {
                 let hints = scriptHints(script)
-                for bundle in hints.bundles {
+                for bundle in hints.bundles where !bundle.contains(".app/Contents/Developer/") {
                     if let app = hostApp(atBundlePath: bundle) { return app }
                 }
                 ports = hints.ports

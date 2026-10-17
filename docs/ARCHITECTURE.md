@@ -88,7 +88,7 @@ card is open).
 | `Services/HTTPProbe.swift` | Streamable HTTP: POST JSON-RPC, replays `Mcp-Session-Id`, parses JSON or SSE frames, closes the session |
 | `Services/SSEProbe.swift` | Legacy SSE: GET the stream, read the `endpoint` event, POST, read replies from the stream. Falls back to `HTTPProbe` when the URL isn't really SSE |
 | `Services/PathResolver.swift` | `~` expansion, env merge, the server's own PATH first, then common bin folders, `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |
-| `Services/HostApps.swift` | The Mac app a server belongs to (a command inside an `.app`, a launcher naming one, a local port an app was seen on, via `lsof` off the main thread). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
+| `Services/HostApps.swift` | The Mac app a server belongs to (the server's own program inside an `.app`, never Xcode's developer tools or an argument's file; a launcher naming one; a local port an app was seen on, via `lsof` off the main thread, re-checked once per session and forgotten when a plain server answers there). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
 
 ### What the UI says (pure, unit-tested)
 

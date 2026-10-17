@@ -45,6 +45,20 @@ final class HostAppsTests: XCTestCase {
                                  transport: .stdio, command: "/bin/sh", args: ["-c", "true"], env: [:], url: nil, headers: [:])
         XCTAssertNil(HostApps.app(for: plain, learnedPorts: [:]), "when unsure, a normal check")
     }
+
+    /// Argon 2026-10-17 #9: Xcode's tools and files an argument names inside
+    /// an app do not need that app open.
+    @MainActor
+    func testDeveloperToolsAndArgumentsDoNotNameAnApp() {
+        XCTAssertNil(HostApps.bundlePath(ofExecutable: "/Applications/Xcode.app/Contents/Developer/usr/bin/python3"))
+        XCTAssertEqual(HostApps.bundlePath(ofExecutable: "/Applications/Wake.app/Contents/MacOS/wake-mcp"),
+                       "/Applications/Wake.app")
+        let argument = ServerConfig(id: "T:arg", name: "arg", source: ServerSource(label: "T"), projectPath: nil,
+                                    transport: .stdio, command: "/bin/sh",
+                                    args: ["/System/Applications/Calculator.app/Contents/Resources/run.sh"],
+                                    env: [:], url: nil, headers: [:])
+        XCTAssertNil(HostApps.app(for: argument, learnedPorts: [:]))
+    }
 }
 
 @MainActor
@@ -151,6 +165,24 @@ final class NeedsAppMonitorTests: XCTestCase {
         await monitor.refreshNow(force: true)
         XCTAssertEqual(onMain.names.count, 1, "once per port")
         XCTAssertEqual(HealthMonitor(defaults: defaults).learnedHostPorts[8742], "/Applications/Reed.app", "kept")
+    }
+
+    /// Argon 2026-10-17 #9: a port learned in an earlier session that a plain
+    /// server now answers on is forgotten, so its failures read broken.
+    func testForgetsAPortNoAppServesAnyMore() async {
+        AppPreferences.saveHostAppPorts([4000: "/Applications/Old.app"], to: defaults)
+        let monitor = HealthMonitor(defaults: defaults)
+        XCTAssertEqual(monitor.learnedHostPorts[4000], "/Applications/Old.app")
+        let config = ServerConfig(id: "T:local", name: "local", source: ServerSource(label: "T"), projectPath: nil,
+                                  transport: .http, command: nil, args: [], env: [:], url: "http://127.0.0.1:4000/mcp",
+                                  headers: [:])
+        monitor.discover = { [config] }
+        monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
+        monitor.listeningApp = { _ in nil }
+        await monitor.reloadConfigs()
+        await monitor.refreshNow(force: true)
+        XCTAssertNil(monitor.learnedHostPorts[4000])
+        XCTAssertNil(HealthMonitor(defaults: defaults).learnedHostPorts[4000], "forgotten for good")
     }
 
 }

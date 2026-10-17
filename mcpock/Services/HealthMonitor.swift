@@ -80,7 +80,8 @@ final class HealthMonitor {
     }
     // MARK: - Servers that belong to a Mac app (2026-10-16)
 
-    /// Local port -> the `.app` seen listening on it, kept across launches.
+    /// Local port -> the `.app` seen listening on it, kept across launches
+    /// (re-checked once per session while its server works).
     private(set) var learnedHostPorts: [Int: String] = [:]
     /// Ports already looked up this session (a command-line listener stays unknown).
     @ObservationIgnored private var lookedUpPorts: Set<Int> = []
@@ -124,8 +125,10 @@ final class HealthMonitor {
     /// per session) and the config's app.
     private func record(_ lookup: HostLookup, for config: ServerConfig) {
         lookedUpPorts.formUnion(lookup.lookedUp)
-        if !lookup.learned.isEmpty {
-            learnedHostPorts.merge(lookup.learned) { _, new in new }
+        var ports = learnedHostPorts.merging(lookup.learned) { _, new in new }
+        for port in lookup.forgotten { ports[port] = nil }
+        if ports != learnedHostPorts {
+            learnedHostPorts = ports
             AppPreferences.saveHostAppPorts(learnedHostPorts, to: defaults)
         }
         hostAppBySpec[Self.probeSpec(config)] = lookup.app
