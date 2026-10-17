@@ -91,6 +91,32 @@ final class HeadersHelperTests: XCTestCase {
         XCTAssertEqual(try result.get(), ["X-Name": "postiz", "X-Url": "https://p.example.com/mcp"])
     }
 
+    /// Argon 2026-10-17 #13: the helper gets the server's own env and runs
+    /// in its project folder; mcpock's two variables win over the config's.
+    func testHelperGetsServerEnvAndProjectFolder() async throws {
+        let folder = dir.appendingPathComponent("project")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "tok".write(to: folder.appendingPathComponent("token.txt"), atomically: true, encoding: .utf8)
+        let path = try script(#"printf '{"X-Team":"%s","X-Token":"%s","X-Name":"%s"}' "$TEAM_ID" "$(cat token.txt)" "$CLAUDE_CODE_MCP_SERVER_NAME""#)
+        let result = await HeadersHelper.run(
+            helper: path, serverName: "postiz", serverURL: "",
+            env: ["TEAM_ID": "t-1", "CLAUDE_CODE_MCP_SERVER_NAME": "wrong"], workingDirectory: folder.path)
+        XCTAssertEqual(try result.get(), ["X-Team": "t-1", "X-Token": "tok", "X-Name": "postiz"])
+    }
+
+    /// A helper that exits at once but leaves a child behind is reaped too.
+    func testFinishedHelperLeavesNoChild() async throws {
+        let pidFile = dir.appendingPathComponent("bg.pid").path
+        let path = try script("sleep 30 > /dev/null 2>&1 &\necho $! > '\(pidFile)'\necho '{\"A\":\"b\"}'")
+        let result = await HeadersHelper.run(helper: path, serverName: "s", serverURL: "")
+        XCTAssertEqual(try result.get(), ["A": "b"])
+        let pid = Int32(try String(contentsOfFile: pidFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        XCTAssertGreaterThan(pid, 0)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertNotEqual(kill(pid, 0), 0, "the finished helper's child \(pid) must not be left running")
+    }
+
     func testNonZeroExitIsReported() async throws {
         let path = try script("echo '{\"Authorization\":\"\(secret)\"}'\nexit 3")
         let result = await HeadersHelper.run(helper: path, serverName: "s", serverURL: "")

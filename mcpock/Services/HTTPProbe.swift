@@ -11,7 +11,8 @@ enum HTTPProbe {
         // Claude Code's headersHelper: fetch fresh headers first. A failing helper
         // is the server's error, not a misleading 401 from probing without them.
         let fetched = await HeadersHelper.run(
-            helper: helper, serverName: config.name, serverURL: config.url ?? ""
+            helper: helper, serverName: config.name, serverURL: config.url ?? "",
+            env: config.env, workingDirectory: config.projectPath
         )
         switch fetched {
         case .failure(let error):

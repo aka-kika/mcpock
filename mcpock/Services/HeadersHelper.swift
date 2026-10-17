@@ -11,16 +11,22 @@ enum HeadersHelper {
     static let timeout: Duration = .seconds(10)
 
     /// Run `helper` through `/bin/sh -c`, as Claude Code does, with the server's
-    /// name and URL in the same two environment variables. Always reaps the
-    /// process tree (a helper that shells out to `security`, `op`, `curl`...).
+    /// name and URL in the same two environment variables, the server's own
+    /// `env`, and its project folder as the working directory (a helper that
+    /// reads a relative path or a variable from the config; Argon 2026-10-17
+    /// #13). Always reaps the process tree (a helper that shells out to
+    /// `security`, `op`, `curl`...).
     static func run(
-        helper: String, serverName: String, serverURL: String, timeout: Duration = HeadersHelper.timeout
+        helper: String, serverName: String, serverURL: String,
+        env: [String: String] = [:], workingDirectory: String? = nil,
+        timeout: Duration = HeadersHelper.timeout
     ) async -> Result<[String: String], ProbeError> {
         let runner: ProcessRunner
         do {
             runner = try ProcessRunner(
                 command: "/bin/sh", args: ["-c", helper],
-                env: ["CLAUDE_CODE_MCP_SERVER_NAME": serverName, "CLAUDE_CODE_MCP_SERVER_URL": serverURL],
+                env: env.merging(["CLAUDE_CODE_MCP_SERVER_NAME": serverName, "CLAUDE_CODE_MCP_SERVER_URL": serverURL]) { _, own in own },
+                workingDirectory: workingDirectory,
                 capturesRawStdout: true
             )
         } catch {
