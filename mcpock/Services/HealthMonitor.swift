@@ -889,8 +889,9 @@ final class HealthMonitor {
     /// amber `degraded` rather than red, so a healthy/starting server doesn't blink red on one
     /// hiccup. A definitive failure (spawn error, non-zero exit) — or a 2nd consecutive
     /// transient failure — shows red `broken`. An **attention** failure (auth: HTTP 401/403)
-    /// is stable amber `degraded` that never escalates — retrying won't help, but nothing is
-    /// crashing, so it reads as "needs you," not "broken." Any success returns to `healthy`.
+    /// is stable amber `degraded` that never turns red — retrying won't help, but nothing is
+    /// crashing, so it reads as "needs you," not "broken"; it backs off like any repeated
+    /// failure. Any success returns to `healthy`.
     nonisolated static func smoothedState(
         probe: HealthState,
         transientFailure: Bool,
@@ -905,9 +906,12 @@ final class HealthMonitor {
         if probe == .selfManaged {
             return (.selfManaged, 0)
         }
-        // Auth / "needs attention": stable amber, no escalation, counter held at 0.
+        // Auth / "needs attention": stable amber, never red. The counter still
+        // climbs, so the probe backs off like any repeated failure: it used to
+        // be held at 0 and the server (and its headersHelper) was hit every
+        // minute forever (Argon 2026-10-17 #7).
         if needsAttention {
-            return (.degraded, 0)
+            return (.degraded, priorFailures + 1)
         }
         // Probes only return .healthy or .broken; this is a failure.
         // Definitive failures jump straight to the threshold AND keep counting up

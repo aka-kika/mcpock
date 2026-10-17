@@ -55,6 +55,21 @@ final class ProbeBackoffTests: XCTestCase {
         XCTAssertEqual(r.failures, 3, "repeated definitive failures keep counting up")
     }
 
+    /// Argon 2026-10-17 #7: a server that needs sign-in stays amber but backs
+    /// off; its counter was held at 0, so it was checked every minute forever.
+    func testNeedsSignInStaysAmberButBacksOff() {
+        var failures = 0
+        for _ in 0..<4 {
+            let r = HealthMonitor.smoothedState(
+                probe: .broken, transientFailure: false, needsAttention: true, priorFailures: failures)
+            XCTAssertEqual(r.state, .degraded, "never red")
+            failures = r.failures
+        }
+        XCTAssertEqual(failures, 4)
+        XCTAssertEqual(HealthMonitor.backoffSeconds(consecutiveFailures: failures), 3600)
+        XCTAssertNil(HealthMonitor.backoffSeconds(consecutiveFailures: 1), "one sign-in failure: next cycle as usual")
+    }
+
     func testFirstDefinitiveFailureStillJumpsStraightToThreshold() {
         let r = HealthMonitor.smoothedState(
             probe: .broken, transientFailure: false, priorFailures: 0)

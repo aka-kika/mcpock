@@ -71,13 +71,13 @@ final class HealthSmoothingTests: XCTestCase {
         // it must never blink red the way a repeated transient failure does.
         let r = smooth(.broken, transient: false, attention: true, failures: 99)
         XCTAssertEqual(r.state, .degraded, "auth must not escalate to broken")
-        XCTAssertEqual(r.failures, 0, "the failure counter stays parked so it can't cross the threshold")
+        XCTAssertEqual(r.failures, 100, "the counter climbs for back-off (Argon 2026-10-17 #7), the state stays amber")
     }
 
     func testAuthTakesPrecedenceOverTransient() {
         let r = smooth(.broken, transient: true, attention: true, failures: 1)
         XCTAssertEqual(r.state, .degraded)
-        XCTAssertEqual(r.failures, 0)
+        XCTAssertEqual(r.failures, 2)
     }
 
     func testAuthCodeClassification() {
