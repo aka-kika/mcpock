@@ -113,7 +113,9 @@ enum StdioProbe {
             let remaining = deadline - ContinuousClock.now
             guard remaining > .zero else { throw ProbeError.timeout(limit) }
             let data = try await process.readMessage(timeout: remaining)
-            let message = try MCPJSONRPC.parseJSONObject(data)
+            // A line that only looks like JSON (a banner such as
+            // `{path: .env}`) is noise, not a broken server (Argon 2026-10-17 #1).
+            guard let message = try? MCPJSONRPC.parseJSONObject(data) else { continue }
             if MCPJSONRPC.isResponse(message, to: id) {
                 return message
             }

@@ -40,6 +40,7 @@
 		2CA4202BCA42967F84035F03 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC2D9DE193DB838D652DFE6 /* AppGroup.swift */; };
 		31413E48BB81260FE36E7994 /* MCPockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C906AC4EF47BD9001A45F5 /* MCPockApp.swift */; };
 		32C4916F78A128A9E0E80AD0 /* ConfigFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C23756C8C12BD59D125F68F /* ConfigFormatTests.swift */; };
+		36105EE649981123D3E120CE /* StdioBannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 093499F646978DF81B60D197 /* StdioBannerTests.swift */; };
 		36E4B87517DBB6C316E010D9 /* ProbeDedupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE4B062C3405D422E83B4A59 /* ProbeDedupTests.swift */; };
 		379B7A459438D1C36D4461CE /* ConfigScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72EEB5C009333D0DA35F9B7F /* ConfigScanner.swift */; };
 		3A58F8C2E3443A22066728AF /* MCPMessageBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BF45D23DABD099DB1DDCEB /* MCPMessageBuffer.swift */; };
@@ -244,6 +245,7 @@
 		052AF522F55D8592F1E9EE44 /* WhatsNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNew.swift; sourceTree = "<group>"; };
 		05AB1301367B07B1C9A2B721 /* ServerReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerReport.swift; sourceTree = "<group>"; };
 		084053D17945570F9E70B29D /* ConfigDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigDiscovery.swift; sourceTree = "<group>"; };
+		093499F646978DF81B60D197 /* StdioBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdioBannerTests.swift; sourceTree = "<group>"; };
 		0D43856E058F8AB4450CFBB1 /* SettingsPanesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanesTests.swift; sourceTree = "<group>"; };
 		0F66B862F2AE178600480A3B /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		10A105700D24E8D55E4E55C1 /* YAMLBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YAMLBlock.swift; sourceTree = "<group>"; };
@@ -525,6 +527,7 @@
 				5A7C9B9263BE42408318ACB9 /* StatusIconTests.swift */,
 				5B20D40BD2AB847657206F56 /* StatusSnapshotTests.swift */,
 				78931860EE005FF56726AA8A /* StderrReasonTests.swift */,
+				093499F646978DF81B60D197 /* StdioBannerTests.swift */,
 				CC43763B73F2D384F40D04C3 /* TestSupport.swift */,
 				8D354EF49B4DADDD58F07225 /* ThemeTests.swift */,
 				F2CE608C22C1FB8E72A9DB85 /* TinycastConfigTests.swift */,
@@ -1050,6 +1053,7 @@
 				7FE7D576203CF03ED01A63DB /* StatusIconTests.swift in Sources */,
 				D2FF1484B51C2981F46EE70E /* StatusSnapshotTests.swift in Sources */,
 				51B6E57E3986CA85100F662D /* StderrReasonTests.swift in Sources */,
+				36105EE649981123D3E120CE /* StdioBannerTests.swift in Sources */,
 				B964FCC5F49190DCAF43E6FD /* TestSupport.swift in Sources */,
 				E470A52B4097D0404D38E355 /* ThemeTests.swift in Sources */,
 				F00A62EAD7E861ED7C0CA1EE /* TinycastConfigTests.swift in Sources */,

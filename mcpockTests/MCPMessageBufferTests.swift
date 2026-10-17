@@ -150,6 +150,75 @@ final class MCPMessageBufferTests: XCTestCase {
         }
     }
 
+    /// Argon 2026-10-17 #1: a banner before a Content-Length frame used to
+    /// jump straight to the body's `{`, dropping the header; the body has no
+    /// line end, so the probe hung until its timeout.
+    func testBannerBeforeContentLengthFrameKeepsTheHeader() throws {
+        let buffer = MCPMessageBuffer()
+        let body = "{\"jsonrpc\":\"2.0\",\"id\":1}"
+        buffer.append("Server starting...\nContent-Length: \(body.utf8.count)\r\n\r\n\(body)".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), body)
+    }
+
+    /// Argon 2026-10-17 #1: a banner with a `{` inside used to be cut at the
+    /// brace and handed out as a message.
+    func testBannerWithBraceIsSkippedAsAWholeLine() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("[dotenv] injecting env {path: .env}\n{\"a\":1}\n".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
+    /// A banner line that arrives in pieces is skipped once its end arrives.
+    func testBannerSplitAcrossReadsIsSkipped() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("[dotenv] injecting ".data(using: .utf8)!)
+        XCTAssertNil(try buffer.nextMessage())
+        buffer.append("{path: .env}\n{\"a\":1}\n".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
+    /// A spinner redraws with carriage returns only; each one ends a noise line.
+    func testCarriageReturnEndsANoiseLine() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("loading |\rloading /\r{\"a\":1}\n".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
+    /// Argon 2026-10-17 #2: text starting "Content" that never becomes a
+    /// header was kept forever and grew until the app crashed.
+    func testContentPrefixedNoiseIsCapped() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("Content directory ready".data(using: .utf8)!)
+        XCTAssertNil(try buffer.nextMessage())
+        buffer.append(Data(repeating: UInt8(ascii: "x"), count: MCPMessageBuffer.maxNoiseLineBytes))
+        XCTAssertNil(try buffer.nextMessage())
+        buffer.append("\n{\"a\":1}\n".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
+    /// The same text with a line end is skipped at once.
+    func testContentPrefixedNoiseLineIsSkipped() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("Content directory ready\n{\"a\":1}\n".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
+    /// A Content-Length header arriving a few bytes at a time still frames.
+    func testPartialContentLengthHeaderWaits() throws {
+        let buffer = MCPMessageBuffer()
+        buffer.append("Content-Le".data(using: .utf8)!)
+        XCTAssertNil(try buffer.nextMessage())
+        buffer.append("ngth: 7\r\n\r\n{\"a\":1}".data(using: .utf8)!)
+        let msg = try XCTUnwrap(try buffer.nextMessage())
+        XCTAssertEqual(String(data: msg, encoding: .utf8), "{\"a\":1}")
+    }
+
     /// A Content-Length header with no blank line after it can't grow forever.
     func testHeaderThatNeverEndsThrows() throws {
         let buffer = MCPMessageBuffer()

@@ -74,27 +74,45 @@ final class MCPMessageBuffer: @unchecked Sendable {
                 return Data(line)
             }
 
-            // Unknown leading bytes — skip forward to the next `{` and retry.
-            if let brace = buffer.firstIndex(of: UInt8(ascii: "{")) {
-                buffer.removeSubrange(0..<brace)
+            // Unknown leading bytes (a banner, a log line): skip them a line at a
+            // time. Jumping to the first `{` used to cut a `Content-Length:`
+            // header off its body (which has no line end, so the probe hung) or
+            // land inside a banner like `[dotenv] {path: …}` (Argon 2026-10-17 #1).
+            // A carriage return ends a line too: spinners redraw with `\r` only.
+            // All whole noise lines go in one cut: removing them one by one
+            // moved the rest of a large banner once per line.
+            var start = 0
+            while start < buffer.count, buffer[start] != UInt8(ascii: "{"), !startsWithContentLengthHeader(at: start),
+                  let lineEnd = buffer[start...].firstIndex(where: { $0 == 0x0A || $0 == 0x0D }) {
+                // Noise glued to a real message on the same line still yields
+                // the message, but only when the rest really is a JSON object.
+                if let brace = buffer[start..<lineEnd].firstIndex(of: UInt8(ascii: "{")) {
+                    let tail = Data(buffer[brace..<lineEnd])
+                    if (try? JSONSerialization.jsonObject(with: tail)) is [String: Any] {
+                        buffer.removeSubrange(0...lineEnd)
+                        return tail
+                    }
+                }
+                start = lineEnd + 1
+            }
+            if start > 0 {
+                buffer.removeSubrange(0..<start)
                 continue
             }
 
-            // No `{` anywhere. Keep the buffer only if it might still become a
-            // Content-Length header once more bytes arrive; otherwise the whole
-            // buffer is non-JSON noise — drop it in one shot (not byte-by-byte) and
-            // wait for real data.
-            // Bytes that aren't text can't be a header either: an empty preview
-            // made `"content-length".hasPrefix("")` true, so binary noise was
-            // kept and grew until the probe timed out (review, 2026-09-26).
-            if let preview = String(bytes: buffer.prefix(32), encoding: .utf8)?.lowercased(), !preview.isEmpty,
-               "content-length".hasPrefix(preview) || preview.hasPrefix("content") {
-                return nil
+            // A noise line that hasn't ended yet (or a header still arriving):
+            // wait for more, but never past the cap. Text starting "Content…"
+            // used to be kept forever and grew until the app crashed
+            // (Argon 2026-10-17 #2).
+            if buffer.count > Self.maxNoiseLineBytes {
+                buffer.removeAll(keepingCapacity: true)
             }
-            buffer.removeAll(keepingCapacity: true)
             return nil
         }
     }
+
+    /// The longest unfinished non-JSON line kept while waiting for its end.
+    static let maxNoiseLineBytes = 64 * 1024
 
     /// The largest message body accepted: far above any real `initialize` or
     /// `tools/list` reply, and small enough that the arithmetic can't overflow.
@@ -102,8 +120,8 @@ final class MCPMessageBuffer: @unchecked Sendable {
     /// Real headers are a few dozen bytes.
     static let maxHeaderBytes = 8 * 1024
 
-    private func startsWithContentLengthHeader() -> Bool {
-        let prefix = buffer.prefix(14)
+    private func startsWithContentLengthHeader(at start: Int = 0) -> Bool {
+        let prefix = buffer[start...].prefix(14)
         guard let s = String(bytes: prefix, encoding: .utf8) else { return false }
         return s.lowercased().hasPrefix("content-length")
     }
