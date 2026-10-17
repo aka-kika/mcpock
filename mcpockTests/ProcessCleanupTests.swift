@@ -112,21 +112,30 @@ final class ProcessCleanupTests: XCTestCase {
     }
 
     /// Argon 2026-10-17 #4: teardown in a cancelled task used to spin: every
-    /// `Task.sleep` threw at once, so the wait loops ran flat out.
-    func testTeardownInACancelledTaskDoesNotSpin() async throws {
+    /// `Task.sleep` threw at once, so the wait loops ran flat out. The pause
+    /// they use now still waits when the task is cancelled.
+    func testPauseStillWaitsInACancelledTask() async {
+        let clock = ContinuousClock()
+        let task = Task { () -> (Duration, Bool) in
+            withUnsafeCurrentTask { $0?.cancel() }
+            let start = clock.now
+            await ProcessRunner.pause(.milliseconds(100))
+            return (clock.now - start, Task.isCancelled)
+        }
+        let (waited, cancelled) = await task.value
+        XCTAssertTrue(cancelled)
+        XCTAssertGreaterThanOrEqual(waited, .milliseconds(90), "a cancelled pause waits, it does not return at once")
+    }
+
+    /// Teardown in a cancelled task still waits out the grace period and
+    /// kills a process that ignores SIGTERM.
+    func testTeardownInACancelledTaskStillKills() async throws {
         let runner = try ProcessRunner(
             command: "/bin/sh",
             args: ["-c", "trap '' TERM; while true; do sleep 1; done"],
             env: [:]
         )
         let pid = runner.processIdentifier
-        func cpuSeconds() -> Double {
-            var usage = rusage()
-            getrusage(RUSAGE_SELF, &usage)
-            return Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6
-                + Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1e6
-        }
-        let before = cpuSeconds()
         let clock = ContinuousClock()
         let start = clock.now
         let task = Task {
@@ -134,11 +143,7 @@ final class ProcessCleanupTests: XCTestCase {
             await runner.terminateAndReap(gracePeriod: .milliseconds(500))
         }
         await task.value
-        let elapsed = clock.now - start
-        let used = cpuSeconds() - before
-
-        XCTAssertGreaterThanOrEqual(elapsed, .milliseconds(450), "the grace period is still waited out")
-        XCTAssertLessThan(used, 0.25, "waiting must not burn CPU (used \(used) s)")
+        XCTAssertGreaterThanOrEqual(clock.now - start, .milliseconds(450), "the grace period is still waited out")
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertFalse(isProcessAlive(pid), "the process that ignores SIGTERM is killed")
     }
