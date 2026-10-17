@@ -27,6 +27,8 @@ enum ShortReason {
         // never need you), so they get no second line.
         case .unknown, .selfManaged, .paused:
             return nil
+        case .needsApp:
+            return group.needsAppName.map { "Needs \($0) open" } ?? "Needs its app open"
         }
     }
 

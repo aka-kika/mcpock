@@ -52,6 +52,7 @@ enum PanelText {
         if c.slow > 0 { parts.append("\(c.slow) slow") }
         if c.signIn > 0 { parts.append("\(c.signIn) \(c.signIn == 1 ? "needs" : "need") sign-in") }
         if c.differs > 0 { parts.append("\(c.differs) set up differently") }
+        if c.needsApp > 0 { parts.append("\(c.needsApp) \(c.needsApp == 1 ? "needs its app" : "need their app")") }
         if firstPass {
             parts.insert("Checking\u{2026}", at: 0)
         } else {
@@ -86,12 +87,14 @@ enum PanelText {
         let slow: Int
         let signIn: Int
         let differs: Int
+        let needsApp: Int
         let checking: Int
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
             signIn = groups.filter(\.needsSignIn).count
             slow = groups.filter { $0.state == .degraded }.count - signIn
+            needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count
         }

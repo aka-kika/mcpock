@@ -39,7 +39,8 @@ enum StatusSnapshot {
             fine: shown.filter { $0.status == "fine" }.count,
             paused: shown.filter { $0.status == "paused" }.count,
             selfManaged: shown.filter { $0.status == "managed by its app" }.count,
-            hidden: groups.count - visible.count
+            hidden: groups.count - visible.count,
+            needsAppOpen: shown.filter { $0.needsApp != nil }.count
         )
         // Round 8 (widgets): the Agents tab's own rows, same order it uses
         // (worst first, aka last) — `AgentSections.build` is already pure and
@@ -78,6 +79,7 @@ enum StatusSnapshot {
         case .unknown: return "checking"
         case .paused: return "paused"
         case .selfManaged: return "managed by its app"
+        case .needsApp: return "needs \(group.needsAppName ?? "its app") open"
         }
     }
 
@@ -140,6 +142,7 @@ enum StatusSnapshot {
             differsOnPurpose: group.isDifferentOnPurpose
                 ? SecretMask.scrub(CardText.onPurposeSentence(for: group), known: allKnown) : nil,
             note: group.state == .healthy ? CardText.slowStartNote(group.slowStartSeconds) : nil,
+            needsApp: group.state == .needsApp ? (group.needsAppName ?? "its app") : nil,
             sources: sources
         )
     }

@@ -98,6 +98,15 @@ struct MCPockApp: App {
         // mounts its panel view only on the first left-click, so installing it
         // there left right-click dead until then (Argon 2026-10-16 #12).
         StatusItemRightClick.install()
+        // An app opening re-checks the servers waiting for it (2026-10-16).
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak monitor] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard let path = app?.bundleURL?.path else { return }
+            let id = app?.bundleIdentifier
+            MainActor.assumeIsolated { monitor?.hostAppLaunched(bundlePath: path, bundleID: id) }
+        }
         // A full check cycle just finished. The usage store starts only once
         // discovery has named the servers: the Cursor and Hermes readers split
         // call names against them, and a reader's cursor never goes back, so a

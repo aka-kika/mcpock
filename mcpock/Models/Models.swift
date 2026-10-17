@@ -35,15 +35,20 @@ enum HealthState: String, Sendable, Hashable {
     /// resumed. The off-switch for servers whose launch has side effects (e.g. an
     /// unauthenticated OAuth server that opens a browser login page every spawn).
     case paused
+    /// It failed while the Mac app it belongs to was closed (Wake's
+    /// `wake-mcp`, Reed's local port): "Needs Wake open", not broken. Calm:
+    /// never red, never counted as broken (2026-10-16).
+    case needsApp
 
     var sortRank: Int {
         switch self {
         case .broken: return 0
         case .degraded: return 1
-        case .unknown: return 2
-        case .healthy: return 3
-        case .selfManaged: return 4
-        case .paused: return 5
+        case .needsApp: return 2
+        case .unknown: return 3
+        case .healthy: return 4
+        case .selfManaged: return 5
+        case .paused: return 6
         }
     }
 }
@@ -138,6 +143,8 @@ struct ServerSnapshot: Identifiable, Sendable, Hashable {
     /// Seconds the last check waited before the retry answered (see
     /// `ProbeResult.slowStartSeconds`); nil when it answered first time.
     var slowStartSeconds: Double?
+    /// The closed app it waits for, while `state == .needsApp`.
+    var hostApp: HostApp? = nil
 
     init(
         config: ServerConfig,
@@ -241,6 +248,8 @@ struct ServerGroup: Identifiable, Sendable, Hashable {
     /// Longest first-try wait among the healthy declarations that only answered
     /// on a retry. Nil when none did. Informational: not a problem.
     var slowStartSeconds: Double? = nil
+    /// "Wake": the closed app it waits for, while `state == .needsApp`.
+    var needsAppName: String? = nil
 
     var id: String { name }
 
@@ -378,4 +387,17 @@ enum ProbeError: Error, LocalizedError, Sendable {
             return false
         }
     }
+}
+
+/// The Mac app a server belongs to (2026-10-16, Kika: "does it indicate the
+/// tool test fail because the tool needs to be open?"). A server inside an
+/// app (Wake's `wake-mcp`, Kartina's `kartina-agent`) or one an app serves on
+/// a local port (Reed on 127.0.0.1:8742) fails while that app is closed; that
+/// is "Needs Wake open", not broken.
+struct HostApp: Hashable, Sendable, Codable {
+    /// "Wake", from the bundle's display name.
+    let name: String
+    /// "/Applications/Wake.app".
+    let bundlePath: String
+    let bundleID: String?
 }

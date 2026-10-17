@@ -103,6 +103,7 @@ struct ServerRowView: View {
         case .degraded: return theme.statusDegraded
         case .healthy: return theme.statusDegraded
         case .unknown, .selfManaged, .paused: return theme.textTertiary
+        case .needsApp: return theme.textSecondary
         }
     }
 

@@ -139,6 +139,7 @@
 		BD58D6F0BCBB0BDF74A58917 /* YAMLBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A105700D24E8D55E4E55C1 /* YAMLBlock.swift */; };
 		BD737C9225540E63EDF314C2 /* StatusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F5DF508E3BDB980FEB3287 /* StatusSnapshot.swift */; };
 		BF68D11F1E109E7CB72F1046 /* DetailCardPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B04D3BCFD3D2CB755E056C /* DetailCardPresenter.swift */; };
+		C3AF830D78C964D43E4783E4 /* HostApps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91147D947184A6B40EC6F325 /* HostApps.swift */; };
 		C53AE77F8DE7861C587B8252 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 981D0A65C6D25412CF19A2A7 /* Assets.xcassets */; };
 		C6C0715B9DD9D9EFA233D0FC /* MCPockStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E52D088F73F7C15B2E72066 /* MCPockStatus.swift */; };
 		C6D23363CCA4EFE60364242D /* CardTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C965E4D47E56B908FE51C6 /* CardTextTests.swift */; };
@@ -159,6 +160,7 @@
 		D671EFF454362A46D18BBDF8 /* PanelStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668454E3E5795BEF3D1D37BC /* PanelStateTests.swift */; };
 		D808D0685ABA35B129A4AF48 /* SpinnableIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FA3F23B5FC1490EAA2F24D4 /* SpinnableIcon.swift */; };
 		D8091CD78501DFB5CDE0B467 /* PanelSectionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AFAFBCD445939A4B4ED2150 /* PanelSectionsTests.swift */; };
+		DABB8776C5B127951751C0B8 /* NeedsAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7666F9F0F62C878DDD3FA84 /* NeedsAppTests.swift */; };
 		DFD6321F7638FFEA7BB56D2D /* SelfManagedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A480112C717EFA056D8E125 /* SelfManagedTests.swift */; };
 		E22DEF3D52E5D1A5CE291AE8 /* SettingsGeneralPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505DD24534DFE53DD2328BA4 /* SettingsGeneralPane.swift */; };
 		E2BB82C6432E35B1B45FBBBC /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E3E403CD0E1393D314118B /* WidgetSnapshotStore.swift */; };
@@ -327,6 +329,7 @@
 		8D0FC55699679577E96FE3CC /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
 		8D354EF49B4DADDD58F07225 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		8E4F324ECFEDA81271EA73A9 /* AgentRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRegistryTests.swift; sourceTree = "<group>"; };
+		91147D947184A6B40EC6F325 /* HostApps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostApps.swift; sourceTree = "<group>"; };
 		9211F9554340D9C17DC4A74F /* HermesUsageReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesUsageReaderTests.swift; sourceTree = "<group>"; };
 		948336ED0AEDE8607880F255 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
 		948823B093A0600FEC098AFD /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
@@ -346,6 +349,7 @@
 		B41F1671097054C84EA88610 /* ConfigPathMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigPathMenu.swift; sourceTree = "<group>"; };
 		B42329EF7776D5B1D70CBEE9 /* StatusItemRightClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemRightClick.swift; sourceTree = "<group>"; };
 		B6AA7980DC4301EE05A0B83F /* MCPServersTOML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServersTOML.swift; sourceTree = "<group>"; };
+		B7666F9F0F62C878DDD3FA84 /* NeedsAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeedsAppTests.swift; sourceTree = "<group>"; };
 		B9195D34E92749D527CA66F1 /* ConfigDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigDiscoveryTests.swift; sourceTree = "<group>"; };
 		BA8B15BA67861AFEA1A9C0E3 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		BB71097BF44FB74C04523111 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -473,6 +477,7 @@
 				3AFA50062B8689AE0474AA0F /* MCPStatusServerTests.swift */,
 				033D4D778180D8D62007F1E6 /* MenuTextTests.swift */,
 				1B2A8919A33142FF4FB5B79F /* MonitorStartTests.swift */,
+				B7666F9F0F62C878DDD3FA84 /* NeedsAppTests.swift */,
 				282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */,
 				6AFAFBCD445939A4B4ED2150 /* PanelSectionsTests.swift */,
 				668454E3E5795BEF3D1D37BC /* PanelStateTests.swift */,
@@ -546,6 +551,7 @@
 				4EBF1461A92D93E004FC288D /* GooseConfig.swift */,
 				E407298A6EEAB2B72A412E24 /* HeadersHelper.swift */,
 				20F0FF81443366BED2D0CC60 /* HealthMonitor.swift */,
+				91147D947184A6B40EC6F325 /* HostApps.swift */,
 				F4F4EB16496D1D088B350C30 /* HTTPProbe.swift */,
 				CE05F2B0E8DFF6C972EA8A62 /* LaunchAtLogin.swift */,
 				FB4248253AF4A25404D99670 /* MCPJSONRPC.swift */,
@@ -874,6 +880,7 @@
 				9D82BC96628D60A0F0ECB812 /* HealthMark.swift in Sources */,
 				0F92FECEA218FFB43FFF04B6 /* HealthMonitor.swift in Sources */,
 				A28B8F6B369EE12B69076E69 /* HermesUsageReader.swift in Sources */,
+				C3AF830D78C964D43E4783E4 /* HostApps.swift in Sources */,
 				850B33630EE30C9FFEDDDA66 /* LaunchAtLogin.swift in Sources */,
 				549FF22F35B142728C509E85 /* MCPJSONRPC.swift in Sources */,
 				3A58F8C2E3443A22066728AF /* MCPMessageBuffer.swift in Sources */,
@@ -977,6 +984,7 @@
 				94BFB6E296214F3B7EACE10B /* MCPStatusServerTests.swift in Sources */,
 				983F9ED2DB5FA8574A0A9F93 /* MenuTextTests.swift in Sources */,
 				2A8396897A5835F97E7A0872 /* MonitorStartTests.swift in Sources */,
+				DABB8776C5B127951751C0B8 /* NeedsAppTests.swift in Sources */,
 				430DACDEC25AE3A3323A3513 /* PanelLayoutTests.swift in Sources */,
 				D8091CD78501DFB5CDE0B467 /* PanelSectionsTests.swift in Sources */,
 				D671EFF454362A46D18BBDF8 /* PanelStateTests.swift in Sources */,

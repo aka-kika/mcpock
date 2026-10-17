@@ -167,6 +167,9 @@ enum AgentSections {
         case .unknown, .selfManaged, .paused:
             rank = nil
             note = nil
+        case .needsApp:
+            rank = nil
+            note = group.needsAppName.map { "Needs \($0) open" }
         }
         return AgentServer(name: group.name, state: state, note: note, rank: rank)
     }

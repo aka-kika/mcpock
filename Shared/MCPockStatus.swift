@@ -44,6 +44,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         var paused: Int
         var selfManaged: Int
         var hidden: Int
+        /// Waiting for the Mac app they belong to, which is closed (2026-10-16).
+        /// Not broken, never a problem. Optional: older files have none.
+        var needsAppOpen: Int? = nil
     }
 
     struct Server: Codable, Equatable, Sendable {
@@ -77,6 +80,8 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// An info note on a fine row, e.g. "Slow to start (over 20 s)". Never a
         /// problem and never counted. Optional: absent in older files.
         var note: String? = nil
+        /// The closed Mac app it waits for ("Wake"), while it needs it open.
+        var needsApp: String? = nil
         var sources: [Source]
     }
 

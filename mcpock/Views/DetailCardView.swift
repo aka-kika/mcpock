@@ -118,7 +118,7 @@ struct DetailCardView: View {
         case .broken: return theme.statusBroken
         case .degraded: return theme.statusDegraded
         case .healthy: return group.differsNeedsAttention ? theme.statusDegraded : theme.statusHealthy
-        case .unknown, .selfManaged, .paused: return theme.textSecondary
+        case .unknown, .selfManaged, .paused, .needsApp: return theme.textSecondary
         }
     }
 
@@ -151,6 +151,10 @@ struct DetailCardView: View {
             return "Built into \(host). It runs inside that app, so mcpock doesn't check it."
         case .unknown:
             return "Waiting for the first check."
+        case .needsApp:
+            let app = group.needsAppName ?? "its app"
+            return "Needs \(app) open. It belongs to \(app), which is closed, so it can't answer now. "
+                + "mcpock checks it again once \(app) is running."
         case .healthy, .degraded, .broken:
             return nil
         }

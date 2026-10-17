@@ -61,6 +61,11 @@ struct HealthMark: View {
             Capsule()
                 .fill(theme.textTertiary)
                 .frame(width: 7, height: 2)
+        case .needsApp:
+            // Waiting, not failing: the calm dash, a shade stronger than paused.
+            Capsule()
+                .fill(theme.textSecondary)
+                .frame(width: 7, height: 2)
         }
     }
 
@@ -81,6 +86,7 @@ struct HealthMark: View {
         case .unknown: return "Checking"
         case .selfManaged: return "Runs inside its app"
         case .paused: return "Paused"
+        case .needsApp: return "Needs its app open"
         }
     }
 
@@ -90,6 +96,9 @@ struct HealthMark: View {
         if group.state == .degraded,
            group.issues.contains(where: { $0.reason.hasPrefix("Needs authentication") }) {
             return "Needs sign-in"
+        }
+        if group.state == .needsApp, let app = group.needsAppName {
+            return "Needs \(app) open"
         }
         if group.state == .healthy && group.differsNeedsAttention {
             return "Set up differently"

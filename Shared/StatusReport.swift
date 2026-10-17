@@ -77,6 +77,9 @@ enum StatusReport {
         lines.append("- broken: \(c.broken)")
         lines.append("- slow: \(c.slow)")
         lines.append("- needs sign-in: \(c.needsSignIn)")
+        if let waiting = c.needsAppOpen, waiting > 0 {
+            lines.append("- waiting for their Mac app to be opened (not broken): \(waiting)")
+        }
         lines.append("- set up differently: \(c.differs)")
         lines.append("- fine: \(c.fine)")
         if c.checking > 0 { lines.append("- not checked yet: \(c.checking)") }
@@ -126,6 +129,13 @@ enum StatusReport {
             lines.append("Fix each server in the config file(s) listed with it. mcpock only reads configs, it never "
                 + "changes them. After a fix, mcpock's next check (or its Refresh button) confirms it.")
         }
+        let waiting = status.servers.filter { $0.needsApp != nil && !$0.hidden }
+        if !waiting.isEmpty {
+            lines.append("")
+            lines.append("Not broken, waiting for their Mac app: "
+                + waiting.map { "\($0.name) needs \($0.needsApp ?? "its app") open" }.joined(separator: "; ")
+                + ". Ask the user to open the app instead of fixing a config; mcpock checks again once it runs.")
+        }
         if !hiddenProblems.isEmpty {
             lines.append("")
             lines.append("Hidden in mcpock and left out: \(hiddenProblems.joined(separator: ", ")). "
@@ -156,6 +166,10 @@ enum StatusReport {
         let indent = number == nil ? "" : "   "
         if let reason = s.reason, !reason.isEmpty { lines.append(indent + "Reason: \(reason)") }
         if let note = s.note, !note.isEmpty { lines.append(indent + "Note: \(note)") }
+        if let app = s.needsApp {
+            lines.append(indent + "Not broken: it belongs to the \(app) app, which is closed. "
+                + "Ask the user to open \(app); mcpock checks it again once \(app) runs.")
+        }
         if let differs = s.differs, !differs.isEmpty { lines.append(indent + "Set up differently: \(differs)") }
         if let onPurpose = s.differsOnPurpose, !onPurpose.isEmpty {
             lines.append(indent + "Set up differently, marked as intended: \(onPurpose)")

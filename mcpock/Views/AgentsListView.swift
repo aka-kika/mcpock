@@ -393,6 +393,7 @@ private struct AgentServerRow: View {
         case .broken: return theme.statusBroken
         case .degraded, .healthy: return theme.statusDegraded
         case .unknown, .selfManaged, .paused: return theme.textTertiary
+        case .needsApp: return theme.textSecondary
         }
     }
 }

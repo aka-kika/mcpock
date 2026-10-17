@@ -61,7 +61,8 @@ enum PanelSections {
         case .broken: return 0
         case .degraded: return 1
         case .healthy: return group.differsNeedsAttention ? 2 : nil
-        case .unknown, .selfManaged, .paused: return nil
+        // Waiting for a closed app is calm: not a problem to fix (2026-10-16).
+        case .unknown, .selfManaged, .paused, .needsApp: return nil
         }
     }
 

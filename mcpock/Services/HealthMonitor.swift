@@ -78,6 +78,54 @@ final class HealthMonitor {
     private(set) var differsAcknowledged: [String: [String]] {
         didSet { groupsCache = nil }
     }
+    // MARK: - Servers that belong to a Mac app (2026-10-16)
+
+    /// Local port -> the `.app` seen listening on it, kept across launches.
+    private(set) var learnedHostPorts: [Int: String] = [:]
+    /// Ports already looked up this session (a command-line listener stays unknown).
+    @ObservationIgnored private var lookedUpPorts: Set<Int> = []
+
+    /// The app a config belongs to. Swapped in tests.
+    @ObservationIgnored lazy var hostAppOf: (ServerConfig) -> HostApp? = { [unowned self] config in
+        HostApps.app(for: config, learnedPorts: self.learnedHostPorts)
+    }
+    /// Whether that app runs. Swapped in tests.
+    @ObservationIgnored var appIsRunning: (HostApp) -> Bool = { HostApps.isRunning($0) }
+    /// Which app listens on a local port. Swapped in tests.
+    @ObservationIgnored var listeningApp: (Int) -> HostApp? = { HostApps.listeningApp(port: $0) }
+
+    /// The closed app a healthy-or-failing server waits for, or nil when it
+    /// has no app or the app runs.
+    func closedHostApp(of config: ServerConfig) -> HostApp? {
+        guard let app = hostAppOf(config), !appIsRunning(app) else { return nil }
+        return app
+    }
+
+    /// Remember which app serves a local port, once per port per session.
+    private func learnHostPorts(of config: ServerConfig) {
+        for port in HostApps.localPorts(of: config) where learnedHostPorts[port] == nil && !lookedUpPorts.contains(port) {
+            lookedUpPorts.insert(port)
+            guard let app = listeningApp(port) else { continue }
+            learnedHostPorts[port] = app.bundlePath
+            AppPreferences.saveHostAppPorts(learnedHostPorts, to: defaults)
+        }
+    }
+
+    /// An app just opened: check at once the servers that waited for it, after
+    /// a moment for it to start serving.
+    func hostAppLaunched(bundlePath: String, bundleID: String?) {
+        let names = groups.filter { group in
+            group.state == .needsApp && servers.contains { snap in
+                HealthMonitor.normalizedName(snap.config.name) == HealthMonitor.normalizedName(group.name)
+                    && (snap.hostApp?.bundlePath == bundlePath || (bundleID != nil && snap.hostApp?.bundleID == bundleID))
+            }
+        }.map(\.name)
+        guard !names.isEmpty else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            for name in names { await self.refresh(groupName: name) }
+        }
+    }
     /// Where hidden/paused/pinned choices persist. `.standard` in the app; tests
     /// pass a throwaway suite, because the test host IS the app and would
     /// otherwise rewrite the user's real preferences.
@@ -236,13 +284,14 @@ final class HealthMonitor {
     /// quiet ring, never the broken diamond, and never masks a real failure.
     nonisolated static func iconState(_ states: [HealthState], anyDiffers: Bool = false) -> AggregateState {
         guard !states.isEmpty else { return .degradedOrUnknown }
-        switch aggregateState(states) {
+        // A server waiting for its closed app never colors the icon (2026-10-16).
+        switch aggregateState(states.map { $0 == .needsApp ? .healthy : $0 }) {
         case .broken: return .broken
         case .degraded, .unknown: return .degradedOrUnknown
         // Self-managed servers are their host app's business, and paused servers
         // aren't being probed at all — neither must ever color the menu-bar icon,
         // so an all-self-managed or all-paused set reads as healthy.
-        case .healthy, .selfManaged, .paused: return anyDiffers ? .attention : .allHealthy
+        case .healthy, .selfManaged, .paused, .needsApp: return anyDiffers ? .attention : .allHealthy
         }
     }
 
@@ -282,6 +331,7 @@ final class HealthMonitor {
         pausedNames = AppPreferences.loadPausedServers(from: defaults)
         pinnedNames = AppPreferences.loadPinnedServers(from: defaults)
         differsAcknowledged = AppPreferences.loadDiffersAcknowledged(from: defaults)
+        learnedHostPorts = AppPreferences.loadHostAppPorts(from: defaults)
     }
 
     /// True once `start()` has run. The app calls `start()` at launch (1.7.1);
@@ -484,6 +534,20 @@ final class HealthMonitor {
         // A pause issued while this probe was in flight wins: never overwrite
         // `.paused` with a stale result.
         guard !isPaused(servers[index].config.name) else { return }
+        // Failed while the app it belongs to is closed: waiting, not broken.
+        // No backoff, so it turns fine at the next check once the app runs.
+        if result.state != .healthy, result.state != .selfManaged,
+           let app = closedHostApp(of: servers[index].config) {
+            servers[index].state = .needsApp
+            servers[index].hostApp = app
+            servers[index].consecutiveFailures = 0
+            servers[index].lastChecked = Date()
+            servers[index].failureReason = "Needs \(app.name) open"
+            servers[index].slowStartSeconds = nil
+            return
+        }
+        servers[index].hostApp = nil
+        if result.state == .healthy { learnHostPorts(of: servers[index].config) }
         let smoothed = Self.smoothedState(
             probe: result.state,
             transientFailure: result.transientFailure,
@@ -584,7 +648,8 @@ final class HealthMonitor {
                 lastChecked: variants.compactMap(\.lastChecked).max(),
                 slowStartSeconds: state == .healthy
                     ? variants.filter { $0.state == .healthy }.compactMap(\.slowStartSeconds).max()
-                    : nil
+                    : nil,
+                needsAppName: state == .needsApp ? variants.compactMap(\.hostApp).first?.name : nil
             )
         }
         // Broken first, then by name — the only sort the display needs.

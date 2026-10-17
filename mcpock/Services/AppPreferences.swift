@@ -97,6 +97,33 @@ enum AppPreferences {
     /// Seconds between automatic probe cycles; `0` means manual only (no timer —
     /// probing happens via "Refresh now" / per-server refresh). Stored as seconds
     /// so future intervals need no migration.
+    /// Local port -> the `.app` seen serving it (2026-10-16).
+    static let hostAppPortsKey = "hostAppPorts"
+
+    static func loadHostAppPorts(from defaults: UserDefaults = store) -> [Int: String] {
+        let raw: [String: String] = decodeJSON(defaults.string(forKey: hostAppPortsKey)) ?? [:]
+        return Dictionary(uniqueKeysWithValues: raw.compactMap { key, value in Int(key).map { ($0, value) } })
+    }
+
+    static func saveHostAppPorts(_ ports: [Int: String], to defaults: UserDefaults = store) {
+        defaults.set(encodeJSON(Dictionary(uniqueKeysWithValues: ports.map { (String($0.key), $0.value) })),
+                     forKey: hostAppPortsKey)
+    }
+
+    private static func decodeJSON<T: Decodable>(_ text: String?) -> T? {
+        guard let data = text?.data(using: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(T.self, from: data)
+    }
+
+    private static func encodeJSON<T: Encodable>(_ value: T) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
     static let probeIntervalKey = "probeInterval"
 
     static func loadProbeInterval(from defaults: UserDefaults = store) -> ProbeInterval {
