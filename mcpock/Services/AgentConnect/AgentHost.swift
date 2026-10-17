@@ -1,0 +1,126 @@
+import Foundation
+
+/// Settings > Connect (1.10.7, the row list from Kartina, read-only on purpose): one row per agent
+/// mcpock reads, saying whether its settings file already has an "mcpock" entry, with the line to
+/// paste in by hand. mcpock never writes these files; adding the entry is the user's (or their
+/// agent's) edit, the same as for any other server.
+struct AgentHost: Identifiable, Sendable {
+    enum Format: Sendable {
+        /// `claude mcp add`, run in Terminal; the entry lands in `~/.claude.json`.
+        case claudeCode
+        /// `{"<top>": {"mcpock": {...}}}`
+        case json(top: String, style: JSONStyle)
+        /// `[mcp_servers.mcpock]`
+        case toml(enabled: Bool)
+        /// A YAML section (`extensions:` for Goose, `mcp_servers:` for Hermes).
+        case yaml(section: String, style: YAMLStyle)
+    }
+    enum JSONStyle: Sendable { case standard, vscode, opencode }
+    enum YAMLStyle: Sendable { case goose, hermes }
+
+    var id: String
+    /// The agent as the row shows it; also its badge (`AgentBadge.forLabel`).
+    var name: String
+    /// The settings file, from the home folder.
+    var file: String
+    var format: Format
+    /// Where the agent lives when it is on this Mac (any one is enough), from the home folder or absolute.
+    var detect: [String]
+    /// What to do after adding the line.
+    var after: String
+
+    static let entry = ConnectSnippets.serverName
+
+    static let all: [AgentHost] = [
+        AgentHost(id: "claude-code", name: "Claude Code", file: ".claude.json", format: .claudeCode,
+                  detect: [".claude", ".local/bin/claude", "/opt/homebrew/bin/claude"], after: "Start a new Claude Code session."),
+        AgentHost(id: "claude-desktop", name: "Claude Desktop", file: "Library/Application Support/Claude/claude_desktop_config.json",
+                  format: .json(top: "mcpServers", style: .standard), detect: ["/Applications/Claude.app", "Library/Application Support/Claude"],
+                  after: "Quit and open Claude Desktop again."),
+        AgentHost(id: "cursor", name: "Cursor", file: ".cursor/mcp.json", format: .json(top: "mcpServers", style: .standard),
+                  detect: ["/Applications/Cursor.app", ".cursor"], after: "Cursor picks it up in its MCP settings."),
+        AgentHost(id: "vscode", name: "VS Code", file: "Library/Application Support/Code/User/mcp.json", format: .json(top: "servers", style: .vscode),
+                  detect: ["/Applications/Visual Studio Code.app", "Library/Application Support/Code"], after: "Start it in VS Code's MCP list (Copilot agent mode)."),
+        AgentHost(id: "windsurf", name: "Windsurf", file: ".codeium/windsurf/mcp_config.json", format: .json(top: "mcpServers", style: .standard),
+                  detect: ["/Applications/Windsurf.app", ".codeium/windsurf"], after: "Refresh Windsurf's MCP servers."),
+        AgentHost(id: "codex", name: "Codex", file: ".codex/config.toml", format: .toml(enabled: false),
+                  detect: [".codex", "/opt/homebrew/bin/codex", ".local/bin/codex", "/Applications/Codex.app"], after: "Start a new Codex session."),
+        AgentHost(id: "grok", name: "Grok", file: ".grok/config.toml", format: .toml(enabled: true),
+                  detect: [".grok"], after: "Start a new Grok session."),
+        AgentHost(id: "opencode", name: "OpenCode", file: ".config/opencode/opencode.json", format: .json(top: "mcp", style: .opencode),
+                  detect: [".config/opencode", "/opt/homebrew/bin/opencode"], after: "Start a new OpenCode session."),
+        AgentHost(id: "goose", name: "Goose", file: ".config/goose/config.yaml", format: .yaml(section: "extensions", style: .goose),
+                  detect: [".config/goose", "/Applications/Goose.app"], after: "Start a new Goose session."),
+        AgentHost(id: "hermes", name: "Hermes", file: ".hermes/config.yaml", format: .yaml(section: "mcp_servers", style: .hermes),
+                  detect: [".hermes"], after: "Restart Hermes."),
+        AgentHost(id: "kimi-code", name: "Kimi Code", file: ".kimi-code/mcp.json", format: .json(top: "mcpServers", style: .standard),
+                  detect: [".kimi-code"], after: "Start a new Kimi Code session."),
+        AgentHost(id: "minimax", name: "MiniMax", file: ".minimax/mcp.json", format: .json(top: "mcpServers", style: .standard),
+                  detect: [".minimax"], after: "Start a new MiniMax session."),
+    ]
+
+    enum Status: Equatable, Sendable { case connected, notConnected, notInstalled }
+
+    func fileURL(home: URL) -> URL { home.appendingPathComponent(file) }
+
+    /// Connected when the file has an "mcpock" entry; otherwise whether the agent is on this Mac.
+    func status(home: URL) -> Status {
+        if hasEntry(home: home) { return .connected }
+        let fm = FileManager.default
+        let here = fm.fileExists(atPath: fileURL(home: home).path)
+            || detect.contains { fm.fileExists(atPath: $0.hasPrefix("/") ? $0 : home.appendingPathComponent($0).path) }
+        return here ? .notConnected : .notInstalled
+    }
+
+    /// Read the way the scan reads each format, comments in JSON included.
+    func hasEntry(home: URL) -> Bool {
+        guard let text = try? String(contentsOf: fileURL(home: home), encoding: .utf8) else { return false }
+        switch format {
+        case .claudeCode, .json:
+            let top: String
+            if case .json(let t, _) = format { top = t } else { top = "mcpServers" }
+            let object = (try? JSONSerialization.jsonObject(with: Data(text.utf8)))
+                ?? (try? JSONSerialization.jsonObject(with: Data(JSONC.plainJSON(text).utf8)))
+            guard let root = object as? [String: Any], let servers = root[top] as? [String: Any] else { return false }
+            return servers[Self.entry] != nil
+        case .toml:
+            return MCPServersTOML.servers(fromTOML: text)[Self.entry] != nil
+        case .yaml(let section, _):
+            return YAMLBlock.entries(in: text, under: section)[Self.entry] != nil
+        }
+    }
+
+    // MARK: The line to paste
+
+    /// The entry for this agent, as its file writes it. `helper`: the path of `mcpock-mcp`.
+    func setup(helper: String) -> String {
+        let json = ConnectSnippets.jsonString(helper)
+        switch format {
+        case .claudeCode:
+            return ConnectSnippets.snippet(.claudeCommand, path: helper)
+        case .json(let top, let style):
+            let body: String
+            switch style {
+            case .standard:
+                body = "\"command\": \(json),\n      \"args\": []"
+            case .vscode:
+                body = "\"type\": \"stdio\",\n      \"command\": \(json),\n      \"args\": []"
+            case .opencode:
+                body = "\"type\": \"local\",\n      \"command\": [\(json)],\n      \"enabled\": true"
+            }
+            return "{\n  \"\(top)\": {\n    \"\(Self.entry)\": {\n      \(body)\n    }\n  }\n}"
+        case .toml(let enabled):
+            var lines = ["[mcp_servers.\(Self.entry)]", "command = \(json)", "args = []"]
+            if enabled { lines.append("enabled = true") }
+            return lines.joined(separator: "\n")
+        case .yaml(_, .goose):
+            return ConnectSnippets.snippet(.gooseYAML, path: helper)
+        case .yaml(_, .hermes):
+            return ConnectSnippets.snippet(.hermesYAML, path: helper)
+        }
+    }
+}
+
+extension AgentHost.Format {
+    var isClaudeCode: Bool { if case .claudeCode = self { return true } else { return false } }
+}

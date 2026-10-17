@@ -36,6 +36,7 @@
 		28ABC0AE8043EDE9DBEF8B99 /* HTTPProbeSSETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F5562939915930D413ABC51 /* HTTPProbeSSETests.swift */; };
 		29C8D4D3207BF623ADC378A2 /* SecretMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1AD044E3456D407A552D7F /* SecretMask.swift */; };
 		2A8396897A5835F97E7A0872 /* MonitorStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B2A8919A33142FF4FB5B79F /* MonitorStartTests.swift */; };
+		2C63EB6A490E00D7BA855EB3 /* AgentHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9B66991AC8D73B24567095 /* AgentHost.swift */; };
 		2CA4202BCA42967F84035F03 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC2D9DE193DB838D652DFE6 /* AppGroup.swift */; };
 		31413E48BB81260FE36E7994 /* MCPockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C906AC4EF47BD9001A45F5 /* MCPockApp.swift */; };
 		32C4916F78A128A9E0E80AD0 /* ConfigFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C23756C8C12BD59D125F68F /* ConfigFormatTests.swift */; };
@@ -58,6 +59,7 @@
 		4FA030B07EDCBED58DA7727E /* ServerReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AB1301367B07B1C9A2B721 /* ServerReport.swift */; };
 		51B6E57E3986CA85100F662D /* StderrReasonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78931860EE005FF56726AA8A /* StderrReasonTests.swift */; };
 		52B50363CFA9EFFBF5D3FC93 /* UpdateControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604C66D104D046D2409E3E5F /* UpdateControllerTests.swift */; };
+		542B730AE01630D240A5ADBA /* AgentConnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FBA742B71F4B99F3D379E6 /* AgentConnectTests.swift */; };
 		5486A7CB5BE930114ED37E81 /* SettingsAgentsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F26542625F7F8EAFF4D18D2 /* SettingsAgentsPane.swift */; };
 		549FF22F35B142728C509E85 /* MCPJSONRPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4248253AF4A25404D99670 /* MCPJSONRPC.swift */; };
 		54A4A72519F392E4B4F7BDF7 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04599C262BE66B556946BCBD /* WidgetSnapshot.swift */; };
@@ -348,6 +350,7 @@
 		9E52D088F73F7C15B2E72066 /* MCPockStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPockStatus.swift; sourceTree = "<group>"; };
 		A006FD20F608A964ED7B3AAF /* GrokUsageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokUsageReader.swift; sourceTree = "<group>"; };
 		A1D410C5BD065362F3163029 /* WidgetSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotTests.swift; sourceTree = "<group>"; };
+		A8FBA742B71F4B99F3D379E6 /* AgentConnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentConnectTests.swift; sourceTree = "<group>"; };
 		AB887986DCC2D3ECCE733855 /* SSEProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEProbeTests.swift; sourceTree = "<group>"; };
 		ACA6CCFA36910A94C0334218 /* AkaSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AkaSourceTests.swift; sourceTree = "<group>"; };
 		AE81A977F2D31489789062D2 /* WidgetSnapshotWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotWriterTests.swift; sourceTree = "<group>"; };
@@ -391,6 +394,7 @@
 		E8247380AA5646FC7ABE26A8 /* StdioProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdioProbe.swift; sourceTree = "<group>"; };
 		E878767734F50FCF40F7F062 /* MCPockTimelineProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPockTimelineProvider.swift; sourceTree = "<group>"; };
 		E9FB8EF2FB0F7E7612FC9E61 /* mcpockWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = mcpockWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA9B66991AC8D73B24567095 /* AgentHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHost.swift; sourceTree = "<group>"; };
 		EDDC61B30760CA61D3724217 /* DiffersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffersTests.swift; sourceTree = "<group>"; };
 		F2CE608C22C1FB8E72A9DB85 /* TinycastConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TinycastConfigTests.swift; sourceTree = "<group>"; };
 		F3171A9482FDF03BF28CF039 /* MenuText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuText.swift; sourceTree = "<group>"; };
@@ -453,10 +457,19 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		4A1F93394BE3847611220253 /* AgentConnect */ = {
+			isa = PBXGroup;
+			children = (
+				EA9B66991AC8D73B24567095 /* AgentHost.swift */,
+			);
+			path = AgentConnect;
+			sourceTree = "<group>";
+		};
 		739033C965F33920F3403060 /* mcpockTests */ = {
 			isa = PBXGroup;
 			children = (
 				66025BFE9342F7F8A33E399E /* AgentBadgeTests.swift */,
+				A8FBA742B71F4B99F3D379E6 /* AgentConnectTests.swift */,
 				8E4F324ECFEDA81271EA73A9 /* AgentRegistryTests.swift */,
 				22FD621E6876006118F99CF3 /* AgentSectionsTests.swift */,
 				ACA6CCFA36910A94C0334218 /* AkaSourceTests.swift */,
@@ -542,6 +555,7 @@
 		A64D9C8BEDA306FE55B386D1 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				4A1F93394BE3847611220253 /* AgentConnect */,
 				C654D4A700FFAD41A0A0877F /* Usage */,
 				ACAAA16B024CF0CACC18A053 /* Widgets */,
 				B2765FD4CC69069DC4E60598 /* AgentRegistry.swift */,
@@ -873,6 +887,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				65F29C6DC0E9AEC763AE2F4C /* AgentBadgeView.swift in Sources */,
+				2C63EB6A490E00D7BA855EB3 /* AgentHost.swift in Sources */,
 				189A7EDD12C711D3B931BACC /* AgentRegistry.swift in Sources */,
 				882D8F5D9D37BB89BCF91CF9 /* AgentSections.swift in Sources */,
 				AE85151EF0F429A11DE05749 /* AgentsListView.swift in Sources */,
@@ -979,6 +994,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				77F36E33D5AF1B3782C2C8B3 /* AgentBadgeTests.swift in Sources */,
+				542B730AE01630D240A5ADBA /* AgentConnectTests.swift in Sources */,
 				4869EFF844EC6D807189D654 /* AgentRegistryTests.swift in Sources */,
 				F797EED5E181C347130ABAB3 /* AgentSectionsTests.swift in Sources */,
 				4ACE71E43B22552EE7A8C0E1 /* AkaSourceTests.swift in Sources */,

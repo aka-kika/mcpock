@@ -103,6 +103,7 @@ card is open).
 | `Services/ServerReport.swift` | 1.5.3: the server menu's Copy Details and the Ask an Agent prompt, built on `StatusSnapshot.server` so they carry the status file's masking |
 | `Services/StatusSnapshot.swift`, `SecretMask.swift` | Builds the status file; masks tokens, URL secrets and every env/header value |
 | `Services/ConnectSnippets.swift` | What Settings > Connect copies: per-agent snippets and the Copy for Claude prompt |
+| `Services/AgentConnect/AgentHost.swift` | Settings > Connect's agent rows (1.10.7, the list from Kartina): whether each agent's file already has an `mcpock` entry, read with the scan's own readers, and the line to paste. Read-only |
 
 ### Views
 

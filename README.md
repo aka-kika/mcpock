@@ -138,8 +138,10 @@ Claude Code. The prompt walks Claude through finding your agent configs,
 backing each one up, adding `mcpock` where it's missing (in each file's own
 format) and testing it.
 
-**By hand:** Settings > Connect has a copy button per agent with the right
-snippet. For Claude Code:
+**By hand:** Settings > Connect lists your agents and shows which ones
+already have mcpock (Connected, Not connected, Not on this Mac), with a copy
+button per agent for the right line. mcpock only reads these files; you or
+your agent paste the line. For Claude Code:
 
 ```bash
 claude mcp add --scope user mcpock -- /Applications/mcpock.app/Contents/Helpers/mcpock-mcp
@@ -281,7 +283,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-641 unit tests at v1.10.7, and the build keeps zero warnings. They cover the
+645 unit tests at v1.10.7, and the build keeps zero warnings. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's

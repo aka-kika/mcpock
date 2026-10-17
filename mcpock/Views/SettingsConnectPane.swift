@@ -10,8 +10,9 @@ import AppKit
 /// adds the server where it's missing, verifies and reports a table. The
 /// per-agent snippets are copy icons (the manual way). Round 9: the one-agent
 /// "Copy Prompt" row is gone; the Claude button is the normal grey button and
-/// turns Claude orange with "Copied" for 2 s. Nothing here writes another
-/// app's config.
+/// turns Claude orange with "Copied" for 2 s. 1.10.7: each agent mcpock reads
+/// has a row saying whether it already has mcpock (`AgentHost`, the list from
+/// Kartina, read-only here). Nothing here writes another app's config.
 struct SettingsConnectPane: View {
     let theme: ThemeColors
     var helperPath: String = ConnectSnippets.helperPath()
@@ -19,6 +20,8 @@ struct SettingsConnectPane: View {
     /// Which copy button just ran, for its short "Copied" / checkmark state.
     @State private var copiedID: String?
     @State private var resetTask: Task<Void, Never>?
+    /// Each agent: connected, not connected, or not on this Mac (read off the main thread).
+    @State private var statuses: [String: AgentHost.Status] = [:]
 
     private static let claudeID = "claude"
 
@@ -30,6 +33,10 @@ struct SettingsConnectPane: View {
     static let claudeText = "Paste it into Claude Code. It finds your agents\u{2019} configs, backs each one up, "
         + "adds mcpock where it\u{2019}s missing, checks that it works and shows you a table."
     static let footerText = "mcpock never edits your agents\u{2019} configs. The server only reads mcpock\u{2019}s own status file."
+    /// The agents without a status row keep their plain copy rows.
+    static var otherTargets: [ConnectSnippets.Target] {
+        ConnectSnippets.targets.filter { target in !AgentHost.all.contains { $0.name == target.name } }
+    }
 
     private var helperExists: Bool { FileManager.default.isExecutableFile(atPath: helperPath) }
 
@@ -61,11 +68,14 @@ struct SettingsConnectPane: View {
                             .foregroundStyle(theme.statusBroken)
                     }
                 }
-                ForEach(ConnectSnippets.targets) { target in
+                ForEach(AgentHost.all) { host in
+                    agentRow(host)
+                }
+                ForEach(Self.otherTargets) { target in
                     row(target)
                 }
             } header: {
-                Text("Or copy the setup for one agent")
+                Text("Your agents, or copy the line for one")
             } footer: {
                 Text(Self.footerText)
                     .font(Theme.caption)
@@ -75,6 +85,61 @@ struct SettingsConnectPane: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .panelScrollIndicators()
+        .onAppear { refreshStatuses() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshStatuses() }
+    }
+
+    // MARK: - Agent rows (1.10.7)
+
+    /// One agent: its badge, its name, whether it has mcpock, and the line to copy.
+    private func agentRow(_ host: AgentHost) -> some View {
+        let status = statuses[host.id]
+        let copied = copiedID == host.id
+        let destination = host.format.isClaudeCode ? "Run in Terminal (adds it for every project)" : "~/" + host.file
+        return HStack(spacing: 10) {
+            AgentBadgeView(badge: AgentBadge.forLabel(host.name), theme: theme, size: 22)
+                .opacity(status == .notInstalled ? 0.5 : 1)
+            Text(host.name)
+                .foregroundStyle(status == .notInstalled ? theme.textTertiary : theme.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            switch status {
+            case .connected:
+                HStack(spacing: 5) {
+                    Circle().fill(theme.statusHealthy).frame(width: 7, height: 7)
+                    Text("Connected").font(Theme.caption).foregroundStyle(theme.textSecondary)
+                }
+            case .notConnected:
+                Text("Not connected").font(Theme.caption).foregroundStyle(theme.textSecondary)
+            case .notInstalled:
+                Text("Not on this Mac").font(Theme.caption).foregroundStyle(theme.textTertiary)
+            case nil:
+                ProgressView().controlSize(.mini)
+            }
+            Button {
+                copy(host.setup(helper: helperPath), id: host.id, for: Self.rowCopiedSeconds)
+            } label: {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 12, weight: copied ? .semibold : .regular))
+                    .foregroundStyle(copied ? theme.statusHealthy : theme.textSecondary)
+                    .frame(width: 24, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .help("Copy the line for \(host.name). Goes in: \(destination). Then: \(host.after)")
+            .accessibilityLabel("Copy the line for \(host.name)")
+        }
+    }
+
+    nonisolated private static var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+
+    /// Read again whenever Settings comes to the front, so a line pasted meanwhile shows.
+    private func refreshStatuses() {
+        Task.detached {
+            let home = Self.home
+            let found = Dictionary(uniqueKeysWithValues: AgentHost.all.map { ($0.id, $0.status(home: home)) })
+            await MainActor.run { statuses = found }
+        }
     }
 
     // MARK: - Rows
