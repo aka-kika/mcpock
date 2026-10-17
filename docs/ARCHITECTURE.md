@@ -87,7 +87,8 @@ card is open).
 | `Services/MCPJSONRPC.swift` | Request builders, response matching by id, tool parsing |
 | `Services/HTTPProbe.swift` | Streamable HTTP: POST JSON-RPC, replays `Mcp-Session-Id`, parses JSON or SSE frames, closes the session |
 | `Services/SSEProbe.swift` | Legacy SSE: GET the stream, read the `endpoint` event, POST, read replies from the stream. Falls back to `HTTPProbe` when the URL isn't really SSE |
-| `Services/PathResolver.swift` | `~` expansion, env merge, common bin folders on PATH, `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |
+| `Services/PathResolver.swift` | `~` expansion, env merge, the server's own PATH first, then common bin folders, `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |
+| `Services/HostApps.swift` | The Mac app a server belongs to (a command inside an `.app`, a launcher naming one, a local port an app was seen on, via `lsof` off the main thread). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
 
 ### What the UI says (pure, unit-tested)
 
@@ -182,6 +183,7 @@ and signed with the app.
 browser login), so `shouldProbe` filters first:
 
 - **Paused** servers are never launched, not even by Refresh.
+- **Needs <App> open**: a check that fails while the server's Mac app is closed reads `.needsApp`, a calm dash with no backoff, never in Needs you or counted as broken. Opening the app checks its servers again after a moment.
 - **Backoff:** after repeated failures a server is re-checked after 5 min,
   then 15 min, then hourly. Refresh (`force: true`) skips backoff, never pause.
 - **Self-managed** (`"builtin": true`: servers that run inside their host
