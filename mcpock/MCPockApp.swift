@@ -40,6 +40,9 @@ struct MCPockApp: App {
         // hidden, paused and marked-as-intended servers once. In 1.6.0 the copy
         // ran after it, so the first launch showed none of them (1.6.1). Demo
         // mode skips it too: it must never read or write the user's real domain.
+        // What's new (1.10.7) reads whether mcpock ran here before from the
+        // flag that copy sets, so it looks first.
+        if !isHostingTests && !isDemo { WhatsNewLauncher.markEarlierRun() }
         if !isHostingTests && !isDemo { SettingsMigration.migrateIfNeeded() }
         // Settings and files left by the 1.10.7 test builds' test calls,
         // dropped before the release (2026-10-17). Same guard: real setup only.
@@ -101,6 +104,8 @@ struct MCPockApp: App {
         // mounts its panel view only on the first left-click, so installing it
         // there left right-click dead until then (Argon 2026-10-16 #12).
         StatusItemRightClick.install()
+        // What's new, once after an update (1.10.7). Not in demo mode.
+        if !isDemo { WhatsNewLauncher.showIfUpdated() }
         // An app opening re-checks the servers waiting for it (2026-10-16).
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main

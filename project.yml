@@ -24,8 +24,8 @@ settings:
     CLANG_ENABLE_MODULES: YES
     ENABLE_TESTABILITY: YES
     # Shared by the app and its bundled mcpock-mcp helper, so the two can't drift.
-    MARKETING_VERSION: "1.10.6"
-    CURRENT_PROJECT_VERSION: "27"
+    MARKETING_VERSION: "1.10.7"
+    CURRENT_PROJECT_VERSION: "35"
 targets:
   mcpock:
     type: application
@@ -37,6 +37,10 @@ targets:
       # Status file model + the helper's MCP handler (round 7), compiled into
       # the app too so the tests can drive them.
       - path: Shared
+      # What's new (1.10.7): one Markdown file per version, read by WhatsNew.
+      - path: docs/release-notes
+        type: folder
+        buildPhase: resources
     dependencies:
       # mcpock-mcp ships inside the app at Contents/Helpers/, signed with it.
       - target: mcpock-mcp

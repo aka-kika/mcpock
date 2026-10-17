@@ -47,7 +47,7 @@ enum StatusItemRightClick {
         return false
     }
 
-    /// Settings, Check for Updates and Quit. "Rescan for agents" used to live
+    /// Settings, Check for Updates, What's New and Quit. "Rescan for agents" used to live
     /// here; the panel's "Refresh now" now re-runs discovery itself, so the
     /// separate action was a second spelling of the same thing.
     private static func showContextMenu(for event: NSEvent) {
@@ -74,6 +74,15 @@ enum StatusItemRightClick {
             checkForUpdates.target = MenuTarget.shared
             menu.addItem(checkForUpdates)
         }
+
+        // 1.10.7: the notes shown once after an update, any time.
+        let whatsNew = NSMenuItem(
+            title: "What's New in mcpock",
+            action: WhatsNewLauncher.hasNotes ? #selector(MenuTarget.whatsNewAction) : nil,
+            keyEquivalent: ""
+        )
+        whatsNew.target = MenuTarget.shared
+        menu.addItem(whatsNew)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -108,6 +117,12 @@ private final class MenuTarget: NSObject {
 
     @objc func quitAction() {
         NSApp.terminate(nil)
+    }
+
+    @objc func whatsNewAction() {
+        MainActor.assumeIsolated {
+            WhatsNewLauncher.open()
+        }
     }
 
     @objc func checkForUpdatesAction() {

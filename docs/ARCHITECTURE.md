@@ -116,6 +116,8 @@ card is open).
 | `Views/ConfigPathMenu.swift` | One right-click menu for every config path (Show in Finder, Copy Path, Open Config… with a confirmation) |
 | `Views/StatusIconView.swift`, `SpinnableIcon.swift` | Menu-bar icon; the refresh glyph's spin |
 | `Views/Settings*.swift`, `Services/SettingsLauncher.swift` | Settings window: General, Servers, Agents, Connect, About |
+| `Services/WhatsNew.swift`, `Services/WhatsNewLauncher.swift` | What's new: `docs/release-notes/<version>.md` (bundled) in a small window, once after an update and from the right-click menu |
+| `Services/AppPreferences.swift` (`TestCallLeftovers`) | Removes, at every launch, what the 1.10.7 test builds' test calls left: four settings and `test-requests/` |
 | `Services/StatusItemRightClick.swift` | Right-click on the menu-bar icon: Settings, Quit |
 | `Services/GlobalHotKey.swift` | Control-Option-M from any app (1.10): a Carbon `RegisterEventHotKey` (no permission prompt), on/off in Settings > General; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
 | `Theme/Theme.swift` | Colour tokens (Light semantic, Dark soft dark), fonts, `AppearanceApplier` |
