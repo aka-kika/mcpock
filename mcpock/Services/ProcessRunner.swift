@@ -98,7 +98,10 @@ final class ProcessRunner: @unchecked Sendable {
         process.standardInput = stdinPipe
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
-        if let workingDirectory {
+        // A project folder deleted since the config was read must not fail
+        // the start with "doesn't exist" (Argon 2026-10-17 #3): discovery
+        // drops such entries, this covers the gap until the next read.
+        if let workingDirectory, ConfigDiscovery.isExistingFolder(workingDirectory) {
             process.currentDirectoryURL = URL(fileURLWithPath: PathResolver.expandTilde(workingDirectory))
         }
 
