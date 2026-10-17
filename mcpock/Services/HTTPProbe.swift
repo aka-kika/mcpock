@@ -149,14 +149,22 @@ enum HTTPProbe {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // Streamed, not `data(for:)`: a Streamable-HTTP server may answer on an
+        // event stream it keeps open, and waiting for its end timed out every
+        // probe of a working server (Argon 2026-10-17 #6). Closed on return.
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        defer { bytes.task.cancel() }
         guard let http = response as? HTTPURLResponse else {
             throw ProbeError.protocolError("Invalid HTTP response")
         }
+        // The request's timeout only covers silence; a stream that keeps
+        // talking without ever answering stops here.
+        let deadline = ContinuousClock.now + .seconds(probeTimeout)
 
         let sessionId = http.value(forHTTPHeaderField: "Mcp-Session-Id")
 
         if !(200...299).contains(http.statusCode) {
+            let data = try await collect(bytes, limit: 64 * 1024, deadline: deadline, throwsOverLimit: false)
             let bodyText = String(data: data, encoding: .utf8) ?? ""
             throw ProbeError.httpError(http.statusCode, bodyText)
         }
@@ -165,18 +173,19 @@ enum HTTPProbe {
             return ([:], sessionId)
         }
 
-        if data.isEmpty {
-            throw ProbeError.noData
-        }
-
         // The request's id: the answer must be for it, not a notification or
         // another request on the same stream (Argon 2026-10-17 #12).
         let id = (try? MCPJSONRPC.parseJSONObject(body))?["id"] as? Int
 
-        // SSE-style response: extract data: lines
+        // SSE-style response: read events until the answer arrives.
         if let contentType = http.value(forHTTPHeaderField: "Content-Type")?.lowercased(),
            contentType.contains("text/event-stream") {
-            return (try parseSSEJSON(data, id: id), sessionId)
+            return (try await answer(in: bytes, id: id, deadline: deadline), sessionId)
+        }
+
+        let data = try await collect(bytes, limit: MCPMessageBuffer.maxBodyBytes, deadline: deadline)
+        if data.isEmpty {
+            throw ProbeError.noData
         }
 
         // Plain JSON first: a JSON answer whose text holds "data:" (a tool
@@ -195,6 +204,57 @@ enum HTTPProbe {
             }
             throw error
         }
+    }
+
+    /// The whole body, at most `limit` bytes: past it, the cut text (an error
+    /// page) or an error (an answer too large to be real).
+    private static func collect(
+        _ bytes: URLSession.AsyncBytes, limit: Int, deadline: ContinuousClock.Instant, throwsOverLimit: Bool = true
+    ) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count >= limit {
+                if throwsOverLimit { throw ProbeError.protocolError("Message too large") }
+                break
+            }
+            if data.count % 4096 == 0, ContinuousClock.now > deadline { throw URLError(.timedOut) }
+        }
+        return data
+    }
+
+    /// The answer on an event stream, returned as soon as its `data:` line
+    /// arrives, the same way `parseSSEJSON` reads a finished body. Data lines
+    /// that only make JSON together (one event split over lines) are joined.
+    private static func answer(
+        in bytes: URLSession.AsyncBytes, id: Int?, deadline: ContinuousClock.Instant
+    ) async throws -> [String: Any] {
+        var pending = ""
+        var lastJSON: [String: Any]?
+        var sawLine = false
+        for try await line in bytes.lines {
+            if ContinuousClock.now > deadline { throw URLError(.timedOut) }
+            sawLine = true
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("data:") else { continue }
+            let payload = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payload.isEmpty || payload == "[DONE]" { continue }
+            pending = pending.isEmpty ? payload : pending + "\n" + payload
+            guard let obj = (try? JSONSerialization.jsonObject(with: Data(pending.utf8))) as? [String: Any] else {
+                if pending.utf8.count > MCPMessageBuffer.maxBodyBytes { pending = "" }
+                continue
+            }
+            pending = ""
+            if let id {
+                if MCPJSONRPC.isResponse(obj, to: id) { return obj }
+                continue
+            }
+            if obj["result"] != nil || obj["error"] != nil { return obj }
+            lastJSON = obj
+        }
+        if let lastJSON { return lastJSON }
+        if !sawLine { throw ProbeError.noData }
+        throw ProbeError.protocolError(id == nil ? "No JSON in SSE stream" : "No answer to request \(id!) in SSE stream")
     }
 
     /// An answer carrying another request's id. A null or missing id (a

@@ -469,6 +469,89 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertEqual(result.tools?.first?.name, "echo")
     }
 
+    /// Argon 2026-10-17 #6: a Streamable-HTTP server that answers on an event
+    /// stream and keeps it open (pings after the answer) timed out every probe,
+    /// because the whole body was awaited.
+    func testHTTPProbeReadsAnswerFromAStreamThatStaysOpen() async throws {
+        let script = """
+        import sys, json, time, http.server, socketserver
+
+        class H(http.server.BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+            def log_message(self, *a): pass
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                msg = json.loads(self.rfile.read(length)) if length else {}
+                method = msg.get('method')
+                mid = msg.get('id')
+                if mid is None:
+                    self.send_response(202)
+                    self.send_header('Content-Length', '0')
+                    self.end_headers()
+                    return
+                if method == 'initialize':
+                    result = {'protocolVersion':'2024-11-05','capabilities':{},
+                              'serverInfo':{'name':'stream','version':'0'}}
+                else:
+                    result = {'tools':[{'name':'echo','description':'Echo'}]}
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Transfer-Encoding', 'chunked')
+                self.end_headers()
+                def chunk(text):
+                    data = text.encode()
+                    self.wfile.write(b'%x\\r\\n%s\\r\\n' % (len(data), data))
+                    self.wfile.flush()
+                chunk('event: message\\ndata: {"jsonrpc":"2.0","method":"notifications/message","params":{}}\\n\\n')
+                chunk('event: message\\ndata: ' + json.dumps({'jsonrpc':'2.0','id':mid,'result':result}) + '\\n\\n')
+                try:
+                    for _ in range(60):
+                        time.sleep(1)
+                        chunk(': ping\\n\\n')
+                except Exception:
+                    pass
+
+        H.timeout = 70
+        class S(socketserver.ThreadingTCPServer):
+            daemon_threads = True
+
+        with S(('127.0.0.1', 0), H) as httpd:
+            sys.stdout.write(str(httpd.server_address[1]) + "\\n")
+            sys.stdout.flush()
+            httpd.serve_forever()
+        """
+
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mcpock-stream-mock-\(UUID().uuidString).py")
+        try script.write(to: tmp, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let server = Process()
+        server.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        server.arguments = [tmp.path]
+        let outPipe = Pipe()
+        server.standardOutput = outPipe
+        server.standardError = Pipe()
+        try server.run()
+        defer { stopMockServer(server) }
+
+        let port = try readLine(from: outPipe.fileHandleForReading, timeout: 5)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertFalse(port.isEmpty, "Mock server did not report its port")
+
+        let config = ServerConfig(
+            id: "test:stream", name: "stream-mock", source: .code, projectPath: nil, transport: .http,
+            command: nil, args: [], env: [:], url: "http://127.0.0.1:\(port)/mcp", headers: [:]
+        )
+        let clock = ContinuousClock()
+        let start = clock.now
+        let result = try await probeWithin(30, config: config, fetchTools: true)
+        XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
+        XCTAssertEqual(result.tools?.map(\.name), ["echo"])
+        XCTAssertLessThan(clock.now - start, .seconds(5), "answered as soon as the event arrived")
+    }
+
     /// An HTTP server that answers `initialize` with 401 must probe as a stable amber
     /// "needs attention" (auth), not red "broken": result carries `needsAttention` and
     /// a human-readable reason. Mirrors the real Vercel MCP (mcp.vercel.com → 401).
@@ -660,13 +743,15 @@ final class ProcessCleanupTests: XCTestCase {
         return result
     }
 
-    /// SIGTERM, then SIGKILL after 2 s: `waitUntilExit` alone could wait forever.
+    /// SIGTERM, then SIGKILL after 2 s. Bounded throughout: `waitUntilExit`
+    /// once hung a run for 10 minutes after the server was already gone.
     private func stopMockServer(_ server: Process) {
         server.terminate()
-        let deadline = Date().addingTimeInterval(2)
+        var deadline = Date().addingTimeInterval(2)
         while server.isRunning && Date() < deadline { usleep(20_000) }
         if server.isRunning { kill(server.processIdentifier, SIGKILL) }
-        server.waitUntilExit()
+        deadline = Date().addingTimeInterval(2)
+        while server.isRunning && Date() < deadline { usleep(20_000) }
     }
 
     private func isProcessAlive(_ pid: Int32) -> Bool {
