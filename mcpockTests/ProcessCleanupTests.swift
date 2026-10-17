@@ -83,6 +83,66 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertTrue(runner.stdoutDidFinish, "stdout reader reaches EOF once the child is gone")
     }
 
+    /// Argon 2026-10-17 #5: a launcher that forks its server and exits at
+    /// once can be gone before its start time is read; without a floor its
+    /// child was never found. Repeated, since the race is narrow.
+    func testInstantLauncherExitLeavesNoOrphanChild() async throws {
+        for round in 0..<10 {
+            let pidFile = FileManager.default.temporaryDirectory
+                .appendingPathComponent("mcpock-instant-\(UUID().uuidString).pid")
+            defer { try? FileManager.default.removeItem(at: pidFile) }
+            let runner = try ProcessRunner(
+                command: "/bin/sh",
+                args: ["-c", "/bin/sh -c 'echo $$ > \"\(pidFile.path)\"; exec sleep 300' & exit 0"],
+                env: [:]
+            )
+            var childPID: Int32 = 0
+            for _ in 0..<100 where childPID == 0 {
+                try await Task.sleep(for: .milliseconds(10))
+                childPID = Int32((try? String(contentsOf: pidFile, encoding: .utf8))?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+            }
+            XCTAssertGreaterThan(childPID, 0)
+            defer { if childPID > 0, isProcessAlive(childPID) { kill(childPID, SIGKILL) } }
+
+            await runner.terminateAndReap(gracePeriod: .milliseconds(300))
+            try await Task.sleep(for: .milliseconds(100))
+            XCTAssertFalse(isProcessAlive(childPID), "round \(round): child \(childPID) must not outlive its launcher")
+        }
+    }
+
+    /// Argon 2026-10-17 #4: teardown in a cancelled task used to spin: every
+    /// `Task.sleep` threw at once, so the wait loops ran flat out.
+    func testTeardownInACancelledTaskDoesNotSpin() async throws {
+        let runner = try ProcessRunner(
+            command: "/bin/sh",
+            args: ["-c", "trap '' TERM; while true; do sleep 1; done"],
+            env: [:]
+        )
+        let pid = runner.processIdentifier
+        func cpuSeconds() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6
+                + Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1e6
+        }
+        let before = cpuSeconds()
+        let clock = ContinuousClock()
+        let start = clock.now
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await runner.terminateAndReap(gracePeriod: .milliseconds(500))
+        }
+        await task.value
+        let elapsed = clock.now - start
+        let used = cpuSeconds() - before
+
+        XCTAssertGreaterThanOrEqual(elapsed, .milliseconds(450), "the grace period is still waited out")
+        XCTAssertLessThan(used, 0.25, "waiting must not burn CPU (used \(used) s)")
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(isProcessAlive(pid), "the process that ignores SIGTERM is killed")
+    }
+
     /// Argon 2026-10-16 #4: a server that floods stderr keeps its first lines
     /// (where the cause is) and its newest ones, never all of it.
     func testStderrFloodIsCapped() async throws {

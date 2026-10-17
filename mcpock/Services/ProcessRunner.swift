@@ -129,6 +129,12 @@ final class ProcessRunner: @unchecked Sendable {
                    sink: { [weak self] in self?.handleStderr($0) },
                    onEOF: { [weak self] in self?.stderrFinished.withLock { $0 = true } })
 
+        // Taken before the spawn, so it is never later than the root's own
+        // start: a launcher that forks its server and exits within a
+        // millisecond has no start time left to read, and without this floor
+        // its children were never found and kept running (Argon 2026-10-17 #5).
+        var spawnTime = timeval()
+        gettimeofday(&spawnTime, nil)
         do {
             try process.run()
         } catch {
@@ -137,7 +143,7 @@ final class ProcessRunner: @unchecked Sendable {
             try? stderrPipe.fileHandleForWriting.close()
             throw ProbeError.spawnFailed(error.localizedDescription)
         }
-        rootStarted = Self.startTime(of: process.processIdentifier)
+        rootStarted = Self.startTime(of: process.processIdentifier) ?? spawnTime
     }
 
     /// Blocking read loop on its own thread; `sink` runs there, in order, and
@@ -224,7 +230,7 @@ final class ProcessRunner: @unchecked Sendable {
 
             let deadline = ContinuousClock.now + gracePeriod
             while process.isRunning && ContinuousClock.now < deadline {
-                try? await Task.sleep(for: .milliseconds(50))
+                await Self.pause(.milliseconds(50))
             }
 
             if process.isRunning {
@@ -232,7 +238,7 @@ final class ProcessRunner: @unchecked Sendable {
                 kill(rootPID, SIGKILL)
                 let killDeadline = ContinuousClock.now + .milliseconds(500)
                 while process.isRunning && ContinuousClock.now < killDeadline {
-                    try? await Task.sleep(for: .milliseconds(20))
+                    await Self.pause(.milliseconds(20))
                 }
             }
         }
@@ -249,7 +255,7 @@ final class ProcessRunner: @unchecked Sendable {
             survivors.forEach { kill($0.pid, SIGTERM) }
             let survivorDeadline = ContinuousClock.now + .milliseconds(300)
             while !survivors.isEmpty && ContinuousClock.now < survivorDeadline {
-                try? await Task.sleep(for: .milliseconds(20))
+                await Self.pause(.milliseconds(20))
                 survivors = survivors.filter { $0.isStillTheSameProcess }
             }
             survivors.forEach { kill($0.pid, SIGKILL) }
@@ -260,10 +266,22 @@ final class ProcessRunner: @unchecked Sendable {
         // the pipe open.
         let stderrDeadline = ContinuousClock.now + .milliseconds(300)
         while !stderrFinished.withLock({ $0 }) && ContinuousClock.now < stderrDeadline {
-            try? await Task.sleep(for: .milliseconds(10))
+            await Self.pause(.milliseconds(10))
         }
 
         failPendingReaders()
+    }
+
+    /// A short wait that still waits when the task is cancelled. Teardown runs
+    /// under cancellation (Stop, a cancelled task group), where `Task.sleep`
+    /// throws at once: its wait loops then spun at 100% CPU for up to 1.6 s
+    /// per process (Argon 2026-10-17 #4).
+    static func pause(_ duration: Duration) async {
+        let (seconds, attoseconds) = duration.components
+        let nanoseconds = Int(seconds) * 1_000_000_000 + Int(attoseconds / 1_000_000_000)
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().asyncAfter(deadline: .now() + .nanoseconds(nanoseconds)) { done.resume() }
+        }
     }
 
     func forceKill() {

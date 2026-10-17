@@ -37,7 +37,7 @@ enum HeadersHelper {
             // grandchild could hold the pipe open).
             let readDeadline = ContinuousClock.now + .milliseconds(500)
             while !runner.stdoutDidFinish, ContinuousClock.now < readDeadline {
-                try? await Task.sleep(for: .milliseconds(10))
+                await ProcessRunner.pause(.milliseconds(10))
             }
         }
         let output = runner.rawStdout
