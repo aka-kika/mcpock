@@ -95,7 +95,8 @@ struct SettingsConnectPane: View {
     private func agentRow(_ host: AgentHost) -> some View {
         let status = statuses[host.id]
         let copied = copiedID == host.id
-        let destination = host.format.isClaudeCode ? "Run in Terminal (adds it for every project)" : "~/" + host.file
+        let shownFile = host.fileURL(home: Self.home).path.replacingOccurrences(of: Self.home.path + "/", with: "")
+        let destination = host.format.isClaudeCode ? "Run in Terminal (adds it for every project)" : "~/" + shownFile
         return HStack(spacing: 10) {
             AgentBadgeView(badge: AgentBadge.forLabel(host.name), theme: theme, size: 22)
                 .opacity(status == .notInstalled ? 0.5 : 1)
@@ -109,6 +110,9 @@ struct SettingsConnectPane: View {
                     Circle().fill(theme.statusHealthy).frame(width: 7, height: 7)
                     Text("Connected").font(Theme.caption).foregroundStyle(theme.textSecondary)
                 }
+            case .turnedOff:
+                Text("Turned off").font(Theme.caption).foregroundStyle(theme.textSecondary)
+                    .help("The mcpock entry is there but switched off in this file")
             case .notConnected:
                 Text("Not connected").font(Theme.caption).foregroundStyle(theme.textSecondary)
             case .notInstalled:

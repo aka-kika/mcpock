@@ -47,6 +47,27 @@ final class AgentConnectTests: XCTestCase {
         XCTAssertEqual(try host("kimi-code").status(home: home), .notConnected, "the agent's folder is enough")
     }
 
+    /// Argon 2026-10-17 #15: a switched-off entry read "Connected", and
+    /// OpenCode's opencode.jsonc was never read.
+    func testSwitchedOffEntryAndJSONCFile() throws {
+        try write(#"{"mcpServers": {"mcpock": {"command": "x", "disabled": true}}}"#, ".cursor/mcp.json")
+        XCTAssertEqual(try host("cursor").status(home: home), .turnedOff)
+        try write(#"{"mcp": {"mcpock": {"type": "local", "command": ["x"], "enabled": false}}}"#, ".config/opencode/opencode.json")
+        XCTAssertEqual(try host("opencode").status(home: home), .turnedOff)
+        try write("[mcp_servers.mcpock]\ncommand = \"x\"\nenabled = false\n", ".grok/config.toml")
+        XCTAssertEqual(try host("grok").status(home: home), .turnedOff)
+        try write("mcp_servers:\n  mcpock:\n    command: x\n    enabled: false\n", ".hermes/config.yaml")
+        XCTAssertEqual(try host("hermes").status(home: home), .turnedOff)
+        try write("extensions:\n  mcpock:\n    enabled: false\n    type: stdio\n    cmd: x\n", ".config/goose/config.yaml")
+        XCTAssertEqual(try host("goose").status(home: home), .turnedOff)
+
+        try FileManager.default.removeItem(at: home.appendingPathComponent(".config/opencode/opencode.json"))
+        try write("// mine\n{ \"mcp\": { \"mcpock\": { \"type\": \"local\", \"command\": [\"x\"] }, } }\n",
+                  ".config/opencode/opencode.jsonc")
+        XCTAssertEqual(try host("opencode").status(home: home), .connected)
+        XCTAssertEqual(try host("opencode").fileURL(home: home).lastPathComponent, "opencode.jsonc")
+    }
+
     func testReadingNeverChangesAFile() throws {
         let text = "// mine\n{ \"mcpServers\": {} }\n"
         try write(text, ".cursor/mcp.json")

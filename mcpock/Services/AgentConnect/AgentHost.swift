@@ -28,6 +28,9 @@ struct AgentHost: Identifiable, Sendable {
     var detect: [String]
     /// What to do after adding the line.
     var after: String
+    /// Other names the same file may have, read when `file` is not there
+    /// (OpenCode's `opencode.jsonc`).
+    var alternateFiles: [String] = []
 
     static let entry = ConnectSnippets.serverName
 
@@ -48,7 +51,8 @@ struct AgentHost: Identifiable, Sendable {
         AgentHost(id: "grok", name: "Grok", file: ".grok/config.toml", format: .toml(enabled: true),
                   detect: [".grok"], after: "Start a new Grok session."),
         AgentHost(id: "opencode", name: "OpenCode", file: ".config/opencode/opencode.json", format: .json(top: "mcp", style: .opencode),
-                  detect: [".config/opencode", "/opt/homebrew/bin/opencode"], after: "Start a new OpenCode session."),
+                  detect: [".config/opencode", "/opt/homebrew/bin/opencode"], after: "Start a new OpenCode session.",
+                  alternateFiles: [".config/opencode/opencode.jsonc"]),
         AgentHost(id: "goose", name: "Goose", file: ".config/goose/config.yaml", format: .yaml(section: "extensions", style: .goose),
                   detect: [".config/goose", "/Applications/Goose.app"], after: "Start a new Goose session."),
         AgentHost(id: "hermes", name: "Hermes", file: ".hermes/config.yaml", format: .yaml(section: "mcp_servers", style: .hermes),
@@ -59,34 +63,62 @@ struct AgentHost: Identifiable, Sendable {
                   detect: [".minimax"], after: "Start a new MiniMax session."),
     ]
 
-    enum Status: Equatable, Sendable { case connected, notConnected, notInstalled }
+    /// `turnedOff`: the entry is there but switched off (`"enabled": false`,
+    /// `"disabled": true`), so the agent does not start it (Argon 2026-10-17 #15).
+    enum Status: Equatable, Sendable { case connected, turnedOff, notConnected, notInstalled }
 
-    func fileURL(home: URL) -> URL { home.appendingPathComponent(file) }
+    /// The settings file: `file`, or the first alternate name that exists.
+    func fileURL(home: URL) -> URL {
+        let fm = FileManager.default
+        for name in [file] + alternateFiles {
+            let url = home.appendingPathComponent(name)
+            if fm.fileExists(atPath: url.path) { return url }
+        }
+        return home.appendingPathComponent(file)
+    }
 
-    /// Connected when the file has an "mcpock" entry; otherwise whether the agent is on this Mac.
+    /// Connected when the file has an "mcpock" entry that is on; otherwise whether the agent is on this Mac.
     func status(home: URL) -> Status {
-        if hasEntry(home: home) { return .connected }
+        switch entry(home: home) {
+        case .on: return .connected
+        case .off: return .turnedOff
+        case .none: break
+        }
         let fm = FileManager.default
         let here = fm.fileExists(atPath: fileURL(home: home).path)
             || detect.contains { fm.fileExists(atPath: $0.hasPrefix("/") ? $0 : home.appendingPathComponent($0).path) }
         return here ? .notConnected : .notInstalled
     }
 
-    /// Read the way the scan reads each format, comments in JSON included.
-    func hasEntry(home: URL) -> Bool {
-        guard let text = try? String(contentsOf: fileURL(home: home), encoding: .utf8) else { return false }
+    enum Entry: Equatable { case none, on, off }
+
+    /// The "mcpock" entry, read the way the scan reads each format (comments in
+    /// JSON included), with the same on/off switches the scan honours.
+    func entry(home: URL) -> Entry {
+        guard let text = try? String(contentsOf: fileURL(home: home), encoding: .utf8) else { return .none }
         switch format {
         case .claudeCode, .json:
             let top: String
             if case .json(let t, _) = format { top = t } else { top = "mcpServers" }
             let object = (try? JSONSerialization.jsonObject(with: Data(text.utf8)))
                 ?? (try? JSONSerialization.jsonObject(with: Data(JSONC.plainJSON(text).utf8)))
-            guard let root = object as? [String: Any], let servers = root[top] as? [String: Any] else { return false }
-            return servers[Self.entry] != nil
+            guard let root = object as? [String: Any], let servers = root[top] as? [String: Any],
+                  let value = servers[Self.entry] else { return .none }
+            let fields = value as? [String: Any] ?? [:]
+            let off = (fields["enabled"] as? Bool) == false || (fields["disabled"] as? Bool) == true
+            return off ? .off : .on
         case .toml:
-            return MCPServersTOML.servers(fromTOML: text)[Self.entry] != nil
-        case .yaml(let section, _):
-            return YAMLBlock.entries(in: text, under: section)[Self.entry] != nil
+            // The TOML reader drops `enabled = false` servers: a table header
+            // with no server behind it is one switched off.
+            if MCPServersTOML.servers(fromTOML: text)[Self.entry] != nil { return .on }
+            return text.contains("[mcp_servers.\(Self.entry)]") ? .off : .none
+        case .yaml(let section, let style):
+            guard let fields = YAMLBlock.entries(in: text, under: section)[Self.entry] else { return .none }
+            let enabled = fields["enabled"]?.scalar
+            switch style {
+            case .goose: return enabled == nil || enabled == "true" ? .on : .off
+            case .hermes: return enabled == "false" ? .off : .on
+            }
         }
     }
 
