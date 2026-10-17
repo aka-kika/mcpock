@@ -139,4 +139,22 @@ final class ConfigShapeTests: XCTestCase {
                        "https://example.com/mcp//not-a-comment", "// inside a string stays")
         XCTAssertEqual(entries.first { $0.name == "docs" }?.entry["args"] as? [String], ["-y", "docs-mcp"])
     }
+
+    /// Argon 2026-10-17 #8: Cline, Roo Code and Windsurf switch a server off
+    /// with `"disabled": true`; Claude Code with a project's `disabledMcpServers`.
+    func testDisabledEntriesAreDropped() throws {
+        let cline = #"{"mcpServers":{"on":{"command":"a"},"off":{"command":"b","disabled":true},"kept":{"command":"c","disabled":false}}}"#
+        XCTAssertEqual(Set(try XCTUnwrap(JSONConfigShape.parse(cline)).map(\.name)), ["on", "kept"])
+
+        let claude = #"{"mcpServers":{"vera":{"command":"v"}},"projects":{"/repo":{"mcpServers":{"local":{"command":"l"},"quiet":{"command":"q"}},"disabledMcpServers":["quiet","vera"]}}}"#
+        let entries = try XCTUnwrap(JSONConfigShape.parse(claude))
+        XCTAssertEqual(Set(entries.map(\.name)), ["vera", "local"],
+                       "the project's own server is dropped; a global one it names stays for other projects")
+    }
+
+    func testDisabledMcpjsonServersByFolder() {
+        let text = #"{"projects":{"/repo/./app":{"disabledMcpjsonServers":["a"]},"/other":{"disabledMcpjsonServers":[]}}}"#
+        XCTAssertEqual(JSONConfigShape.disabledMcpjsonServers(text), ["/repo/app": ["a"]])
+        XCTAssertEqual(JSONConfigShape.disabledMcpjsonServers("nope"), [:])
+    }
 }

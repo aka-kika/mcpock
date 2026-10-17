@@ -63,7 +63,9 @@ struct ConfigShape {
 /// - `{"mcp": {<name>: {...}}}` — OpenCode, whose `command` is an argv array and
 ///   whose env map is called `environment`.
 ///
-/// `"enabled": false` entries are dropped, matching the TOML and YAML readers.
+/// `"enabled": false` and `"disabled": true` entries are dropped, matching the
+/// TOML and YAML readers, and so are a Claude Code project's own servers named
+/// in its `disabledMcpServers`.
 ///
 /// `genericKeys: false` reads only `mcpServers`: the scan uses it for files whose
 /// name is not a known MCP config name (see `ConfigScanner.scanShapes`).
@@ -83,7 +85,11 @@ enum JSONConfigShape {
             for (projectPath, value) in projects {
                 guard let project = value as? [String: Any],
                       let mcp = project["mcpServers"] as? [String: Any] else { continue }
-                entries.append(contentsOf: extract(mcp, projectPath: projectPath))
+                // Turned off in that project with /mcp (Argon 2026-10-17 #8). The
+                // same list also names global servers, which stay: they run in
+                // every other project.
+                let off = Set(project["disabledMcpServers"] as? [String] ?? [])
+                entries.append(contentsOf: extract(mcp, projectPath: projectPath).filter { !off.contains($0.name) })
             }
         }
         if genericKeys, let servers = root["servers"] as? [String: Any] {
@@ -100,10 +106,28 @@ enum JSONConfigShape {
         return entries.contains(where: \.hasEndpoint) ? entries : nil
     }
 
+    /// Claude Code's per-project lists of `.mcp.json` servers switched off in
+    /// that project (`projects.<path>.disabledMcpjsonServers`), by folder.
+    static func disabledMcpjsonServers(_ text: String) -> [String: Set<String>] {
+        guard let data = text.data(using: .utf8),
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let projects = root["projects"] as? [String: Any]
+        else { return [:] }
+        var result: [String: Set<String>] = [:]
+        for (path, value) in projects {
+            guard let names = (value as? [String: Any])?["disabledMcpjsonServers"] as? [String], !names.isEmpty
+            else { continue }
+            result[(path as NSString).standardizingPath] = Set(names)
+        }
+        return result
+    }
+
     private static func extract(_ dict: [String: Any], projectPath: String?) -> [DiscoveredEntry] {
         dict.compactMap { name, value in
             guard var entry = value as? [String: Any] else { return nil }
             if (entry["enabled"] as? Bool) == false { return nil }
+            // Cline, Roo Code and Windsurf say it the other way round.
+            if (entry["disabled"] as? Bool) == true { return nil }
             normalize(&entry)
             return DiscoveredEntry(name: name, entry: entry, projectPath: projectPath)
         }

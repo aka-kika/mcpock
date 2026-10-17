@@ -121,4 +121,29 @@ final class ConfigDiscoveryTests: XCTestCase {
         XCTAssertFalse(ConfigDiscovery.isExistingFolder(home.appendingPathComponent(".claude.json").path),
                        "a file is not a project folder")
     }
+
+    /// Argon 2026-10-17 #8: a project's `.mcp.json` server that Claude Code
+    /// was told to leave off there is not started.
+    func testDisabledMcpjsonServerIsSkipped() throws {
+        let project = home.appendingPathComponent("Projects/App")
+        try write("Projects/App/.mcp.json", #"{"mcpServers": {"on": {"command": "a"}, "off": {"command": "b"}}}"#)
+        try write(".claude.json", """
+        {"projects": {"\(project.path)": {"disabledMcpjsonServers": ["off"]}}}
+        """)
+        let registry = [KnownAgent(label: "Code", path: home.appendingPathComponent(".claude.json").path, shape: .json)]
+        let configs = ConfigDiscovery.discover(registry: registry, scanRoots: [home.path])
+        XCTAssertNotNil(configs.first { $0.name == "on" })
+        XCTAssertNil(configs.first { $0.name == "off" })
+    }
+
+    /// Argon 2026-10-17 #3: a project folder deleted after the config was
+    /// read no longer fails the start; the server runs from the default folder.
+    func testMissingWorkingDirectoryDoesNotFailTheStart() async throws {
+        let runner = try ProcessRunner(command: "/bin/sh", args: ["-c", "exit 0"], env: [:],
+                                       workingDirectory: home.appendingPathComponent("gone").path)
+        for _ in 0..<100 where runner.isRunning { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertFalse(runner.isRunning)
+        XCTAssertTrue(runner.exitedNormally)
+        XCTAssertEqual(runner.terminationStatus, 0)
+    }
 }

@@ -38,6 +38,12 @@ enum ConfigDiscovery {
             servers.append(contentsOf: configs(from: entries, source: source, idPrefix: "reg:\(agent.label)"))
         }
 
+        // A project's `.mcp.json` servers that Claude Code was told to leave
+        // off there (Argon 2026-10-17 #8).
+        let mcpjsonOff = registry.first { $0.label == AgentRegistry.claudeCodeLabel }
+            .flatMap { try? String(contentsOfFile: $0.path, encoding: .utf8) }
+            .map(JSONConfigShape.disabledMcpjsonServers) ?? [:]
+
         // 2. Scan: everything else, deduped against the registry.
         for hit in ConfigScanner.scan(roots: scanRoots) where !claimedPaths.contains(hit.path) {
             claimedPaths.insert(hit.path)
@@ -45,11 +51,13 @@ enum ConfigDiscovery {
                 label: label(forScannedPath: hit.path, derived: hit.label, registry: registry),
                 path: hit.path
             )
+            let folder = claudeProjectFolder(forScannedPath: hit.path)
+            let off = folder.flatMap { mcpjsonOff[($0 as NSString).standardizingPath] } ?? []
             servers.append(contentsOf: configs(
-                from: droppingStaleProjects(hit.entries, folderExists: folderExists),
+                from: droppingStaleProjects(hit.entries, folderExists: folderExists).filter { !off.contains($0.name) },
                 source: source,
                 idPrefix: "scan:\(hit.path)",
-                projectPath: claudeProjectFolder(forScannedPath: hit.path)
+                projectPath: folder
             ))
         }
 
