@@ -1,17 +1,21 @@
 import Foundation
 
-/// Builds a shareable report of all failing MCP servers, for the Settings
-/// "Export errors…" action. Pure string builders so they're unit-testable;
-/// the file write + save panel live in the view.
+/// Builds a shareable report of the servers that need attention, for the
+/// Settings "Copy All" and "Export…" actions. It is the report the agents
+/// read (`StatusReport.problemLines`, from the same snapshot as
+/// `status.json`): config paths, servers set up differently, hidden ones
+/// left out, agents by their full names (Argon 2026-10-17 #12). Pure string
+/// builders so they're unit-testable; the file write + save panel live in
+/// the view.
 enum ErrorExport {
     enum Format {
         case markdown
         case json
     }
 
-    /// Groups that currently have a failure worth reporting (broken/degraded with a reason).
-    static func failing(_ groups: [ServerGroup]) -> [ServerGroup] {
-        groups.filter { !$0.issues.isEmpty }
+    /// The servers the report lists: needing attention, not hidden.
+    static func failing(_ status: MCPockStatus) -> [MCPockStatus.Server] {
+        StatusReport.problems(in: status)
     }
 
     /// Pick the format implied by a chosen filename's extension (defaults to Markdown).
@@ -19,86 +23,48 @@ enum ErrorExport {
         ext.lowercased() == "json" ? .json : .markdown
     }
 
-    static func string(_ format: Format, from groups: [ServerGroup], totalCount: Int, generated: Date) -> String {
+    static func string(_ format: Format, from status: MCPockStatus, now: Date) -> String {
         switch format {
-        case .markdown: return markdown(from: groups, totalCount: totalCount, generated: generated)
-        case .json: return json(from: groups, totalCount: totalCount, generated: generated)
+        case .markdown: return markdown(from: status, now: now)
+        case .json: return json(from: status, now: now)
         }
     }
 
     // MARK: - Markdown
 
-    static func markdown(from groups: [ServerGroup], totalCount: Int, generated: Date) -> String {
-        let failing = failing(groups)
+    static func markdown(from status: MCPockStatus, now: Date) -> String {
         var lines: [String] = ["# mcpock error report", ""]
-        lines.append("Generated: \(displayFormatter.string(from: generated))")
-        lines.append("Failing servers: \(failing.count) of \(totalCount)")
-
-        guard !failing.isEmpty else {
+        lines.append("Generated: \(displayFormatter.string(from: now))")
+        let count = failing(status).count
+        if count > 0 {
             lines.append("")
-            lines.append("No failing servers.")
-            return lines.joined(separator: "\n") + "\n"
+            lines.append(ServerGroup.reportPreamble(plural: count > 1))
         }
-
         lines.append("")
-        lines.append(ServerGroup.reportPreamble(plural: true))
-
-        for group in failing {
-            lines.append("")
-            lines.append("## \(group.name) — \(group.state.rawValue)")
-            lines.append("Sources: \(group.sourceSummary)")
-            lines.append("")
-            for issue in group.issues {
-                lines.append("- **\(issue.label)**: \(issue.reason)")
-                if !issue.command.isEmpty {
-                    lines.append("  `\(issue.command)`")
-                }
-            }
-        }
+        lines.append(contentsOf: StatusReport.problemLines(status, now: now))
         return lines.joined(separator: "\n") + "\n"
     }
 
     // MARK: - JSON
 
     private struct Payload: Encodable {
-        let generated: String
+        let generated: Date
         let failingCount: Int
         let totalCount: Int
-        let servers: [Server]
-
-        struct Server: Encodable {
-            let name: String
-            let state: String
-            let sources: [String]
-            let errors: [Issue]
-        }
-        struct Issue: Encodable {
-            let source: String
-            let reason: String
-            let command: String
-        }
+        let summary: String
+        let servers: [MCPockStatus.Server]
     }
 
-    static func json(from groups: [ServerGroup], totalCount: Int, generated: Date) -> String {
-        let failing = failing(groups)
+    static func json(from status: MCPockStatus, now: Date) -> String {
+        let failing = failing(status)
         let payload = Payload(
-            generated: ISO8601DateFormatter().string(from: generated),
+            generated: now,
             failingCount: failing.count,
-            totalCount: totalCount,
-            servers: failing.map { group in
-                Payload.Server(
-                    name: group.name,
-                    state: group.state.rawValue,
-                    sources: group.sourceLabels,
-                    errors: group.issues.map {
-                        Payload.Issue(source: $0.label, reason: $0.reason, command: $0.command)
-                    }
-                )
-            }
+            totalCount: status.counts.total,
+            summary: status.summary,
+            servers: failing
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(payload),
+        guard let data = try? MCPockStatus.encoder().encode(payload),
               let string = String(data: data, encoding: .utf8) else {
             return "{}"
         }

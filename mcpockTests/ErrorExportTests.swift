@@ -1,65 +1,58 @@
 import XCTest
 @testable import mcpock
 
+/// Settings "Copy All" / "Export…": the report the agents read, from the
+/// same snapshot as `status.json` (Argon 2026-10-17 #12).
 final class ErrorExportTests: XCTestCase {
-    private let date = Date(timeIntervalSince1970: 1_780_000_000)  // fixed, deterministic
+    private let now = MCPockStatus.decoderDate("2027-01-15T08:02:00Z")
 
-    private func group(_ name: String, _ state: HealthState, issues: [ServerIssue], sources: [String]) -> ServerGroup {
-        ServerGroup(name: name, state: state, sourceLabels: sources, tools: [], issues: issues,
-                    variantCount: sources.count)
+    /// One broken, one sign-in, one set up differently, one fine, one hidden broken.
+    private var sample: MCPockStatus {
+        try! MCPockStatus.decoder().decode(MCPockStatus.self, from: Data(MCPStatusServerTests.fixtureJSON.utf8))
     }
 
-    private var sample: [ServerGroup] {
-        [
-            group("eventkit", .broken,
-                  issues: [ServerIssue(label: "Cursor", reason: "Spawn error: not found", command: "/bin/eventkit")],
-                  sources: ["Code", "Cursor"]),
-            group("healthy-one", .healthy, issues: [], sources: ["Code"]),  // no issues → excluded
-            group("vercel", .broken,
-                  issues: [ServerIssue(label: "Cursor", reason: "HTTP 401", command: "")],
-                  sources: ["Cursor"]),
-        ]
+    private var allFine: MCPockStatus {
+        var status = sample
+        status.servers = status.servers.filter { !$0.needsAttention }
+        return status
     }
 
-    func testFailingExcludesHealthy() {
-        let failing = ErrorExport.failing(sample)
-        XCTAssertEqual(failing.map(\.name), ["eventkit", "vercel"])
+    func testFailingIsWhatTheAgentsSee() {
+        XCTAssertEqual(ErrorExport.failing(sample).map(\.name), ["firecrawl", "figma", "wake"],
+                       "set up differently counts, hidden and fine ones don't")
     }
 
-    func testMarkdownListsFailingServersWithReasonsAndCommand() {
-        let md = ErrorExport.markdown(from: sample, totalCount: 3, generated: date)
+    func testMarkdownIsTheAgentsReport() {
+        let md = ErrorExport.markdown(from: sample, now: now)
         XCTAssertTrue(md.hasPrefix("# mcpock error report"))
-        XCTAssertTrue(md.contains("Failing servers: 2 of 3"), md)
-        XCTAssertTrue(md.contains("## eventkit — broken"), md)
-        XCTAssertTrue(md.contains("- **Cursor**: Spawn error: not found"), md)
-        XCTAssertTrue(md.contains("`/bin/eventkit`"), "command should be shown when present")
-        XCTAssertTrue(md.contains("## vercel — broken"), md)
-        XCTAssertFalse(md.contains("healthy-one"), "healthy servers must be excluded")
+        XCTAssertTrue(md.contains(StatusReport.problemLines(sample, now: now).joined(separator: "\n")), md)
+        XCTAssertTrue(md.contains("/Users/k/.cursor/mcp.json"), "config paths are in it")
+        XCTAssertTrue(md.contains("wake — set up differently"), md)
+        XCTAssertTrue(md.contains("Claude Code"), "agents by their full names")
+        XCTAssertFalse(md.contains("old-thing —"), "a hidden server is only named, not listed")
+        XCTAssertFalse(md.contains("tinycast"), "a fine server is left out")
     }
 
-    func testMarkdownEmptyWhenNoErrors() {
-        let md = ErrorExport.markdown(from: [group("ok", .healthy, issues: [], sources: ["Code"])],
-                                      totalCount: 1, generated: date)
-        XCTAssertTrue(md.contains("Failing servers: 0 of 1"))
-        XCTAssertTrue(md.contains("No failing servers."))
+    func testMarkdownWhenNothingNeedsAttention() {
+        let md = ErrorExport.markdown(from: allFine, now: now)
+        XCTAssertTrue(md.contains("Nothing needs attention."), md)
+        XCTAssertFalse(md.contains("automated health report from mcpock"), md)
     }
 
-    func testMarkdownExplainerAbsentWhenNoFailures() {
-        let md = ErrorExport.markdown(from: [group("ok", .healthy, issues: [], sources: ["Code"])],
-                                      totalCount: 1, generated: date)
-        XCTAssertFalse(md.contains("startup health check"), md)
+    func testMarkdownIncludesFramingExplainer() {
+        let md = ErrorExport.markdown(from: sample, now: now)
+        XCTAssertTrue(md.contains(ServerGroup.reportPreamble(plural: true)), md)
     }
 
-    func testJSONIsValidAndContainsFailingServers() throws {
-        let jsonString = ErrorExport.json(from: sample, totalCount: 3, generated: date)
-        let obj = try JSONSerialization.jsonObject(with: Data(jsonString.utf8)) as? [String: Any]
-        XCTAssertEqual(obj?["failingCount"] as? Int, 2)
-        XCTAssertEqual(obj?["totalCount"] as? Int, 3)
-        let servers = obj?["servers"] as? [[String: Any]]
-        XCTAssertEqual(servers?.count, 2)
-        XCTAssertEqual(servers?.first?["name"] as? String, "eventkit")
-        let errors = servers?.first?["errors"] as? [[String: Any]]
-        XCTAssertEqual(errors?.first?["reason"] as? String, "Spawn error: not found")
+    func testJSONCarriesConfigPathsAndDiffers() throws {
+        let jsonString = ErrorExport.json(from: sample, now: now)
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(jsonString.utf8)) as? [String: Any])
+        XCTAssertEqual(obj["failingCount"] as? Int, 3)
+        XCTAssertEqual(obj["totalCount"] as? Int, 5)
+        let servers = try XCTUnwrap(obj["servers"] as? [[String: Any]])
+        XCTAssertEqual(servers.map { $0["name"] as? String }, ["firecrawl", "figma", "wake"])
+        XCTAssertEqual(servers[0]["configPaths"] as? [String], ["/Users/k/.cursor/mcp.json", "/Users/k/.claude.json"])
+        XCTAssertEqual(servers[2]["differs"] as? String, "Grok points at a different command than Cursor.")
     }
 
     func testFormatFromExtension() {
@@ -70,17 +63,9 @@ final class ErrorExportTests: XCTestCase {
     }
 
     func testFileStampIsFilesystemSafe() {
-        let stamp = ErrorExport.fileStamp(date)
+        let stamp = ErrorExport.fileStamp(now)
         XCTAssertFalse(stamp.contains(":"))
         XCTAssertFalse(stamp.contains(" "))
         XCTAssertFalse(stamp.contains("/"))
-    }
-
-    func testMarkdownIncludesFramingExplainer() {
-        // The export shares its preamble with ServerGroup.copyText so the two
-        // explanations can't drift — assert against that single source.
-        let md = ErrorExport.markdown(from: sample, totalCount: 3, generated: date)
-        XCTAssertTrue(md.contains(ServerGroup.reportPreamble(plural: true)), md)
-        XCTAssertTrue(md.contains("automated health report from mcpock"), md)
     }
 }

@@ -310,13 +310,13 @@ struct SettingsGeneralPane: View {
     /// Put the same report "Export…" writes onto the clipboard — the panel's
     /// per-row "Copy errors" is one server; this is all of them at once.
     private func copyAllErrors() {
-        let groups = monitor?.groups ?? []
-        let failing = ErrorExport.failing(groups).count
+        guard let status = monitor?.statusSnapshot() else { return }
+        let failing = ErrorExport.failing(status).count
         guard failing > 0 else {
             exportNote = "No errors to copy"
             return
         }
-        let report = ErrorExport.markdown(from: groups, totalCount: groups.count, generated: Date())
+        let report = ErrorExport.markdown(from: status, now: Date())
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
         exportNote = "Copied \(failing) error\(failing == 1 ? "" : "s")"
@@ -325,8 +325,7 @@ struct SettingsGeneralPane: View {
     /// Save a report of every failing server to a Markdown or JSON file (chosen by
     /// the save panel's file type). Writes the whole current error set, not just one.
     private func exportErrors() {
-        let groups = monitor?.groups ?? []
-        let total = groups.count
+        guard let status = monitor?.statusSnapshot() else { return }
         let now = Date()
 
         NSApp.activate(ignoringOtherApps: true)
@@ -341,10 +340,10 @@ struct SettingsGeneralPane: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         let format = ErrorExport.format(forExtension: url.pathExtension)
-        let contents = ErrorExport.string(format, from: groups, totalCount: total, generated: now)
+        let contents = ErrorExport.string(format, from: status, now: now)
         do {
             try contents.write(to: url, atomically: true, encoding: .utf8)
-            let failing = ErrorExport.failing(groups).count
+            let failing = ErrorExport.failing(status).count
             exportNote = "Exported \(failing) error\(failing == 1 ? "" : "s") → \(url.lastPathComponent)"
         } catch {
             exportNote = "Export failed: \(error.localizedDescription)"
