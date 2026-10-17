@@ -36,11 +36,16 @@ struct UsageCursor: Codable, Equatable, Sendable {
     /// the first read sees it shrink; the later pieces still hold old calls,
     /// so every later read of it filters by this too (Argon 2026-10-17 #13).
     var restartCutoff: [String: Int64] = [:]
+    /// Per source whose records get rewritten under a new row id (Cursor's
+    /// chat bubbles): record key -> call time (ms) of each call counted in
+    /// the last couple of days, so a rewrite is never counted again
+    /// (Argon 2026-10-17 #10).
+    var countedKeys: [String: [String: Int64]] = [:]
 
     static let empty = UsageCursor(values: [:])
 
     private enum CodingKeys: String, CodingKey {
-        case values, newest, countedBefore, restartCutoff
+        case values, newest, countedBefore, restartCutoff, countedKeys
     }
 
     /// A call's time as `newest` stores it.
@@ -87,6 +92,7 @@ extension UsageCursor {
         newest = try container.decodeIfPresent([String: Int64].self, forKey: .newest) ?? [:]
         countedBefore = try container.decodeIfPresent(Int64.self, forKey: .countedBefore)
         restartCutoff = try container.decodeIfPresent([String: Int64].self, forKey: .restartCutoff) ?? [:]
+        countedKeys = try container.decodeIfPresent([String: [String: Int64]].self, forKey: .countedKeys) ?? [:]
     }
 }
 

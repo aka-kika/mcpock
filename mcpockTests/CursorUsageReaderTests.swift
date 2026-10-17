@@ -215,6 +215,66 @@ final class CursorUsageReaderTests: XCTestCase {
         XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 2)
     }
 
+    /// Argon 2026-10-17 #10: Cursor rewrites a finished bubble (same key,
+    /// new rowid); the call was counted a second time.
+    func testFinishedBubbleRewrittenLaterIsNotCountedAgain() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        let key = "bubbleId:c:one"
+        fixture.putBubble(key: key, name: "mcp-serverone-do_thing", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        let reader = CursorUsageReader(databasePath: path)
+        let first = reader.read(since: .empty, knownServers: [])
+        XCTAssertEqual(first.events.count, 1)
+
+        fixture.putBubble(key: key, name: "mcp-serverone-do_thing", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        let second = reader.read(since: first.cursor, knownServers: [])
+        XCTAssertTrue(second.events.isEmpty, "the rewrite is the same call")
+        XCTAssertEqual(second.cursor.values[CursorUsageReader.cursorKey], 2, "and it is not read again")
+
+        // Saved and loaded like usage.json does: the memory survives.
+        let saved = try! JSONDecoder().decode(UsageCursor.self, from: JSONEncoder().encode(second.cursor))
+        fixture.putBubble(key: key, name: "mcp-serverone-do_thing", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        XCTAssertTrue(reader.read(since: saved, knownServers: []).events.isEmpty)
+    }
+
+    /// Two calls at once, the first one slower: it finishes after the
+    /// second was counted and still counts.
+    func testCallsFinishingOutOfOrderBothCount() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:c:late", name: "mcp-serverone-a", status: "loading", createdAt: "2026-09-20T10:00:00.000Z")
+        fixture.putBubble(key: "bubbleId:c:fast", name: "mcp-servertwo-b", status: "completed", createdAt: "2026-09-20T10:00:05.000Z")
+        let reader = CursorUsageReader(databasePath: path)
+        let first = reader.read(since: .empty, knownServers: [])
+        XCTAssertEqual(first.events.map(\.server), ["servertwo"])
+
+        fixture.putBubble(key: "bubbleId:c:late", name: "mcp-serverone-a", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        XCTAssertEqual(reader.read(since: first.cursor, knownServers: []).events.map(\.server), ["serverone"])
+    }
+
+    /// A rewrite of a call older than the key memory is never new.
+    func testRewriteOfAnOldCallIsNotCounted() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:c:old", name: "mcp-serverone-a", status: "completed", createdAt: "2026-09-01T10:00:00.000Z")
+        let newest = ISO8601DateFormatter().date(from: "2026-09-20T10:00:00Z")!
+        let cursor = UsageCursor(values: [CursorUsageReader.cursorKey: 0], newest: [CursorUsageReader.cursorKey: UsageCursor.millis(newest)])
+        XCTAssertTrue(CursorUsageReader(databasePath: path).read(since: cursor, knownServers: []).events.isEmpty)
+    }
+
+    /// A full read starts past the table's last row, other keys too, so
+    /// they are not read again every time.
+    func testCursorAdvancesPastOtherKeys() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:c:one", name: "mcp-serverone-a", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        fixture.putBubble(key: "composerData:c", name: nil, status: nil, createdAt: "2026-09-20T10:00:01.000Z")
+        fixture.putBubble(key: "composerData:d", name: nil, status: nil, createdAt: "2026-09-20T10:00:02.000Z")
+        let result = CursorUsageReader(databasePath: path).read(since: .empty, knownServers: [])
+        XCTAssertEqual(result.events.count, 1)
+        XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 3)
+    }
+
     /// A missing database is not an error: no events, same cursor back.
     func testMissingDatabaseReturnsNoEventsSameCursor() {
         let missingPath = root.appendingPathComponent("does-not-exist.vscdb").path

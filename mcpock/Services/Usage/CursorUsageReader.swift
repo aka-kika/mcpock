@@ -44,6 +44,12 @@ import SQLite3
 /// always on an early `"error"` row) has no real server or tool in it and
 /// is skipped rather than reported as an empty server.
 ///
+/// Cursor can also rewrite a bubble after its call finished, which brings
+/// the same call back under a new rowid: the keys of calls counted in the
+/// last two days are kept in the cursor (`UsageCursor.countedKeys`), and a
+/// call older than that behind the newest one counted is a rewrite, never
+/// new (Argon 2026-10-17 #10).
+///
 /// **Opening the database.** Cursor keeps this file open continuously in
 /// WAL mode. Opening it `SQLITE_OPEN_READONLY` and never issuing a
 /// checkpoint is safe for a second reader to do while Cursor runs — that is
@@ -96,10 +102,10 @@ struct CursorUsageReader: UsageReader {
         // (reinstall, history cleared): rowids start low again, and without
         // this the scan found nothing forever (review, 2026-09-26). Start over,
         // as the Hermes reader does.
-        guard let (scan, sinceRowid) = Self.withOpenDatabase(at: databasePath, body: { db -> (ScanResult, Int64) in
+        guard let (scan, sinceRowid, tableMax) = Self.withOpenDatabase(at: databasePath, body: { db -> (ScanResult, Int64, Int64) in
             let tableMax = Self.queryMaxRowid(db) ?? storedRowid
             let since = storedRowid > tableMax ? 0 : storedRowid
-            return (Self.scan(db, sinceRowid: since, knownServers: knownServers), since)
+            return (Self.scan(db, sinceRowid: since, knownServers: knownServers), since, tableMax)
         }) else {
             // Neither the direct open nor the copy-and-read fallback worked
             // (e.g. the file vanished between the exists check and here).
@@ -114,7 +120,10 @@ struct CursorUsageReader: UsageReader {
         // read later without that check.
         let restarted = sinceRowid != storedRowid
         guard !restarted || scan.isComplete else { return ([], cursor) }
-        guard scan.maxRowid > sinceRowid else {
+        // A full scan read every row up to the table's end, other keys too:
+        // start past them next time instead of reading them again.
+        let reached = scan.isComplete ? max(scan.maxRowid, tableMax) : scan.maxRowid
+        guard reached > sinceRowid else {
             // Nothing new. After a reset to an empty table, remember the
             // restart so the stale high cursor isn't kept.
             guard restarted else { return ([], cursor) }
@@ -123,10 +132,43 @@ struct CursorUsageReader: UsageReader {
             return ([], reset)
         }
         var next = cursor
-        next.values[Self.cursorKey] = scan.maxRowid
-        let events = restarted ? cursor.uncounted(scan.events, from: Self.cursorKey) : scan.events
+        next.values[Self.cursorKey] = reached
+        let fresh = Self.notYetCounted(scan.calls, cursor: cursor)
+        let counted = restarted
+            ? fresh.filter { !cursor.uncounted([$0.event], from: Self.cursorKey).isEmpty } : fresh
+        let events = counted.map(\.event)
         next.noteCounted(events, from: Self.cursorKey)
+        next.countedKeys[Self.cursorKey] = Self.keysToKeep(
+            counted, cursor: cursor, newest: next.newest[Self.cursorKey])
         return (events, next)
+    }
+
+    /// How long a counted bubble's key is remembered: a bubble Cursor
+    /// rewrites after its call finished comes back under a new rowid, so
+    /// without its key it was counted again (Argon 2026-10-17 #10). Calls
+    /// older than this behind the newest one are rewrites, never new.
+    static let keyMemoryMillis: Int64 = 2 * 24 * 3600 * 1000
+
+    /// The calls not counted before: their key is new, and they are not
+    /// older than the key memory reaches. Calls that finish out of order
+    /// (two at once, the first one slower) still count.
+    private static func notYetCounted(_ calls: [Call], cursor: UsageCursor) -> [Call] {
+        let seen = cursor.countedKeys[cursorKey] ?? [:]
+        let floor = cursor.newest[cursorKey].map { $0 - keyMemoryMillis }
+        return calls.filter { call in
+            seen[call.key] == nil && floor.map { UsageCursor.millis(call.event.date) > $0 } ?? true
+        }
+    }
+
+    /// The remembered keys plus this read's counted ones, without those
+    /// past the key memory.
+    private static func keysToKeep(_ counted: [Call], cursor: UsageCursor, newest: Int64?) -> [String: Int64] {
+        var keys = cursor.countedKeys[cursorKey] ?? [:]
+        for call in counted {
+            keys[call.key] = UsageCursor.millis(call.event.date)
+        }
+        guard let newest else { return keys }
+        return keys.filter { $0.value > newest - keyMemoryMillis }
     }
 
     // MARK: - Scanning
@@ -140,8 +182,14 @@ struct CursorUsageReader: UsageReader {
         return sqlite3_column_int64(statement, 0)
     }
 
+    /// One counted-shape row: its bubble key and the call it records.
+    private struct Call {
+        let key: String
+        let event: UsageEvent
+    }
+
     private struct ScanResult {
-        var events: [UsageEvent]
+        var calls: [Call]
         var maxRowid: Int64
         /// Read to the end (SQLITE_DONE), not stopped by SQLITE_BUSY or an error.
         var isComplete = false
@@ -159,21 +207,22 @@ struct CursorUsageReader: UsageReader {
         SELECT rowid,
                json_extract(value, '$.toolFormerData.name'),
                json_extract(value, '$.toolFormerData.status'),
-               json_extract(value, '$.createdAt')
+               json_extract(value, '$.createdAt'),
+               key
         FROM cursorDiskKV
         WHERE key LIKE ? AND rowid > ?
         ORDER BY rowid ASC
         """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            return ScanResult(events: [], maxRowid: sinceRowid, isComplete: false)
+            return ScanResult(calls: [], maxRowid: sinceRowid, isComplete: false)
         }
         defer { sqlite3_finalize(statement) }
 
         sqlite3_bind_text(statement, 1, rowLikePattern, -1, Self.sqliteTransient)
         sqlite3_bind_int64(statement, 2, sinceRowid)
 
-        var events: [UsageEvent] = []
+        var calls: [Call] = []
         var maxRowid = sinceRowid
         var isComplete = false
         let isoFormatter = ISO8601DateFormatter()
@@ -202,10 +251,11 @@ struct CursorUsageReader: UsageReader {
                 continue
             }
 
-            events.append(UsageEvent(agent: "Cursor", server: split.server, date: date))
+            let key = Self.columnText(statement, 4) ?? "rowid:\(rowid)"
+            calls.append(Call(key: key, event: UsageEvent(agent: "Cursor", server: split.server, date: date)))
         }
 
-        return ScanResult(events: events, maxRowid: maxRowid, isComplete: isComplete)
+        return ScanResult(calls: calls, maxRowid: maxRowid, isComplete: isComplete)
     }
 
     private static func columnText(_ statement: OpaquePointer?, _ index: Int32) -> String? {
