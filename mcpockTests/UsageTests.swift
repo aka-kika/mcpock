@@ -296,6 +296,32 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(UsageStore.dayIndex(for: nextDay, calendar: calendar), UsageStore.dayIndex(for: morning, calendar: calendar) + 1)
     }
 
+    /// Argon 2026-10-17 #11: in London, local midnight on 30 March 2026
+    /// (after the clocks went forward) divided by 86,400 rounded down to the
+    /// same index as 29 March.
+    func testDayIndexAcrossSpringForwardInLondon() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        let sunday = ISO8601DateFormatter().date(from: "2026-03-29T12:00:00Z")!
+        let monday = ISO8601DateFormatter().date(from: "2026-03-30T12:00:00Z")!
+        XCTAssertEqual(UsageStore.dayIndex(for: monday, calendar: calendar),
+                       UsageStore.dayIndex(for: sunday, calendar: calendar) + 1)
+        XCTAssertEqual(UsageStore.dayIndex(for: ISO8601DateFormatter().date(from: "1970-01-01T12:00:00Z")!,
+                                           calendar: calendar), 0)
+    }
+
+    /// Indexes saved the old way map to the same local day, east and west.
+    func testLegacyDayIndexesMapToTheSameDay() {
+        for zone in ["Asia/Jerusalem", "America/New_York", "UTC"] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: zone)!
+            let noon = calendar.date(from: DateComponents(year: 2026, month: 10, day: 17, hour: 12))!
+            let legacy = Int((calendar.startOfDay(for: noon).timeIntervalSince1970 / 86400).rounded(.down))
+            XCTAssertEqual(UsageStore.dayIndex(fromLegacy: legacy, calendar: calendar),
+                           UsageStore.dayIndex(for: noon, calendar: calendar), zone)
+        }
+    }
+
     func testNoReaderIsADash() async {
         let store = UsageStore(readers: [], directory: directory, isHostingTests: true, defaults: defaults)
         await store.start(knownServers: [])?.value
@@ -385,7 +411,7 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .allTime), 6, "5 kept, 1 new, the old call not again")
 
         let written = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-        XCTAssertEqual(written?["version"] as? Int, 2)
+        XCTAssertEqual(written?["version"] as? Int, 3)
     }
 
     /// Plays a source that started over: hands back every event it holds,

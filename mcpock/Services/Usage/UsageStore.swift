@@ -185,12 +185,33 @@ final class UsageStore {
 
     nonisolated private static let secondsPerDay: TimeInterval = 86400
 
-    /// A day index (days since the Unix epoch, local calendar) so window math
-    /// is a plain integer comparison. `nonisolated` and pure: usable from the
-    /// detached refresh task and from tests alike.
+    /// A day index (days since 1970-01-01, counted on the local calendar
+    /// date) so window math is a plain integer comparison. `nonisolated` and
+    /// pure: usable from the detached refresh task and from tests alike.
+    ///
+    /// From the date's own year, month and day, not its midnight divided by
+    /// 86,400: where the clock goes from UTC+0 to UTC+1 (UK, Ireland,
+    /// Portugal), two days in a row got the same index (Argon 2026-10-17 #11).
     nonisolated static func dayIndex(for date: Date, calendar: Calendar = .current) -> Int {
-        let start = calendar.startOfDay(for: date)
-        return Int((start.timeIntervalSince1970 / secondsPerDay).rounded(.down))
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return daysFromCivil(year: parts.year ?? 1970, month: parts.month ?? 1, day: parts.day ?? 1)
+    }
+
+    /// Days from 1970-01-01 to a proleptic Gregorian date (Howard Hinnant's
+    /// `days_from_civil`).
+    nonisolated private static func daysFromCivil(year: Int, month: Int, day: Int) -> Int {
+        let y = month <= 2 ? year - 1 : year
+        let era = (y >= 0 ? y : y - 399) / 400
+        let yoe = y - era * 400
+        let doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        return era * 146_097 + doe - 719_468
+    }
+
+    /// A day index saved before version 3 (local midnight divided by 86,400):
+    /// the local day whose midnight fell in that stretch.
+    nonisolated static func dayIndex(fromLegacy index: Int, calendar: Calendar = .current) -> Int {
+        dayIndex(for: Date(timeIntervalSince1970: Double(index + 1) * secondsPerDay - 1), calendar: calendar)
     }
 
     // MARK: - Persistence
@@ -198,12 +219,13 @@ final class UsageStore {
     /// Only counts, cursors and buckets ever get to disk — never a call's
     /// arguments, result or any chat text (those never even reach `UsageEvent`).
     private struct Persisted: Codable {
-        /// 2 since 1.10.6 (cursors carry `UsageCursor.newest`); missing before.
+        /// 2 since 1.10.6 (cursors carry `UsageCursor.newest`); 3 when day
+        /// indexes come from the calendar date; missing before 1.10.6.
         var version: Int?
         var buckets: [PersistedBucket]
         var cursors: [String: UsageCursor]
     }
-    nonisolated private static let formatVersion = 2
+    nonisolated private static let formatVersion = 3
     private struct PersistedBucket: Codable {
         let agent: String
         let server: String
@@ -220,8 +242,9 @@ final class UsageStore {
             let key = BucketKey(agent: bucket.agent, server: bucket.server)
             var days: [Int: Int] = [:]
             for (dayString, count) in bucket.days {
-                guard let day = Int(dayString) else { continue }
-                days[day] = count
+                guard let saved = Int(dayString) else { continue }
+                let day = (decoded.version ?? 0) < 3 ? Self.dayIndex(fromLegacy: saved) : saved
+                days[day, default: 0] += count
             }
             loaded[key] = days
         }
