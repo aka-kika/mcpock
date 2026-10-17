@@ -41,6 +41,9 @@ struct MCPockApp: App {
         // ran after it, so the first launch showed none of them (1.6.1). Demo
         // mode skips it too: it must never read or write the user's real domain.
         if !isHostingTests && !isDemo { SettingsMigration.migrateIfNeeded() }
+        // Settings and files left by the 1.10.7 test builds' test calls,
+        // dropped before the release (2026-10-17). Same guard: real setup only.
+        if !isHostingTests && !isDemo { TestCallLeftovers.remove() }
         // Demo mode's monitor, panel and Settings persist into a throwaway
         // suite, never `.standard` (the user's real saved pins, hidden/paused
         // servers, theme…): `AppPreferences.store`.

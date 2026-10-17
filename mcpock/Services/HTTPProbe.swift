@@ -180,7 +180,7 @@ enum HTTPProbe {
         }
 
         // Plain JSON first: a JSON answer whose text holds "data:" (a tool
-        // description, a test call's output) is still JSON.
+        // description, a tool's output) is still JSON.
         do {
             let json = try MCPJSONRPC.parseJSONObject(data)
             if let id, isForAnotherRequest(json, id: id) {

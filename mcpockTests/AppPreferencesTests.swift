@@ -43,6 +43,32 @@ final class AppPreferencesTests: XCTestCase {
                        ".hidden still shows bars with a mouse connected")
         XCTAssertEqual(PanelScrollIndicators.visibility(hide: false), .automatic)
     }
+
+    func testTestCallLeftoversAreRemoved() throws {
+        let suite = "AppPreferencesTests.testCallLeftovers"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.retireSuite(named: suite) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TestCallLeftovers-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let folder = directory.appendingPathComponent("test-requests", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: folder.appendingPathComponent("a.request.json"))
+        try Data("{}".utf8).write(to: directory.appendingPathComponent("usage.json"))
+        for key in TestCallLeftovers.keys { defaults.set("x", forKey: key) }
+        defaults.set(["feed"], forKey: AppPreferences.hiddenServersKey)
+
+        TestCallLeftovers.remove(from: defaults, directory: directory)
+
+        for key in TestCallLeftovers.keys { XCTAssertNil(defaults.object(forKey: key), key) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path), "request folder gone")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("usage.json").path),
+                      "the rest of the folder stays")
+        XCTAssertEqual(AppPreferences.loadHiddenServers(from: defaults), ["feed"], "other settings stay")
+
+        TestCallLeftovers.remove(from: defaults, directory: directory)  // nothing left: a no-op
+    }
 }
 
 /// 1.6.0 rename: the one-time copy of every known preference from the old

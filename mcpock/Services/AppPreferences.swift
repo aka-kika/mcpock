@@ -94,9 +94,6 @@ enum AppPreferences {
     static let hideScrollBarsKey = "hideScrollBars"
     static let defaultHideScrollBars = true
 
-    /// Seconds between automatic probe cycles; `0` means manual only (no timer —
-    /// probing happens via "Refresh now" / per-server refresh). Stored as seconds
-    /// so future intervals need no migration.
     /// Local port -> the `.app` seen serving it (2026-10-16).
     static let hostAppPortsKey = "hostAppPorts"
 
@@ -124,6 +121,9 @@ enum AppPreferences {
         return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) }
     }
 
+    /// Seconds between automatic probe cycles; `0` means manual only (no timer —
+    /// probing happens via "Refresh now" / per-server refresh). Stored as seconds
+    /// so future intervals need no migration.
     static let probeIntervalKey = "probeInterval"
 
     static func loadProbeInterval(from defaults: UserDefaults = store) -> ProbeInterval {
@@ -316,6 +316,28 @@ enum SettingsMigration {
         for key in knownKeys {
             guard let value = old.object(forKey: key) else { continue }
             newDefaults.set(value, forKey: key)
+        }
+    }
+}
+
+/// Test calls lived only in the 1.10.7 test builds (28-34) and were dropped
+/// before the release (2026-10-17). Their saved rows (some switched on, with
+/// write tools) and the folder agents left requests in must not outlive them:
+/// every launch removes whatever is still there.
+enum TestCallLeftovers {
+    static let keys = ["testCallsEnabled", "testCallSettings", "testCallRecords", "testCallAgentLog"]
+    static let folderName = "test-requests"
+
+    static func remove(
+        from defaults: UserDefaults = .standard,
+        directory: URL = MCPockStatus.defaultDirectory()
+    ) {
+        for key in keys where defaults.object(forKey: key) != nil {
+            defaults.removeObject(forKey: key)
+        }
+        let folder = directory.appendingPathComponent(folderName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: folder.path) {
+            try? FileManager.default.removeItem(at: folder)
         }
     }
 }
