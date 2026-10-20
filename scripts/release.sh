@@ -50,10 +50,14 @@ DIST_DIR="dist"
 
 echo "==> Generating project + building Release"
 xcodegen generate
+# Apple Silicon only (Kika, 2026-10-20: "yes"): a Release build is universal
+# by default, but the app is tested and offered on Apple Silicon only.
 xcodebuild -scheme "$SCHEME" -configuration Release -derivedDataPath "$BUILD_DIR" \
-  -destination 'platform=macOS,arch=arm64' clean build
+  -destination 'platform=macOS,arch=arm64' ARCHS=arm64 clean build
 
 APP="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
+ARCHS_BUILT="$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")"
+[[ "$ARCHS_BUILT" == "arm64" ]] || { echo "error: expected an arm64-only app, got: $ARCHS_BUILT" >&2; exit 1; }
 rm -rf "$DIST_DIR"; mkdir -p "$DIST_DIR"
 
 echo "==> Trimming and signing Sparkle (round 10: in-app updates)"
