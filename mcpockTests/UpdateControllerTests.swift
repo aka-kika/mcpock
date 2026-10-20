@@ -17,6 +17,14 @@ final class UpdateControllerTests: XCTestCase {
         Bundle.main.infoDictionary ?? [:]
     }
 
+    /// Review 2026-10-20 (8117): plain http:// servers on a named host are
+    /// not blocked by App Transport Security; the feed itself stays https.
+    func testPlainHTTPServersAreAllowed() {
+        let ats = info["NSAppTransportSecurity"] as? [String: Any]
+        XCTAssertEqual(ats?["NSAllowsArbitraryLoads"] as? Bool, true)
+        XCTAssertTrue((info["SUFeedURL"] as? String)?.hasPrefix("https://") == true)
+    }
+
     func testFeedURLPointsAtMcpockDotCom() {
         XCTAssertEqual(info["SUFeedURL"] as? String, "https://mcpock.com/appcast.xml",
                        "the repo is private, so the feed can't live on a GitHub release — see HANDOFF.md")

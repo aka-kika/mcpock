@@ -26,6 +26,17 @@
 	<string>public.app-category.developer-tools</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<!-- Plain http:// MCP servers (a tailnet or office name such as
+	     http://box.example:8080/mcp) must be reachable like they are from the
+	     agent: mcpock only connects to the servers in your configs, so App
+	     Transport Security would only block real servers (review 2026-10-20,
+	     8117). Updates stay safe: the feed is https and every update is
+	     checked against SUPublicEDKey. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
