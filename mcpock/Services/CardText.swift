@@ -81,14 +81,6 @@ enum CardText {
     static let markedLine = "Marked as intended"
     static let undoButton = "Undo"
 
-    /// "Set up differently": two rows of two equal-width buttons.
-    static let differsButtons = [
-        [compareButton, askAgentButton],
-        [copyDetailsButton, markAsIntendedButton],
-    ]
-    /// The why box: one row of two.
-    static let whyButtons = [askAgentButton, copyErrorsButton]
-
     /// Title of the "why" box: broken, slow, or waiting for a sign-in.
     static func whyTitle(for group: ServerGroup) -> String {
         if group.needsSignIn { return "Why it needs sign-in" }

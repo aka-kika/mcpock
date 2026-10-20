@@ -337,8 +337,9 @@ final class DifferentOnPurposeTests: XCTestCase {
     }
 
     func testCardButtonWording() {
-        XCTAssertEqual(CardText.differsButtons, [["Compare", "Ask an agent"], ["Copy details", "Mark as intended"]])
-        XCTAssertEqual(CardText.whyButtons, ["Ask an agent", "Copy errors"])
+        XCTAssertEqual([CardText.compareButton, CardText.askAgentButton, CardText.copyDetailsButton, CardText.markAsIntendedButton],
+                       ["Compare", "Ask an agent", "Copy details", "Mark as intended"])
+        XCTAssertEqual(CardText.copyErrorsButton, "Copy errors")
         XCTAssertEqual(CardText.markedLine, "Marked as intended")
         XCTAssertEqual(CardText.undoButton, "Undo")
     }
