@@ -41,7 +41,11 @@ final class HealthMonitor {
     /// Writes `status.json` for agents (round 7) a moment after anything here
     /// changes. Set by the app at launch; nil in tests, so a test monitor never
     /// touches the real file.
-    @ObservationIgnored var statusWriter: StatusWriter?
+    @ObservationIgnored var statusWriter: StatusWriter? {
+        didSet { statusWriter?.onWrite = { [weak self] in self?.statusFileError = $0 } }
+    }
+    /// Why the last status-file write failed, or nil; Settings > General shows it.
+    var statusFileError: String?
     /// Writes the widgets' snapshot into the App Group container (round 8).
     /// Set by the app at launch; nil in tests, same reason as `statusWriter`.
     @ObservationIgnored var widgetSnapshotWriter: WidgetSnapshotWriter?

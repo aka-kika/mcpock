@@ -185,3 +185,30 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(grok.problemCount, 1, "the odd one out on wake")
     }
 }
+
+/// Review 2026-10-20 (f341): a failed status-file write is kept and shown,
+/// and a later good write clears it.
+final class StatusWriteErrorTests: XCTestCase {
+    @MainActor
+    func testFailedWriteIsKeptThenCleared() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-statuswrite-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        // A file where the folder should be: the write fails.
+        let blocked = root.appendingPathComponent("blocked")
+        try Data("x".utf8).write(to: blocked)
+
+        let monitor = HealthMonitor(defaults: UserDefaults(suiteName: "mcpock.tests.statuswrite.\(UUID().uuidString)")!)
+        monitor.statusWriter = StatusWriter(directory: blocked)
+        monitor.statusWriter?.schedule { monitor.statusSnapshot() }
+        for _ in 0..<100 where monitor.statusFileError == nil { try await Task.sleep(for: .milliseconds(30)) }
+        XCTAssertNotNil(monitor.statusFileError)
+        XCTAssertTrue(SettingsGeneralPane.statusFileErrorText("Nope").hasSuffix("Nope. Your agents see the last results it saved."))
+
+        monitor.statusWriter = StatusWriter(directory: root.appendingPathComponent("ok"))
+        monitor.statusWriter?.schedule { monitor.statusSnapshot() }
+        for _ in 0..<100 where monitor.statusFileError != nil { try await Task.sleep(for: .milliseconds(30)) }
+        XCTAssertNil(monitor.statusFileError)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("ok/\(MCPockStatus.fileName)").path))
+    }
+}

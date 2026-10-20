@@ -156,6 +156,10 @@ enum StatusSnapshot {
 final class StatusWriter {
     let directory: URL
     private var pending: Task<Void, Never>?
+    /// After each write: nil when it worked, else why it failed. A failed
+    /// write used to be dropped, and agents read old results with nothing
+    /// saying so (review 2026-10-20, f341).
+    var onWrite: ((String?) -> Void)?
     /// How long to wait for more changes before writing.
     static let delay: Duration = .milliseconds(800)
 
@@ -175,9 +179,15 @@ final class StatusWriter {
             self.pending = nil
             guard let status = make() else { return }
             let directory = self.directory
-            await Task.detached(priority: .utility) {
-                try? Self.write(status, to: directory)
+            let failure = await Task.detached(priority: .utility) { () -> String? in
+                do {
+                    try Self.write(status, to: directory)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
             }.value
+            self.onWrite?(failure)
         }
     }
 

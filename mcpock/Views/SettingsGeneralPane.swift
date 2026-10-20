@@ -38,6 +38,12 @@ struct SettingsGeneralPane: View {
         + "Then use the arrow keys, Return and Escape."
     static let hotKeyTakenText = "Another app already uses \(GlobalHotKey.displayText), so mcpock can't."
     static let sliderWidth: CGFloat = 190
+
+    /// Under the status file when its last write failed.
+    static func statusFileErrorText(_ error: String) -> String {
+        let reason = error.hasSuffix(".") ? error : error + "."
+        return "Could not save it: \(reason) Your agents see the last results it saved."
+    }
     /// Fixed to the widest stop label ("Manual", "15 min"), so the text
     /// beside the slider never changes width or wraps while dragging and the
     /// row never reflows (round 9: "Every 15 min" wrapped to two lines).
@@ -175,6 +181,12 @@ struct SettingsGeneralPane: View {
                     ConfigPathRow(path: statusFilePath, theme: theme, openTitle: MenuText.openFileTitle,
                                   font: .system(size: 11.5, design: .monospaced))
                         .padding(.trailing, -5)
+                }
+                if let error = monitor?.statusFileError {
+                    Text(Self.statusFileErrorText(error))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(theme.statusBroken)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             } header: {
                 Text("Status")
