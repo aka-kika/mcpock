@@ -44,7 +44,10 @@ struct AgentSection: Identifiable, Hashable, Sendable {
     var attentionCount: Int { problems.count - brokenCount }
     /// Not checked yet (right after launch). Neither a problem nor fine.
     var checkingCount: Int { servers.filter { $0.state == .unknown }.count }
-    var fineCount: Int { servers.count - problems.count - checkingCount }
+    /// Paused, by her or waiting for a scan-only file's OK: not checked, so
+    /// never "answers normally" (review 2026-10-20, 5ae6).
+    var pausedCount: Int { servers.filter { $0.state == .paused }.count }
+    var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount }
 }
 
 /// Builds the Agents tab (v1.5 spec, Phase 4) from the same `ServerGroup`s as the
@@ -207,7 +210,10 @@ enum AgentSections {
     /// every server answered yet), or "All fine".
     static func problemText(_ section: AgentSection) -> String {
         let count = section.problems.count
-        if count == 0 { return section.checkingCount > 0 ? "Checking\u{2026}" : "All fine" }
+        if count == 0 {
+            if section.checkingCount > 0 { return "Checking\u{2026}" }
+            return section.fineCount == 0 && section.pausedCount > 0 ? "Paused" : "All fine"
+        }
         return "\(count) \(count == 1 ? "needs" : "need") you"
     }
 
@@ -256,14 +262,20 @@ enum AgentSections {
     static func restText(_ section: AgentSection) -> String {
         let rest = section.fineCount
         let checking = section.checkingCount
+        let paused = section.pausedCount
+        let pausedPart = paused > 0 ? ", \(paused) paused" : ""
         if checking > 0 {
-            let more = section.problems.isEmpty ? "" : "\(rest + checking) more, "
-            return more + "\(checking) not checked yet"
+            let more = section.problems.isEmpty ? "" : "\(rest + checking + paused) more, "
+            return more + "\(checking) not checked yet" + pausedPart
         }
         if section.problems.isEmpty {
+            if rest == 0, paused > 0 {
+                return paused == 1 ? "Its only server is paused" : "All \(paused) servers are paused"
+            }
+            if paused > 0 { return "\(rest) \(rest == 1 ? "answers" : "answer") normally, \(paused) paused" }
             return rest == 1 ? "Its only server answers normally" : "All \(rest) servers answer normally"
         }
-        if rest == 0 { return "Nothing else here" }
-        return "\(rest) more, all fine"
+        if rest == 0 { return paused > 0 ? "\(paused) more, paused" : "Nothing else here" }
+        return "\(rest) more, all fine" + pausedPart
     }
 }

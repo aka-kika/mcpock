@@ -175,7 +175,10 @@ final class AgentSectionsTests: XCTestCase {
             group("oauth", [src("MiniMax", .paused)], differs: ["MiniMax"]),
         ])
         XCTAssertTrue(sections[0].problems.isEmpty)
-        XCTAssertEqual(sections[0].fineCount, 2)
+        // Paused is quiet, not a problem, but not "answers normally" either
+        // (review 2026-10-20, 5ae6).
+        XCTAssertEqual(sections[0].fineCount, 1)
+        XCTAssertEqual(sections[0].pausedCount, 1)
     }
 
     /// Right after launch nothing is checked yet; that is not a problem.
@@ -225,6 +228,22 @@ final class AgentSectionsTests: XCTestCase {
         XCTAssertEqual(AgentSections.restText(sections[0]), "2 more, all fine")
         XCTAssertEqual(AgentSections.problemText(sections[1]), "All fine")
         XCTAssertEqual(AgentSections.restText(sections[1]), "Its only server answers normally")
+    }
+
+    /// A paused server (hers, or waiting for a scan-only file's OK) is not
+    /// "answers normally".
+    func testPausedIsNotFine() {
+        let sections = AgentSections.build(groups: [
+            group("a", [src("toolx", .paused)]),
+            group("b", [src("Code", .paused)]),
+            group("c", [src("Code")]),
+        ])
+        let toolx = sections.first { $0.agent == "toolx" }!
+        let code = sections.first { $0.agent == "Code" }!
+        XCTAssertEqual(AgentSections.problemText(toolx), "Paused")
+        XCTAssertEqual(AgentSections.restText(toolx), "Its only server is paused")
+        XCTAssertEqual(AgentSections.problemText(code), "All fine")
+        XCTAssertEqual(AgentSections.restText(code), "1 answers normally, 1 paused")
     }
 
     func testCompactSummaryForTheFooter() {
