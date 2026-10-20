@@ -57,4 +57,4 @@ tokens stay hidden.
 
 ---
 
-Everything else is v1.5.4 (see `docs/RELEASE-NOTES-v1.5.4.md`).
+Everything else is v1.5.4 (see `docs/archive/RELEASE-NOTES-v1.5.4.md`).

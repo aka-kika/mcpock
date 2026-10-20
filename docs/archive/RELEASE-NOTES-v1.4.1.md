@@ -16,4 +16,4 @@ cleared it, after its own continuation got a turn — which the spinning loop ne
 gave it. Whoever wakes first now clears the finished task, and the loop yields.
 Regression test races fifty rounds of overlapping refreshes against a deadline.
 
-Everything else is v1.4.0 (see `docs/RELEASE-NOTES-v1.4.0.md`).
+Everything else is v1.4.0 (see `docs/archive/RELEASE-NOTES-v1.4.0.md`).

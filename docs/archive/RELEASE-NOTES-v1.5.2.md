@@ -30,4 +30,4 @@ quiet the note also stopped the health checks.
 - **For agents:** `mcpbar_server` says "Set up differently on purpose
   (acknowledged)" for such a server.
 
-Everything else is v1.5.1 (see `docs/RELEASE-NOTES-v1.5.1.md`).
+Everything else is v1.5.1 (see `docs/archive/RELEASE-NOTES-v1.5.1.md`).

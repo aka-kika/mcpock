@@ -24,4 +24,4 @@ names above it. It sat a little to the left.
 - Debug and test builds use their own app id (`com.mcpock.app.debug`), so
   running the tests no longer moves Open at Login off `/Applications`.
 
-Everything else is v1.7.1 (see `docs/RELEASE-NOTES-v1.7.1.md`).
+Everything else is v1.7.1 (see `docs/archive/RELEASE-NOTES-v1.7.1.md`).

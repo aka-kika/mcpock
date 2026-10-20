@@ -92,7 +92,7 @@ monitor and panel persist into a throwaway `UserDefaults` suite instead).
 
 | You changed… | Also update… |
 |--------------|--------------|
-| What the user sees | [README.md](README.md), the next `docs/RELEASE-NOTES-v*.md` |
+| What the user sees | [README.md](README.md), the next `docs/release-notes/<version>.md` (older notes are in `docs/archive/`) |
 | Architecture or a rule | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Agent logos | [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md) |
 

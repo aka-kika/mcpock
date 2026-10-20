@@ -28,4 +28,4 @@ macOS 26+, Apple Silicon.
   Now it spins and the footer says "Checking…" the moment you click, and keeps
   going until the whole check is done.
 
-Everything else is v1.5.0 (see `docs/RELEASE-NOTES-v1.5.0.md`).
+Everything else is v1.5.0 (see `docs/archive/RELEASE-NOTES-v1.5.0.md`).

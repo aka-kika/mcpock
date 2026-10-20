@@ -59,4 +59,4 @@ From a full review of the app before this release:
   screen update.
 - Secret masking compiles its patterns once instead of on every use.
 
-Everything else is v1.7.2 (see `docs/RELEASE-NOTES-v1.7.2.md`).
+Everything else is v1.7.2 (see `docs/archive/RELEASE-NOTES-v1.7.2.md`).

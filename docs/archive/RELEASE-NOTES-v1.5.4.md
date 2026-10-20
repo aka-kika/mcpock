@@ -39,4 +39,4 @@ was open (or back, after **Mark as intended**) could keep its old mark and no
 note until you switched tabs. Each row is now rebuilt when it changes
 section.
 
-Everything else is v1.5.3 (see `docs/RELEASE-NOTES-v1.5.3.md`).
+Everything else is v1.5.3 (see `docs/archive/RELEASE-NOTES-v1.5.3.md`).

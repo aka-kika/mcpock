@@ -20,4 +20,4 @@ mcpock now starts its first check when it launches, then follows your
 "Check servers" setting as before. Usage counts update after every full
 check, panel open or not.
 
-Everything else is v1.7.0 (see `docs/RELEASE-NOTES-v1.7.0.md`).
+Everything else is v1.7.0 (see `docs/archive/RELEASE-NOTES-v1.7.0.md`).

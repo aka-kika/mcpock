@@ -106,4 +106,4 @@ The separate "+N more" tools window is gone: the card now shows the same
 list, in the same style, in place, and scrolls when it is long, so a second
 window added nothing but another thing to open and close.
 
-Everything else is v1.5.2 (see `docs/RELEASE-NOTES-v1.5.2.md`).
+Everything else is v1.5.2 (see `docs/archive/RELEASE-NOTES-v1.5.2.md`).
