@@ -38,3 +38,6 @@ CLAUDE.local.md
 # Signing identity, team and notary profile (see scripts/release.env.example)
 release.env
 scripts/release.env
+
+# Cloudflare wrangler cache (holds account details): never committed
+.wrangler/
