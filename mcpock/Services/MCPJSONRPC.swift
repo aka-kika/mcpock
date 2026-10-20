@@ -58,7 +58,10 @@ enum MCPJSONRPC {
         guard message["result"] != nil || message["error"] != nil else { return false }
         if let number = message["id"] as? NSNumber { return number.intValue == id }
         if let string = message["id"] as? String { return string == String(id) }
-        return false
+        // An error with a null id is the server's answer to a request it could
+        // not read (a parse or version error): the reply, with its real
+        // message, not a wait until the timeout (review 2026-10-20, 7243).
+        return message["error"] != nil && (message["id"] == nil || message["id"] is NSNull)
     }
 
     static func parseJSONObject(_ data: Data) throws -> [String: Any] {

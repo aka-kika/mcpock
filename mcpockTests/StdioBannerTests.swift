@@ -49,6 +49,29 @@ final class StdioBannerTests: XCTestCase {
         )
     }
 
+    /// Review 2026-10-20 (7243): a server that refuses the first call with
+    /// `id: null` reads broken with its own message at once, not Slow.
+    func testNullIdErrorIsReadAtOnce() async throws {
+        let script = """
+        import sys, json
+        for line in sys.stdin:
+            sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'id': None,
+                'error': {'code': -32600, 'message': 'Unsupported protocol version'}}) + '\\n')
+            sys.stdout.flush()
+        """
+        let path = dir.appendingPathComponent("nullid.py")
+        try script.write(to: path, atomically: true, encoding: .utf8)
+        let config = ServerConfig(
+            id: "test:nullid", name: "nullid", source: .code, projectPath: nil, transport: .stdio,
+            command: "/usr/bin/python3", args: [path.path], env: [:], url: nil, headers: [:])
+        let start = ContinuousClock.now
+        let result = await StdioProbe.probe(config: config, fetchTools: false, timeout: .seconds(5))
+        XCTAssertLessThan(ContinuousClock.now - start, .seconds(4), "no wait for the timeout")
+        XCTAssertEqual(result.state, .broken)
+        XCTAssertFalse(result.transientFailure)
+        XCTAssertTrue(result.failureReason?.contains("Unsupported protocol version") == true, result.failureReason ?? "")
+    }
+
     func testBannerWithBraceThenJSONLinesIsHealthy() async throws {
         let config = try fakeServer(banner: "[dotenv] injecting env {path: .env}\n", contentLength: false)
         let result = await StdioProbe.probe(config: config, fetchTools: true, timeout: .seconds(5))
