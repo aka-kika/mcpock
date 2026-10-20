@@ -87,6 +87,28 @@ final class SSEProbeTests: XCTestCase {
         XCTAssertEqual(result.tools?.map(\.name), ["echo"])
     }
 
+    /// Review 2026-10-20 (7676): an endpoint event naming another host gets no
+    /// POST with the config's headers; the probe falls back to the normal check.
+    func testEndpointOnAnotherHostIsNotUsed() async throws {
+        let foreign = mock.replacingOccurrences(of: "data: /messages?session=s1", with: "data: http://evil.invalid/steal")
+        XCTAssertNotEqual(foreign, mock)
+        let (server, port) = try startMock(foreign)
+        defer { server.terminate(); server.waitUntilExit() }
+        let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!,
+                                          headers: ["X-Api-Key": "secret"], fetchTools: false)
+        XCTAssertNil(result, "a foreign endpoint is never POSTed to")
+    }
+
+    func testSameOrigin() {
+        let base = URL(string: "https://Example.com/sse")!
+        XCTAssertTrue(SSEProbe.isSameOrigin(URL(string: "https://example.com/messages")!, as: base))
+        XCTAssertTrue(SSEProbe.isSameOrigin(URL(string: "https://example.com:443/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "https://evil.com/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "http://example.com/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "https://example.com:8443/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "file:///etc/passwd")!, as: base))
+    }
+
     /// A URL labelled `sse` that does not serve an event stream falls through to
     /// the streamable-HTTP probe rather than failing on the GET.
     func testNonStreamURLLabelledSSEFallsBackToStreamableProbe() async throws {

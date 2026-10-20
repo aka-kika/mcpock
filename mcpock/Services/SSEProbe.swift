@@ -66,8 +66,9 @@ enum SSEProbe {
             }
             return result
         } catch {
-            // An event stream with no endpoint is not a legacy SSE server.
-            if !endpoint.seen { return nil }
+            // An event stream with no endpoint is not a legacy SSE server, and
+            // one that points somewhere else gets the normal HTTP check.
+            if !endpoint.seen || error is ForeignEndpoint { return nil }
             return ProbeResult(
                 state: .broken,
                 failureReason: (error as? ProbeError)?.localizedDescription ?? error.localizedDescription,
@@ -103,6 +104,10 @@ enum SSEProbe {
         seen.seen = true
         guard let endpoint = URL(string: endpointText.trimmingCharacters(in: .whitespaces), relativeTo: base)?.absoluteURL
         else { throw ProbeError.invalidURL(endpointText) }
+        // The endpoint gets the config's headers (API keys), so it must be the
+        // server the config names, not any host the stream mentions (review
+        // 2026-10-20, 7676).
+        guard isSameOrigin(endpoint, as: base) else { throw ForeignEndpoint() }
 
         try await post(MCPJSONRPC.initializeRequest(id: 1), to: endpoint, headers: headers)
         try MCPJSONRPC.validateInitializeResponse(try await nextResponse(&lines, id: 1))
@@ -114,6 +119,20 @@ enum SSEProbe {
             tools = try MCPJSONRPC.parseTools(from: try await nextResponse(&lines, id: 2))
         }
         return ProbeResult(state: .healthy, failureReason: nil, tools: tools)
+    }
+
+    /// The stream named an endpoint on another scheme, host or port.
+    private struct ForeignEndpoint: Error {}
+
+    /// Same scheme (http or https), host and port as the configured URL.
+    static func isSameOrigin(_ endpoint: URL, as base: URL) -> Bool {
+        guard let scheme = endpoint.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              scheme == base.scheme?.lowercased(),
+              let host = endpoint.host, let baseHost = base.host,
+              host.caseInsensitiveCompare(baseHost) == .orderedSame
+        else { return false }
+        let defaultPort = scheme == "https" ? 443 : 80
+        return (endpoint.port ?? defaultPort) == (base.port ?? defaultPort)
     }
 
     /// One parsed SSE event: `event:` name (default `message`) and its `data:` line.
