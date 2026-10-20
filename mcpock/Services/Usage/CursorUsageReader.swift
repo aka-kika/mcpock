@@ -302,23 +302,36 @@ struct CursorUsageReader: UsageReader {
     /// Opens `path` read-only and runs `body`, closing the connection
     /// afterwards either way. Tries the file directly first (safe to do
     /// against Cursor's live, WAL-mode database — this never checkpoints
-    /// and never writes); if that open itself fails, copies the database
-    /// and its `-wal` sidecar to a scratch directory and retries against the
-    /// copy, which is always removed before returning. Returns nil if
-    /// neither attempt could open a database.
-    private static func withOpenDatabase<T>(at path: String, body: (OpaquePointer) -> T) -> T? {
-        if let result = openAndRun(path, body: body) {
+    /// and never writes); if that open itself fails, retries once through
+    /// SQLite's `mode=ro&immutable=1` URI form, which reads the file in
+    /// place and creates nothing. It used to copy the whole database (chats
+    /// included) into the temp folder here, and a crash left that copy
+    /// behind (review 2026-10-20, f3ee); usage never keeps chats, so nothing
+    /// is copied now. The one cost: an immutable open ignores the `-wal`
+    /// sidecar, so bubbles Cursor has not checkpointed yet are missed until
+    /// the next scan. Returns nil if neither attempt could open a database.
+    /// `skipDirectOpen` lets a test reach the fallback.
+    static func withOpenDatabase<T>(
+        at path: String,
+        skipDirectOpen: Bool = false,
+        body: (OpaquePointer) -> T
+    ) -> T? {
+        if !skipDirectOpen, let result = openAndRun(path, body: body) {
             return result
         }
-        guard let snapshotDirectory = try? makeSnapshot(of: path) else { return nil }
-        defer { try? FileManager.default.removeItem(at: snapshotDirectory) }
-        let snapshotPath = snapshotDirectory.appendingPathComponent("state.vscdb").path
-        return openAndRun(snapshotPath, body: body)
+        var components = URLComponents(url: URL(fileURLWithPath: path), resolvingAgainstBaseURL: false)
+        components?.query = "mode=ro&immutable=1"
+        guard let uri = components?.string else { return nil }
+        return openAndRun(uri, extraFlags: SQLITE_OPEN_URI, body: body)
     }
 
-    private static func openAndRun<T>(_ path: String, body: (OpaquePointer) -> T) -> T? {
+    private static func openAndRun<T>(
+        _ path: String,
+        extraFlags: Int32 = 0,
+        body: (OpaquePointer) -> T
+    ) -> T? {
         var db: OpaquePointer?
-        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX | extraFlags
         guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK, let db else {
             if let db { sqlite3_close(db) }
             return nil
@@ -329,23 +342,5 @@ struct CursorUsageReader: UsageReader {
         // moment than skip a whole scan.
         sqlite3_busy_timeout(db, 5_000)
         return body(db)
-    }
-
-    /// Copies `path` (and its `-wal` sidecar, if present — the bubbles
-    /// Cursor hasn't checkpointed into the main file yet live there) into a
-    /// fresh temp directory. Read-only against the source: `copyItem` never
-    /// opens it for writing. The caller removes the returned directory.
-    private static func makeSnapshot(of path: String) throws -> URL {
-        let fileManager = FileManager.default
-        let directory = fileManager.temporaryDirectory
-            .appendingPathComponent("mcpock-cursor-usage-\(UUID().uuidString)", isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent("state.vscdb")
-        try fileManager.copyItem(atPath: path, toPath: destination.path)
-        let walSource = path + "-wal"
-        if fileManager.fileExists(atPath: walSource) {
-            try? fileManager.copyItem(atPath: walSource, toPath: destination.path + "-wal")
-        }
-        return directory
     }
 }

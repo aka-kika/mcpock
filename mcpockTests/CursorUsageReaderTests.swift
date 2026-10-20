@@ -287,6 +287,33 @@ final class CursorUsageReaderTests: XCTestCase {
         XCTAssertEqual(result.cursor, startingCursor)
     }
 
+    /// The fallback open reads the database in place and copies nothing
+    /// (review 2026-10-20, f3ee): no `mcpock-cursor-usage-*` entry appears in
+    /// the temp folder, and the rows still read.
+    func testFallbackOpenLeavesNoCopyInTempFolder() throws {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:a:1", name: "mcp-demo-run", status: "completed", createdAt: "2026-01-01T00:00:00.000Z")
+
+        let tempFolder = FileManager.default.temporaryDirectory
+        func copies() -> Set<String> {
+            Set(((try? FileManager.default.contentsOfDirectory(atPath: tempFolder.path)) ?? [])
+                .filter { $0.hasPrefix("mcpock-cursor-usage-") && !$0.hasPrefix("mcpock-cursor-usage-test-") })
+        }
+        let before = copies()
+
+        let count: Int32? = CursorUsageReader.withOpenDatabase(at: path, skipDirectOpen: true) { db in
+            var statement: OpaquePointer?
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM cursorDiskKV;", -1, &statement, nil) == SQLITE_OK,
+                  sqlite3_step(statement) == SQLITE_ROW else { return -1 }
+            return sqlite3_column_int(statement, 0)
+        }
+
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(copies(), before)
+    }
+
     /// `agent` reports "Cursor", exactly as `UsageEvent.agent` expects.
     func testAgentLabelIsCursor() {
         let reader = CursorUsageReader(databasePath: root.appendingPathComponent("state.vscdb").path)
