@@ -69,6 +69,30 @@ final class AppPreferencesTests: XCTestCase {
 
         TestCallLeftovers.remove(from: defaults, directory: directory)  // nothing left: a no-op
     }
+
+    /// The clean-up runs on the first launch only (review 2026-10-20, 2dc6):
+    /// anything that shows up afterwards is left alone.
+    func testTestCallLeftoversRunOnlyOnce() throws {
+        let suite = "AppPreferencesTests.testCallLeftoversOnce"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.retireSuite(named: suite) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TestCallLeftoversOnce-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let folder = directory.appendingPathComponent("test-requests", isDirectory: true)
+
+        TestCallLeftovers.remove(from: defaults, directory: directory)  // nothing there: still marks done
+        XCTAssertTrue(defaults.bool(forKey: TestCallLeftovers.doneFlagKey))
+
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for key in TestCallLeftovers.keys { defaults.set("x", forKey: key) }
+
+        TestCallLeftovers.remove(from: defaults, directory: directory)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path), "second launch leaves the folder")
+        for key in TestCallLeftovers.keys { XCTAssertNotNil(defaults.object(forKey: key), key) }
+    }
 }
 
 /// 1.6.0 rename: the one-time copy of every known preference from the old

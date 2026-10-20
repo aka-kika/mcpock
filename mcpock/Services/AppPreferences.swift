@@ -323,15 +323,20 @@ enum SettingsMigration {
 /// Test calls lived only in the 1.10.7 test builds (28-34) and were dropped
 /// before the release (2026-10-17). Their saved rows (some switched on, with
 /// write tools) and the folder agents left requests in must not outlive them:
-/// every launch removes whatever is still there.
+/// the first launch removes whatever is still there, then sets a flag so no
+/// later launch looks again (review 2026-10-20, 2dc6).
 enum TestCallLeftovers {
     static let keys = ["testCallsEnabled", "testCallSettings", "testCallRecords", "testCallAgentLog"]
     static let folderName = "test-requests"
+    /// Set once the clean-up has run (whether or not anything was there).
+    static let doneFlagKey = "testCallLeftoversRemoved"
 
     static func remove(
         from defaults: UserDefaults = .standard,
         directory: URL = MCPockStatus.defaultDirectory()
     ) {
+        guard defaults.object(forKey: doneFlagKey) == nil else { return }
+        defer { defaults.set(true, forKey: doneFlagKey) }
         for key in keys where defaults.object(forKey: key) != nil {
             defaults.removeObject(forKey: key)
         }
