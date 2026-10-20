@@ -240,8 +240,10 @@ final class ScanOnlyFileTests: XCTestCase {
         let group = HealthMonitor.groupByName(monitor.servers).first!
         XCTAssertNotNil(CardText.awaitingFileNote(for: group, home: "/u"))
         XCTAssertTrue(CardText.awaitingFileNote(for: group, home: "/u")!.contains("~/.tool/mcp.json"))
-        monitor.setPaused(false, name: "tool")
+        XCTAssertTrue(monitor.awaitsFileOK("tool"))
+        PanelState(monitor: monitor, defaults: fresh).togglePause("tool")   // the card's and the menu's Resume
         XCTAssertEqual(monitor.allowedScanFiles, ["/u/.tool/mcp.json"])
+        XCTAssertFalse(monitor.isPaused("tool"), "Resume never pauses it instead")
         XCTAssertFalse(monitor.servers.first!.awaitingFileOK)
         XCTAssertEqual(AppPreferences.loadAllowedScanFiles(from: fresh), ["/u/.tool/mcp.json"], "remembered")
 

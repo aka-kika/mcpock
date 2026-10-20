@@ -435,6 +435,12 @@ final class HealthMonitor {
         scanOnlyFile(config).map { !allowed.contains($0) } ?? false
     }
 
+    /// True when a server behind the row waits for its scan-only file's OK.
+    func awaitsFileOK(_ name: String) -> Bool {
+        let key = Self.normalizedName(name)
+        return servers.contains { Self.normalizedName($0.config.name) == key && $0.awaitingFileOK }
+    }
+
     /// Allow the scan-only files behind a row and check it at once (Resume,
     /// right-click). Returns true when there was one to allow.
     @discardableResult

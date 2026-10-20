@@ -553,7 +553,9 @@ final class PanelState {
     }
 
     func togglePause(_ name: String) {
-        monitor.setPaused(!monitor.isPaused(name), name: name)
+        // A row waiting for its scan-only file's OK reads paused: Resume gives it.
+        let paused = monitor.isPaused(name) || monitor.awaitsFileOK(name)
+        monitor.setPaused(!paused, name: name)
     }
 
     /// Re-probe one row, with the card's button spinning until it's done.
