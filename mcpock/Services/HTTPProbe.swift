@@ -116,7 +116,7 @@ enum HTTPProbe {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        _ = try? await URLSession.shared.data(for: request)
+        _ = try? await ProbeSession.shared.data(for: request)
     }
 
     /// A slow-starting or momentarily-unreachable HTTP server is transient (smoothed to amber);
@@ -153,7 +153,7 @@ enum HTTPProbe {
         // Streamed, not `data(for:)`: a Streamable-HTTP server may answer on an
         // event stream it keeps open, and waiting for its end timed out every
         // probe of a working server (Argon 2026-10-17 #6). Closed on return.
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await ProbeSession.shared.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let http = response as? HTTPURLResponse else {
             throw ProbeError.protocolError("Invalid HTTP response")

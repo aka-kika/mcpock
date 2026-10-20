@@ -28,7 +28,7 @@ enum SSEProbe {
         let bytes: URLSession.AsyncBytes
         let response: URLResponse
         do {
-            (bytes, response) = try await URLSession.shared.bytes(for: request)
+            (bytes, response) = try await ProbeSession.shared.bytes(for: request)
         } catch {
             return ProbeResult(state: .broken, failureReason: error.localizedDescription, tools: nil,
                                transientFailure: HTTPProbe.isTransient(error))
@@ -186,7 +186,7 @@ enum SSEProbe {
         request.httpBody = try MCPJSONRPC.encode(message)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ProbeSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ProbeError.protocolError("Invalid HTTP response")
         }
