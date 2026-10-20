@@ -934,6 +934,15 @@ final class HealthMonitor {
         if config.builtin {
             return ProbeResult(state: .selfManaged, failureReason: nil, tools: nil)
         }
+        // `${VAR}` and friends filled in as the agent would; one that can't be
+        // is not started with the literal text (review 2026-10-20, 0d87). Amber
+        // "not checked", never red, backs off like a sign-in.
+        let expanded = ConfigVariables.expand(config)
+        guard expanded.unresolved.isEmpty else {
+            return ProbeResult(state: .broken, failureReason: ConfigVariables.reason(for: expanded.unresolved),
+                               tools: nil, needsAttention: true)
+        }
+        let config = expanded.config
         switch config.transport {
         case .stdio:
             return await StdioProbe.probe(config: config, fetchTools: fetchTools)

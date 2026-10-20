@@ -208,7 +208,10 @@ by the scan, with no code change.
 | aka | Asked from aka's local helper (`127.0.0.1:6464`) while aka runs | API |
 | Tinycast | `~/Library/Preferences/com.tinycast.app.plist` (`mcpServers`) | Settings |
 
-Notes: servers turned off with `enabled: false` are skipped. Servers marked
+Notes: servers turned off with `enabled: false` are skipped. `${VAR}`,
+`${env:VAR}` and `${workspaceFolder}` are filled in before a check, from
+mcpock's own environment and the project folder; a server that needs one
+mcpock can't fill (like `${input:...}`) reads **Not checked**. Servers marked
 `"builtin": true` (they run inside their own app) are shown
 but never started. **aka** keeps its servers in its own database, so mcpock
 asks aka's local helper for the list (only when aka itself is the program on

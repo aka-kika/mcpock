@@ -74,7 +74,7 @@ enum StatusSnapshot {
     static func statusWords(_ group: ServerGroup) -> String {
         switch group.state {
         case .broken: return "broken"
-        case .degraded: return group.needsSignIn ? "needs sign-in" : "slow"
+        case .degraded: return group.needsSignIn ? "needs sign-in" : group.needsVariable ? "not checked" : "slow"
         case .healthy: return group.differsNeedsAttention ? "set up differently" : "fine"
         case .unknown: return "checking"
         case .paused: return "paused"
@@ -128,7 +128,7 @@ enum StatusSnapshot {
             name: group.name,
             state: group.state.rawValue,
             status: status,
-            needsAttention: ["broken", "slow", "needs sign-in", "set up differently"].contains(status),
+            needsAttention: ["broken", "slow", "needs sign-in", "not checked", "set up differently"].contains(status),
             reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
             hidden: hidden,
             pinned: pinned,

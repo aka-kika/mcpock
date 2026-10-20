@@ -51,6 +51,7 @@ enum PanelText {
         if c.broken > 0 { parts.append("\(c.broken) broken") }
         if c.slow > 0 { parts.append("\(c.slow) slow") }
         if c.signIn > 0 { parts.append("\(c.signIn) \(c.signIn == 1 ? "needs" : "need") sign-in") }
+        if c.notChecked > 0 { parts.append("\(c.notChecked) not checked") }
         if c.differs > 0 { parts.append("\(c.differs) set up differently") }
         if c.needsApp > 0 { parts.append("\(c.needsApp) \(c.needsApp == 1 ? "needs its app" : "need their app")") }
         if firstPass {
@@ -86,6 +87,7 @@ enum PanelText {
         let broken: Int
         let slow: Int
         let signIn: Int
+        let notChecked: Int
         let differs: Int
         let needsApp: Int
         let checking: Int
@@ -93,7 +95,8 @@ enum PanelText {
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
             signIn = groups.filter(\.needsSignIn).count
-            slow = groups.filter { $0.state == .degraded }.count - signIn
+            notChecked = groups.filter(\.needsVariable).count
+            slow = groups.filter { $0.state == .degraded }.count - signIn - notChecked
             needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count
@@ -110,6 +113,12 @@ extension ServerGroup {
     /// (401/403), not because it is slow. Reads "Needs sign-in" everywhere.
     var needsSignIn: Bool {
         state == .degraded && issues.contains { $0.reason.hasPrefix("Needs authentication") }
+    }
+
+    /// Degraded because its config uses a variable mcpock can't fill in
+    /// (`ConfigVariables`): not checked, not slow. Reads "Not checked".
+    var needsVariable: Bool {
+        state == .degraded && !needsSignIn && issues.contains { $0.reason.hasPrefix(ConfigVariables.reasonPrefix) }
     }
 
     /// The agents behind the row, one per agent (a server declared in two Claude

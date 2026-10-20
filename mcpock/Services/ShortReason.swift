@@ -43,6 +43,10 @@ enum ShortReason {
         if trimmed.hasPrefix("Needs authentication") {
             return "Needs sign-in"
         }
+        if trimmed.hasPrefix(ConfigVariables.reasonPrefix),
+           let close = trimmed.firstIndex(of: "}") {
+            return clip("Not checked: uses \(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 5)...close])")
+        }
         if let rest = trimmed.dropPrefix("Spawn error: ") {
             if rest.hasPrefix("Command not found") { return "Could not start: command not found" }
             if rest.hasPrefix("Not executable") { return "Could not start: not executable" }
