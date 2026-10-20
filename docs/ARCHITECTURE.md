@@ -59,7 +59,7 @@ card is open).
 
 | File | Role |
 |------|------|
-| `mcpock/MCPockApp.swift` | `@main`, the `MenuBarExtra`, owns `HealthMonitor` and `PanelState`, starts the monitor on the first panel open |
+| `mcpock/MCPockApp.swift` | `@main`, the `MenuBarExtra`, owns `HealthMonitor` and `PanelState`, starts the monitor when the app launches |
 | `Services/HealthMonitor.swift` | Discovery reload, probe cycles (single-flight), smoothing, backoff, pause/pin/hide, grouping, menu-bar verdict, status file scheduling |
 | `Services/AppPreferences.swift` | UserDefaults keys; `ProbeInterval` (the Check servers slider stops); `differsAcknowledged` (1.5.2, JSON string: name -> fingerprints) |
 | `Services/LaunchAtLogin.swift` | `SMAppService` wrapper |
@@ -74,19 +74,22 @@ card is open).
 | `Services/ConfigScanner.swift` | Bounded, TCC-safe sweep of `~/.config/*`, `~/Library/Application Support/*` and home dot-folders. Never Documents, Desktop or Downloads; skips symlinks and files no agent loads (`excludedFileSuffixes`: `~/.minimax/mcp/mcp.json`, since MiniMax reads only `~/.minimax/mcp.json`) |
 | `Services/ConfigShape.swift` | Recognises a config by its shape (JSON `mcpServers` / `servers` / `mcp`, TOML `[mcp_servers.*]`, YAML `extensions:` / `mcp_servers:`); a file counts only if one entry has a `command` or `url` |
 | `Services/ConfigDiscovery.swift` | Merges registry and scan, dedupes by canonical path, drops `enabled: false` entries and projects whose folder is gone |
+| `Services/ClaudeProjectApproval.swift` | A scanned project `.mcp.json` server runs only when Claude Code approved it for that folder (`enabledMcpjsonServers`, `enableAllProjectMcpServers`; project settings only in a trusted folder; disabled wins) |
 | `Services/MCPServersTOML.swift`, `GooseConfig.swift`, `MCPServersYAML.swift`, `YAMLBlock.swift` | Small parsers for the TOML/YAML shapes agents write (no third-party TOML/YAML). `YAMLBlock` builds a node tree and reads YAML's multi-line scalars: wrapped plain text (Hermes wraps long paths), multi-line quoted text, `|` / `>` blocks, flow `[]` / `{}` |
-| `Services/AkaSource.swift` | aka keeps servers in a database, not a file: `GET http://127.0.0.1:6464/api/mcp/servers`, then launches each the way aka does (`bun x`, `python`, `bun run`) |
+| `Services/AkaSource.swift` | aka keeps servers in a database, not a file: `GET http://127.0.0.1:6464/api/mcp/servers`, then launches each the way aka does (`bun x`, `python`, `bun run`). Asked only when `AkaListener` finds aka itself on the port (the user's process, inside `ai.pipali` or an aka source folder) |
 
 ### Probing
 
 | File | Role |
 |------|------|
 | `Services/StdioProbe.swift` | spawn → `initialize` → `notifications/initialized` → `tools/list` (only when needed) → terminate; builds the failure reason |
-| `Services/ProcessRunner.swift` | Pipes, message reads with timeout, stderr capture, process-**tree** kill (SIGTERM, then SIGKILL) |
+| `Services/ProcessRunner.swift` | Pipes, message reads with timeout, stderr capture, process-**tree** kill (SIGTERM, then SIGKILL); reader threads poll and stop after teardown; at most 256 unread messages |
+| `Services/ConfigVariables.swift` | Fills `${VAR}`, `${VAR:-x}`, `${env:VAR}`, `${workspaceFolder}` in a copy of the config before a probe; one it can't fill (outside env values) reads "Not checked" |
 | `Services/MCPMessageBuffer.swift` | `[UInt8]`-backed reader: newline-delimited JSON, tolerates `Content-Length` frames and leading noise |
 | `Services/MCPJSONRPC.swift` | Request builders, response matching by id, tool parsing |
 | `Services/HTTPProbe.swift` | Streamable HTTP: POST JSON-RPC, replays `Mcp-Session-Id`, parses JSON or SSE frames, closes the session |
-| `Services/SSEProbe.swift` | Legacy SSE: GET the stream, read the `endpoint` event, POST, read replies from the stream. Falls back to `HTTPProbe` when the URL isn't really SSE |
+| `Services/ProbeSession.swift` | The probes' ephemeral `URLSession`: redirects followed only to the same scheme, host and port, so headers never reach another host |
+| `Services/SSEProbe.swift` | Legacy SSE: GET the stream, read the `endpoint` event, POST, read replies from the stream. Falls back to `HTTPProbe` when the URL isn't really SSE, or when the endpoint names another host |
 | `Services/PathResolver.swift` | `~` expansion, env merge, the server's own PATH first, then common bin folders, `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |
 | `Services/HostApps.swift` | The Mac app a server belongs to (the server's own program inside an `.app`, never Xcode's developer tools or an argument's file; a launcher naming one; a local port an app was seen on, via `lsof` off the main thread, re-checked once per session and forgotten when a plain server answers there). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
 
