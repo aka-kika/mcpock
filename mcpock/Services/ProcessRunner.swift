@@ -548,6 +548,9 @@ final class ProcessRunner: @unchecked Sendable {
 
     // MARK: - Private
 
+    /// Complete messages kept for the next read; older ones are dropped.
+    static let maxQueuedMessages = 256
+
     private func handleStdout(_ chunk: Data) {
         let toResume: [(CheckedContinuation<Data, Error>, Result<Data, Error>)] = state.withLock { state in
             var pending: [(CheckedContinuation<Data, Error>, Result<Data, Error>)] = []
@@ -556,6 +559,10 @@ final class ProcessRunner: @unchecked Sendable {
             do {
                 while let msg = try state.messageBuffer.nextMessage() {
                     if state.pendingContinuations.isEmpty {
+                        // Nobody reads that far ahead: keep the newest, so a
+                        // server that floods messages can't grow memory
+                        // (review 2026-10-20, 7d92).
+                        if state.messageQueue.count >= Self.maxQueuedMessages { state.messageQueue.removeFirst() }
                         state.messageQueue.append(msg)
                     } else {
                         let cont = state.pendingContinuations.removeFirst().cont

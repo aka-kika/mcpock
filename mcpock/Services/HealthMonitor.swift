@@ -808,16 +808,24 @@ final class HealthMonitor {
 
         let probe = self.probeWithHostApp()
         await withTaskGroup(of: ([String], (ProbeResult, HostLookup)).self) { group in
-            for instances in specGroups.values {
+            // At most `maxConcurrentProbes` at once, the next one starting as
+            // each ends: a big setup used to start every server at login in
+            // the same second (review 2026-10-20, 7d92).
+            var waiting = Array(specGroups.values)
+            func next() -> (@Sendable () async -> ([String], (ProbeResult, HostLookup)))? {
+                guard !waiting.isEmpty else { return nil }
+                let instances = waiting.removeFirst()
                 let config = instances[0].config
                 // Fetch tools if ANY instance needs them (a timer round re-fetches
                 // only on a transition to healthy), and always on Refresh
                 // (`force`), so a server's new tools show (review, 2026-10-14).
                 let fetchTools = force || instances.contains { $0.state != .healthy }
                 let ids = instances.map(\.id)
-                group.addTask {
-                    (ids, await probe(config, fetchTools))
-                }
+                return { (ids, await probe(config, fetchTools)) }
+            }
+            for _ in 0..<Self.maxConcurrentProbes {
+                guard let task = next() else { break }
+                group.addTask(operation: task)
             }
             let specs = Dictionary(due.map { ($0.id, Self.probeSpec($0.config)) }, uniquingKeysWith: { first, _ in first })
             // Apply each result the moment it arrives, so the header count and the
@@ -825,6 +833,7 @@ final class HealthMonitor {
             // slowest probe (a full cycle takes ~10-25s on a large setup) finishes.
             for await (ids, (result, lookup)) in group {
                 if Task.isCancelled { break }
+                if let task = next() { group.addTask(operation: task) }
                 for id in ids {
                     // A result for a config that changed meanwhile describes the
                     // old setup: never apply it (Argon 2026-10-16 #8).
@@ -857,6 +866,8 @@ final class HealthMonitor {
 
     /// Consecutive transient failures required before a server is shown as `broken` (red).
     nonisolated static let failureThreshold = 2
+    /// How many servers a cycle checks at the same time.
+    nonisolated static let maxConcurrentProbes = 6
 
     /// Seconds to wait before re-probing a server that has failed this many times
     /// in a row; `nil` = probe every cycle (still under the failure threshold).
