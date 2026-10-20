@@ -64,7 +64,14 @@ final class ProcessRunner: @unchecked Sendable {
     ) throws {
         self.capturesRawStdout = capturesRawStdout
         var processEnv = PathResolver.processEnvironment(configEnv: env)
-        let resolved = PathResolver.resolveCommand(command, env: processEnv)
+        var resolved = PathResolver.resolveCommand(command, env: processEnv)
+        // A relative path (`./.venv/bin/python`) is the project's, where the
+        // agent starts it, not mcpock's own folder (review 2026-10-20, 542f).
+        if resolved.contains("/"), !resolved.hasPrefix("/"),
+           let workingDirectory, ConfigDiscovery.isExistingFolder(workingDirectory) {
+            resolved = ((PathResolver.expandTilde(workingDirectory) as NSString)
+                .appendingPathComponent(resolved) as NSString).standardizingPath
+        }
 
         // A GUI app-bundle binary as the server command means an Electron-style
         // "run my script as Node" setup (MiniMax Code's `matrix`, etc.). Without

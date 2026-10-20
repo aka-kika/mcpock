@@ -177,6 +177,21 @@ final class ConfigDiscoveryTests: XCTestCase {
         XCTAssertEqual(ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".tools").path]).map(\.name), ["s"])
     }
 
+    /// Review 2026-10-20 (542f): `./.venv/bin/python` is the project's own,
+    /// found in the project folder, not in mcpock's.
+    func testRelativeCommandRunsFromTheProjectFolder() async throws {
+        try write("proj/bin/server", "#!/bin/sh\nexit 0\n")
+        let script = home.appendingPathComponent("proj/bin/server")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let runner = try ProcessRunner(command: "./bin/server", args: [], env: [:],
+                                       workingDirectory: home.appendingPathComponent("proj").path)
+        for _ in 0..<100 where runner.isRunning { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertTrue(runner.exitedNormally)
+        XCTAssertEqual(runner.terminationStatus, 0)
+        XCTAssertThrowsError(try ProcessRunner(command: "./bin/server", args: [], env: [:],
+                                               workingDirectory: home.appendingPathComponent("other").path))
+    }
+
     /// Argon 2026-10-17 #3: a project folder deleted after the config was
     /// read no longer fails the start; the server runs from the default folder.
     func testMissingWorkingDirectoryDoesNotFailTheStart() async throws {
