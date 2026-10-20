@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 /// Persisted user preferences (UserDefaults via AppStorage keys).
 enum AppPreferences {

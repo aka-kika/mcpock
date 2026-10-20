@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// Root of the card window: resolves the theme, finds the selected row and hands

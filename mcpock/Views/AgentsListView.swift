@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// The Agents tab (v1.5 spec, Phase 4): one row per agent, sorted by what needs

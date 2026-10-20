@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// One agent as the Agents pane lists it: its name, how many servers it
 /// declares, and the config file(s) those came from.

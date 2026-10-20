@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 /// Installs a right-click menu on the MenuBarExtra status item (Settings + Quit).
 @MainActor
