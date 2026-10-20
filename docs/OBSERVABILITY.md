@@ -6,8 +6,9 @@ that be part of mcpock?"* Companion to the out-of-scope list in
 [CONTRIBUTING.md](../CONTRIBUTING.md#out-of-scope) and
 [docs/ARCHITECTURE.md](ARCHITECTURE.md) (how it fits together).
 
-**Status (still true in v1.5):** decision recorded, not built. Anything here needs a deliberate product
-decision before implementation — the app is intentionally small.
+**Status (v1.10):** decision recorded. Usage counts (option 2 below, counts only)
+shipped in 1.7; the rest is not built. Anything else here needs a deliberate
+product decision before implementation — the app is intentionally small.
 
 ---
 
@@ -27,10 +28,10 @@ would be a different product.
 
 | Ask | Feasible in mcpock? | Why |
 |-----|---------------------|-----|
-| **Which leak tokens** | ✅ now | mcpock already fetches `tools/list` and **discards the schemas** (`MCPJSONRPC.parseTools` keeps only name + description). The serialized size of names + descriptions + `inputSchema` is the *fixed context cost* each server injects into every request — the dominant real-world token leak (a many-tool server with fat schemas silently eats the context budget on every call). |
-| **Which are slow** | ⚠️ partial | It can time its own handshake (responsiveness / cold-start), but not real per-call latency under real payloads. Probes currently record no duration. |
-| **Which are actually used** | ❌ needs read-path | Requires parsing Claude Code on-disk session transcripts (`~/.claude/projects/**/*.jsonl` — they carry `tool_use` / `tool_result` blocks plus per-message token usage), a read-only extension in the same idiom as reading `~/.claude.json`; or a proxy. |
-| **Which hallucinate** | ❌ never | Hallucination is an LLM-output property, not an MCP-server signal. MCP carries nothing to measure it. Claiming it would be dishonest. |
+| **Which leak tokens** | Yes, now | mcpock already fetches `tools/list` and **discards the schemas** (`MCPJSONRPC.parseTools` keeps only name + description). The serialized size of names + descriptions + `inputSchema` is the *fixed context cost* each server injects into every request — the dominant real-world token leak (a many-tool server with fat schemas silently eats the context budget on every call). |
+| **Which are slow** | Partial | It can time its own handshake (responsiveness / cold-start), but not real per-call latency under real payloads. Probes currently record no duration. |
+| **Which are actually used** | Built in 1.7 (counts) | Read-only readers of each agent's own history: Claude Code transcripts (`~/.claude/projects/**/*.jsonl`), Grok, Cursor and Hermes (`Services/Usage/`, see [ARCHITECTURE.md](ARCHITECTURE.md)). They count calls per agent and server; no arguments, results, latency or tokens. |
+| **Which hallucinate** | Never | Hallucination is an LLM-output property, not an MCP-server signal. MCP carries nothing to measure it. Claiming it would be dishonest. |
 
 ## Recommendation
 
@@ -51,11 +52,12 @@ of the same `~/` surfaces). Ranked by fit:
    matters) and **"which are slow"** (responsiveness). Reuses `MCPJSONRPC.parseTools`,
    `MCPToolInfo`, `ServerSnapshot`, `HealthMonitor.runProbeCycle`, `ServerRowView`,
    and the `AppPreferences` / UserDefaults idiom — no new dependency.
-2. **Fits with effort (still read-only) — usage from transcripts.** A reader
-   alongside `ConfigDiscovery` parses Claude Code session `.jsonl` for real
-   invocation counts, error rates, result sizes, and real latency / tokens per MCP
-   tool. This is where **"which tools are actually used"** truly comes from. Claude
-   Code first (Cursor / Claude Desktop formats are less documented).
+2. **Fits with effort (still read-only) — usage from transcripts.** Built in 1.7
+   as counts only: readers parse each agent's own history (Claude Code, Grok,
+   Cursor, Hermes) for how often each agent called each server, shown as 7-day,
+   30-day or all-time counts. This is where **"which tools are actually used"**
+   truly comes from. Error rates, result sizes and real latency / tokens per tool
+   are not built.
 3. **Never fits — hallucination detection.** Belongs to a prompt / agent-eval tool,
    not a server monitor.
 
@@ -69,6 +71,6 @@ current spawn-probe-kill model).
 - **Is "the Datadog for MCP" a good idea?** Yes — but most of it lives *outside*
   mcpock's read-only, out-of-band vantage point.
 - **Should it be part of *this* tool?** Only the honest slice: **context / token
-  weight + probe latency** (fits today) and, if we go further, **usage from Claude
-  Code transcripts** (fits the read-only ethos with more work). Drop hallucination.
+  weight + probe latency** (fits today) and **usage from the agents' own
+  history** (read-only; counts shipped in 1.7). Drop hallucination.
   Keep the proxy as a separate product.

@@ -1,6 +1,6 @@
 # mcpock — Architecture
 
-How the app is put together (v1.5), how one health check flows end to end, and
+How the app is put together (v1.10), how one health check flows end to end, and
 the rules that must not regress. For what the app does from a user's point of
 view, see the [README](../README.md); for build and test steps, see
 [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -64,6 +64,7 @@ card is open).
 | `Services/AppPreferences.swift` | UserDefaults keys; `ProbeInterval` (the Check servers slider stops); `differsAcknowledged` (1.5.2, JSON string: name -> fingerprints) |
 | `Services/LaunchAtLogin.swift` | `SMAppService` wrapper |
 | `Services/UpdateController.swift` | Owns Sparkle's `SPUStandardUpdaterController` for the app's lifetime; never created while hosting tests |
+| `Services/DemoData.swift` | Demo mode for screenshots (`--demo` or `MCPOCK_DEMO=1`, `--demo-widgets` to feed the widgets): a fixed offline sample set and throwaway settings; never scans, spawns or connects |
 | `Models/Models.swift` | `ServerConfig`, `ServerSnapshot`, `ServerGroup`, `HealthState`, `ProbeResult`, `ProbeError`, `ServerSource`, `DiffNote` |
 
 ### Discovery
@@ -88,6 +89,7 @@ card is open).
 | `Services/MCPMessageBuffer.swift` | `[UInt8]`-backed reader: newline-delimited JSON, tolerates `Content-Length` frames and leading noise |
 | `Services/MCPJSONRPC.swift` | Request builders, response matching by id, tool parsing |
 | `Services/HTTPProbe.swift` | Streamable HTTP: POST JSON-RPC, replays `Mcp-Session-Id`, parses JSON or SSE frames, closes the session |
+| `Services/HeadersHelper.swift` | Runs Claude Code's `headersHelper` for an http/sse entry (`/bin/sh -c`, 10 s, process tree reaped) and merges its headers over the static ones; its output is never logged or stored |
 | `Services/ProbeSession.swift` | The probes' ephemeral `URLSession`: redirects followed only to the same scheme, host and port, so headers never reach another host |
 | `Services/SSEProbe.swift` | Legacy SSE: GET the stream, read the `endpoint` event, POST, read replies from the stream. Falls back to `HTTPProbe` when the URL isn't really SSE, or when the endpoint names another host |
 | `Services/PathResolver.swift` | `~` expansion, env merge, the server's own PATH first, then common bin folders, `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |

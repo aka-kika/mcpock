@@ -115,7 +115,9 @@ Needs **macOS 26 or later** on Apple Silicon.
 
 ## Quick start
 
-1. Click the menu bar icon. The **Servers** tab lists every server, problems first.
+1. Click the menu bar icon. The panel opens on the **Agents** tab: one row per
+   agent, the ones that need you first; open one to see its servers. The
+   **Servers** tab lists every server, problems first.
 2. Click a row that needs you. The card says why, in plain words.
 3. Click **Copy errors** (or **Ask an agent**) and paste it to your agent, or
    fix the config yourself.
