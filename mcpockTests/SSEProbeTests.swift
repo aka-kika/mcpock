@@ -87,6 +87,20 @@ final class SSEProbeTests: XCTestCase {
         XCTAssertEqual(result.tools?.map(\.name), ["echo"])
     }
 
+    /// Review 2026-10-20 (8c5b): a message split over several `data:` lines is
+    /// one JSON answer, so the server reads healthy with its tools.
+    func testMessageSplitOverDataLinesIsJoined() async throws {
+        let split = mock.replacingOccurrences(
+            of: "self.wfile.write(b'event: message\\ndata: ' + json.dumps(msg).encode() + b'\\n\\n'); self.wfile.flush()",
+            with: "body = json.dumps(msg, indent=1).encode().replace(b'\\n', b'\\ndata: '); self.wfile.write(b'event: message\\ndata: ' + body + b'\\n\\n'); self.wfile.flush()")
+        XCTAssertNotEqual(split, mock)
+        let (server, port) = try startMock(split)
+        defer { server.terminate(); server.waitUntilExit() }
+        let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!, headers: [:], fetchTools: true)
+        XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
+        XCTAssertEqual(result?.tools?.map(\.name), ["echo"])
+    }
+
     /// Review 2026-10-20 (7676): an endpoint event naming another host gets no
     /// POST with the config's headers; the probe falls back to the normal check.
     func testEndpointOnAnotherHostIsNotUsed() async throws {

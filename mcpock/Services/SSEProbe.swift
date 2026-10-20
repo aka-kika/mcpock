@@ -145,9 +145,12 @@ enum SSEProbe {
     ///
     /// `AsyncLineSequence` swallows the blank lines that delimit SSE events, so an
     /// event is taken as complete at its `data:` line; the `event:` line before it
-    /// names it. MCP puts one JSON line per event, which is all the probe needs.
+    /// names it. A message whose JSON is split over several `data:` lines is
+    /// joined with newlines, as SSE says, until it reads as one JSON object
+    /// (review 2026-10-20, 8c5b; the HTTP probe's streamed answers do the same).
     private static func nextEvent(_ lines: inout Lines, named wanted: String? = nil) async throws -> Event? {
         var name = "message"
+        var pending: String?
         while let line = try await lines.next() {
             if line.isEmpty || line.hasPrefix(":") { continue }   // keep-alive / comment
             guard let colon = line.firstIndex(of: ":") else { continue }
@@ -157,9 +160,18 @@ enum SSEProbe {
             switch field {
             case "event":
                 name = String(value)
+                pending = nil
             case "data":
-                let event = Event(name: name, data: String(value))
+                let data = pending.map { $0 + "\n" + value } ?? String(value)
+                // The endpoint is plain text on one line; a message is JSON.
+                if name != "endpoint", (try? MCPJSONRPC.parseJSONObject(Data(data.utf8))) == nil,
+                   data.utf8.count <= MCPMessageBuffer.maxBodyBytes {
+                    pending = data
+                    continue
+                }
+                let event = Event(name: name, data: data)
                 name = "message"
+                pending = nil
                 if wanted == nil || event.name == wanted { return event }
             default:
                 break
