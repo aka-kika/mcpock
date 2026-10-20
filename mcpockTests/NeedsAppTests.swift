@@ -30,6 +30,25 @@ final class HostAppsTests: XCTestCase {
         XCTAssertEqual(hints.bundles, [])
         XCTAssertEqual(HostApps.scriptHints("exec \"/Applications/Vera.app/Contents/MacOS/vera-mcp\" --stdio").bundles,
                        ["/Applications/Vera.app"])
+        XCTAssertEqual(HostApps.scriptHints("FOO=1 /Applications/Wake.app/Contents/MacOS/wake-mcp \"$@\"").bundles,
+                       ["/Applications/Wake.app"])
+    }
+
+    /// Review 2026-10-20 (5345): a `.app` the script only mentions is not the
+    /// server's app, and no port is guessed before an app was seen on it.
+    @MainActor
+    func testOnlyTheLaunchedProgramNamesAnApp() {
+        let script = """
+        #!/bin/sh
+        # Works with /Applications/Reed.app too
+        cd /Applications/Foo.app/Contents/Resources
+        exec node /Applications/Foo.app/Contents/Resources/server.js --log /Applications/Bar.app/log
+        """
+        XCTAssertEqual(HostApps.scriptHints(script).bundles, [])
+        let reedPort = ServerConfig(id: "T:r", name: "r", source: ServerSource(label: "T"), projectPath: nil,
+                                    transport: .http, command: nil, args: [], env: [:],
+                                    url: "http://127.0.0.1:8742/mcp", headers: [:])
+        XCTAssertNil(HostApps.app(for: reedPort, learnedPorts: [:]), "8742 is not Reed's until Reed is seen there")
     }
 
     /// A real app on every Mac: its command inside the bundle names it.

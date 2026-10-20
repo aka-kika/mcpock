@@ -44,13 +44,20 @@ enum HostApps {
         return parts.scheme == "https" ? 443 : 80
     }
 
-    /// What a launcher script points at: `.app` bundles it names and local
-    /// ports it talks to.
+    /// What a launcher script points at: the `.app` bundles of the programs
+    /// it runs and local ports it talks to. Only a line's program counts, not
+    /// any `.app` the script mentions (a comment, an argument, a script inside
+    /// an app run by `node`): otherwise a real error read "Needs <App> open"
+    /// (review 2026-10-20, 5345).
     nonisolated static func scriptHints(_ text: String) -> (bundles: [String], ports: [Int]) {
         var bundles: [String] = []
-        for match in appPathRegex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-            guard let range = Range(match.range, in: text) else { continue }
-            let path = String(text[range])
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
+            // `exec`, `nohup` and `VAR=value` before the program are not it.
+            let words = AkaSource.splitCommandLine(trimmed)
+                .drop { $0 == "exec" || $0 == "nohup" || $0 == "command" || ($0.contains("=") && !$0.hasPrefix("/")) }
+            guard let program = words.first, let path = bundlePath(ofExecutable: program) else { continue }
             if !bundles.contains(path) { bundles.append(path) }
         }
         var ports: [Int] = []
@@ -61,13 +68,7 @@ enum HostApps {
         return (bundles, ports)
     }
 
-    private static let appPathRegex = try! NSRegularExpression(pattern: #"/[^\s"'$:]*?\.app(?=/|\s|"|'|$)"#)
     private static let localPortRegex = try! NSRegularExpression(pattern: #"(?:localhost|127\.0\.0\.1|\[::1\]):(\d{2,5})"#)
-
-    /// Ports whose app mcpock knows before ever seeing it listen: only apps
-    /// checked on the maintainer's Mac, and only when installed here.
-    /// Reed (reed.md) serves its MCP on 127.0.0.1:8742.
-    nonisolated static let knownPorts: [Int: String] = [8742: "com.kikalab.reed"]
 
     // MARK: - This Mac
 
@@ -125,10 +126,8 @@ enum HostApps {
             if let port = config.url.flatMap(localPort(inURL:)) { ports = [port] }
         }
         for port in ports {
+            // Only a port an app was seen listening on; no built-in guesses.
             if let path = learnedPorts[port], let app = hostApp(atBundlePath: path) { return app }
-            if let id = knownPorts[port],
-               let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id),
-               let app = hostApp(atBundlePath: url.path) { return app }
         }
         return nil
     }
