@@ -24,6 +24,30 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertFalse(isProcessAlive(pid), "Process \(pid) must not remain as an orphan")
     }
 
+    /// Review 2026-10-20 (c46c): a child that double-forks into its own
+    /// session escapes the group kill and holds the pipes open. The reader
+    /// threads still end shortly after teardown instead of blocking forever.
+    func testReadersEndWhenAnEscapedChildHoldsThePipes() async throws {
+        let pidFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mcpock-setsid-\(UUID().uuidString).pid")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        // Double fork: the grandchild leaves the group and its parent exits,
+        // so nothing ties it to the server any more.
+        let script = "import os, time\nif os.fork() == 0:\n    os.setsid()\n    if os.fork() == 0:\n        open('\(pidFile.path)', 'w').write(str(os.getpid()))\n        time.sleep(60)\n    os._exit(0)\nelse:\n    time.sleep(60)\n"
+        let runner = try ProcessRunner(command: "/usr/bin/python3", args: ["-c", script], env: [:])
+        var escaped: Int32 = 0
+        for _ in 0..<100 where escaped == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+            escaped = Int32((try? String(contentsOf: pidFile, encoding: .utf8)) ?? "") ?? 0
+        }
+        XCTAssertGreaterThan(escaped, 0)
+        defer { kill(escaped, SIGKILL) }
+        await runner.terminateAndReap(gracePeriod: .milliseconds(200))
+        XCTAssertTrue(isProcessAlive(escaped), "the escaped child is outside the group: the case under test")
+        for _ in 0..<50 where !runner.readersDidFinish { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertTrue(runner.readersDidFinish, "both reader threads ended")
+    }
+
     /// A server that exits as soon as its stdin closes, leaving a child running
     /// (1.9.0, found by the slow-start work): closing stdin used to come before
     /// the tree was listed, so the child was reparented away and never killed.

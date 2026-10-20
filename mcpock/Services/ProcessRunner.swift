@@ -35,6 +35,14 @@ final class ProcessRunner: @unchecked Sendable {
     /// of what the server printed rather than racing it.
     private let stderrFinished = OSAllocatedUnfairLock(initialState: false)
     private let stdoutFinished = OSAllocatedUnfairLock(initialState: false)
+    /// Set once teardown is over: the reader threads stop waiting and close
+    /// their pipe ends even if a process that escaped the group (a double
+    /// fork into its own session) still holds the other end open (review
+    /// 2026-10-20, c46c). Before, two threads per check stayed blocked forever.
+    private let readersAbandoned = OSAllocatedUnfairLock(initialState: false)
+
+    /// True once both reader threads have ended.
+    var readersDidFinish: Bool { stdoutDidFinish && stderrFinished.withLock { $0 } }
     /// Only a one-shot command (the headers helper) keeps its raw stdout; a
     /// server probe never does, so it doesn't hold a copy of every reply.
     private let capturesRawStdout: Bool
@@ -129,13 +137,14 @@ final class ProcessRunner: @unchecked Sendable {
         // under build load, 2026-09-12). A blocking reader parses each chunk
         // *before* it can observe EOF, so "closed" is only ever declared after
         // the last byte has been handled.
-        Self.drain(stdoutPipe.fileHandleForReading, name: "mcpock.stdout",
+        let abandoned: @Sendable () -> Bool = { [weak self] in self?.readersAbandoned.withLock { $0 } ?? true }
+        Self.drain(stdoutPipe.fileHandleForReading, name: "mcpock.stdout", abandoned: abandoned,
                    sink: { [weak self] in self?.handleStdout($0) },
                    onEOF: { [weak self] in
                        self?.stdoutFinished.withLock { $0 = true }
                        self?.failPendingReaders()
                    })
-        Self.drain(stderrPipe.fileHandleForReading, name: "mcpock.stderr",
+        Self.drain(stderrPipe.fileHandleForReading, name: "mcpock.stderr", abandoned: abandoned,
                    sink: { [weak self] in self?.handleStderr($0) },
                    onEOF: { [weak self] in self?.stderrFinished.withLock { $0 = true } })
 
@@ -156,19 +165,35 @@ final class ProcessRunner: @unchecked Sendable {
         rootStarted = Self.startTime(of: process.processIdentifier) ?? spawnTime
     }
 
-    /// Blocking read loop on its own thread; `sink` runs there, in order, and
-    /// `onEOF` runs after the final chunk has been delivered.
+    /// Read loop on its own thread; `sink` runs there, in order, and `onEOF`
+    /// runs after the final chunk has been delivered. It waits with `poll` in
+    /// short steps, so it can stop once `abandoned` says teardown is over,
+    /// then closes its end of the pipe.
     private static func drain(
-        _ handle: FileHandle, name: String,
+        _ handle: FileHandle, name: String, abandoned: @escaping @Sendable () -> Bool,
         sink: @escaping (Data) -> Void, onEOF: @escaping () -> Void
     ) {
         let thread = Thread {
-            while true {
-                let chunk = handle.availableData
-                if chunk.isEmpty { break }
-                sink(chunk)
+            let fd = handle.fileDescriptor
+            var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+            while !abandoned() {
+                var request = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                let ready = poll(&request, 1, 200)
+                if ready == 0 { continue }
+                if ready < 0 {
+                    if errno == EINTR { continue }
+                    break
+                }
+                let count = read(fd, &buffer, buffer.count)
+                if count < 0 {
+                    if errno == EINTR || errno == EAGAIN { continue }
+                    break
+                }
+                if count == 0 { break }
+                sink(Data(buffer[0..<count]))
             }
             onEOF()
+            try? handle.close()
         }
         thread.name = name
         thread.start()
@@ -279,6 +304,7 @@ final class ProcessRunner: @unchecked Sendable {
             await Self.pause(.milliseconds(10))
         }
 
+        readersAbandoned.withLock { $0 = true }
         failPendingReaders()
     }
 
@@ -313,6 +339,7 @@ final class ProcessRunner: @unchecked Sendable {
         groupMembers(of: rootPID)
             .filter { $0.isStillTheSameProcess }
             .forEach { kill($0.pid, SIGKILL) }
+        readersAbandoned.withLock { $0 = true }
         failPendingReaders()
     }
 
