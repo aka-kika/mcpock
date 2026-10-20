@@ -51,11 +51,25 @@ final class AppBundleProbeTests: XCTestCase {
                       "expected the fake GUI-boot exit code, got: \(result.failureReason ?? "nil")")
     }
 
+    /// Review 2026-10-20 (6967): an app started with its own flag is not run
+    /// as Node; the fake "boots the GUI" (exit 66) as the real app would.
+    func testAppStartedWithItsOwnFlagIsNotRunAsNode() async throws {
+        let config = try makeFakeAppBundleConfig(id: "test:electron-flag", configEnv: [:], args: ["--mcp-stdio"])
+        defer { removeFakeBundle(for: config) }
+        let result = await StdioProbe.probe(config: config, fetchTools: false)
+        XCTAssertTrue(result.failureReason?.contains("66") == true, result.failureReason ?? "nil")
+        XCTAssertTrue(PathResolver.isNodeScript("/a/b/cli.CJS"))
+        XCTAssertFalse(PathResolver.isNodeScript("--stdio"))
+        XCTAssertFalse(PathResolver.isNodeScript(nil))
+    }
+
     // MARK: - Fixture
 
     /// Builds `<tmp>/<uuid>/Fake.app/Contents/MacOS/fake`: a script that answers
     /// the MCP handshake only under ELECTRON_RUN_AS_NODE=1 and exits 66 otherwise.
-    private func makeFakeAppBundleConfig(id: String, configEnv: [String: String]) throws -> ServerConfig {
+    private func makeFakeAppBundleConfig(
+        id: String, configEnv: [String: String], args: [String] = ["server.mjs"]
+    ) throws -> ServerConfig {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("mcpock-fakeapp-\(UUID().uuidString)")
         let macOSDir = root.appendingPathComponent("Fake.app/Contents/MacOS")
@@ -107,7 +121,7 @@ final class AppBundleProbeTests: XCTestCase {
             projectPath: nil,
             transport: .stdio,
             command: binary.path,
-            args: [],
+            args: args,
             env: configEnv,
             url: nil,
             headers: [:]

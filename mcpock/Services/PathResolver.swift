@@ -47,6 +47,13 @@ enum PathResolver {
         path.contains(".app/Contents/MacOS/")
     }
 
+    /// True for a `.js`, `.mjs` or `.cjs` path: what an Electron binary runs
+    /// as Node.
+    static func isNodeScript(_ argument: String?) -> Bool {
+        guard let ext = argument.map({ ($0 as NSString).pathExtension.lowercased() }) else { return false }
+        return ["js", "mjs", "cjs"].contains(ext)
+    }
+
     /// Pure spelling normalisation of a launch command, for comparing two configs
     /// ("do these agents launch the same thing?") — not for spawning. `~` is
     /// expanded, and an absolute path that sits directly in one of the common bin

@@ -77,8 +77,11 @@ final class ProcessRunner: @unchecked Sendable {
         // "run my script as Node" setup (MiniMax Code's `matrix`, etc.). Without
         // ELECTRON_RUN_AS_NODE=1 the binary boots the full app, which the probe
         // then kills — an open/crash loop every cycle. Inject it unless the
-        // config sets the variable itself; non-Electron binaries ignore it.
-        if PathResolver.isAppBundleExecutable(resolved), env["ELECTRON_RUN_AS_NODE"] == nil {
+        // config sets the variable itself, and only when the first argument
+        // is the script to run: an app started with its own flag
+        // (`Foo --mcp-stdio`) must boot as itself (review 2026-10-20, 6967).
+        if PathResolver.isAppBundleExecutable(resolved), env["ELECTRON_RUN_AS_NODE"] == nil,
+           PathResolver.isNodeScript(args.first) {
             processEnv["ELECTRON_RUN_AS_NODE"] = "1"
         }
 
