@@ -19,7 +19,7 @@ enum StatusLoad: Sendable {
 }
 
 /// The plain-text answers behind the helper's three tools (round 7). Pure:
-/// the snapshot, the clock and "is that pid alive" come in as values, so
+/// the snapshot, the clock and "is that mcpock still running" come in as values, so
 /// `StatusReportTests` runs them on a fixture file.
 enum StatusReport {
     static let notRunningYet = "mcpock isn't running or hasn't checked yet. "
@@ -49,21 +49,21 @@ enum StatusReport {
 
     /// The header every answer starts with: the note about freshness (if any),
     /// or the reason there is nothing to read.
-    private static func preamble(_ load: StatusLoad, now: Date, isRunning: (Int32) -> Bool) -> (MCPockStatus?, [String]) {
+    private static func preamble(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> (MCPockStatus?, [String]) {
         switch load {
         case .missing:
             return (nil, [notRunningYet])
         case .unreadable(let path, let detail):
             return (nil, ["mcpock's status file at \(path) couldn't be read (\(detail)). Open mcpock so it writes a fresh one."])
         case .loaded(let status):
-            let note = freshnessNote(status, now: now, isRunning: isRunning(status.pid))
+            let note = freshnessNote(status, now: now, isRunning: isRunning(status))
             return (status, note.map { [$0, ""] } ?? [])
         }
     }
 
     // MARK: - mcpock_status
 
-    static func statusText(_ load: StatusLoad, now: Date, isRunning: (Int32) -> Bool) -> String {
+    static func statusText(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
         let (status, head) = preamble(load, now: now, isRunning: isRunning)
         guard let status else { return head.joined(separator: "\n") }
         let c = status.counts
@@ -105,7 +105,7 @@ enum StatusReport {
             .map(\.element)
     }
 
-    static func problemsText(_ load: StatusLoad, now: Date, isRunning: (Int32) -> Bool) -> String {
+    static func problemsText(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
         let (status, head) = preamble(load, now: now, isRunning: isRunning)
         guard let status else { return head.joined(separator: "\n") }
         return (head + problemLines(status, now: now)).joined(separator: "\n")
@@ -146,7 +146,7 @@ enum StatusReport {
 
     // MARK: - mcpock_server
 
-    static func serverText(_ load: StatusLoad, name: String, now: Date, isRunning: (Int32) -> Bool) -> String {
+    static func serverText(_ load: StatusLoad, name: String, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
         let (status, head) = preamble(load, now: now, isRunning: isRunning)
         guard let status else { return head.joined(separator: "\n") }
         let key = normalized(name)

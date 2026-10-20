@@ -143,12 +143,51 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(StatusReport.freshnessNote(status, now: at, isRunning: true)?.contains("first check") ?? false)
     }
 
-    /// e160 (review 2026-10-20): the agent reports first and asks before editing a config.
+    // MARK: - Review 2026-10-20 (e160, 7b1a)
+
+    /// e160: the agent reports first and asks before editing a config.
     func testInstructionsAskBeforeEditingConfigs() {
         let text = MCPStatusServer.instructions
         XCTAssertFalse(text.contains("then fix what it reports"), text)
         XCTAssertTrue(text.contains("ask before changing any config file"), text)
         XCTAssertTrue(text.contains("never edits configs"), text)
+    }
+
+    private func loadedStatus() throws -> MCPockStatus {
+        guard case .loaded(let status) = StatusLoad.read(from: try fixtureFile()) else { throw XCTSkip("fixture") }
+        return status
+    }
+
+    /// 7b1a: a live pid that is mcpock and started before the file counts as running.
+    func testRunningNeedsTheSameMcpockProcess() throws {
+        let status = try loadedStatus()
+        let before = status.generated.addingTimeInterval(-3600)
+        func check(alive: Bool = true, path: String? = "/Applications/mcpock.app/Contents/MacOS/mcpock",
+                   started: Date?) -> Bool {
+            MCPStatusServer.mcpockIsRunning(status, isAlive: { _ in alive }, executablePath: { _ in path }, startTime: { _ in started })
+        }
+        XCTAssertTrue(check(started: before))
+        XCTAssertFalse(check(alive: false, started: before), "no such pid")
+        XCTAssertFalse(check(path: "/usr/bin/ssh", started: before), "pid reused by another program")
+        XCTAssertFalse(check(started: status.generated.addingTimeInterval(600)), "pid reused after the file was written")
+        XCTAssertTrue(check(started: status.generated.addingTimeInterval(2)), "a little clock slack")
+    }
+
+    /// A lookup the system refuses is skipped, not held against mcpock.
+    func testRunningSkipsLookupsThatFail() throws {
+        let status = try loadedStatus()
+        XCTAssertTrue(MCPStatusServer.mcpockIsRunning(status, isAlive: { _ in true }, executablePath: { _ in nil }, startTime: { _ in nil }))
+    }
+
+    /// The real lookups: this test process is alive, has a path and a start time before now,
+    /// and has a start time that is not in the future.
+    func testRealLookupsReadThisProcess() {
+        let me = ProcessInfo.processInfo.processIdentifier
+        XCTAssertTrue(MCPStatusServer.processIsAlive(me))
+        XCTAssertNotNil(MCPStatusServer.executablePath(me))
+        let started = MCPStatusServer.startTime(me)
+        XCTAssertNotNil(started)
+        XCTAssertLessThanOrEqual(started ?? .distantFuture, Date())
     }
 
     // MARK: - JSON-RPC

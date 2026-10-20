@@ -21,7 +21,7 @@ struct MCPStatusServer {
 
     var loadStatus: () -> StatusLoad
     var now: () -> Date = Date.init
-    var isRunning: (Int32) -> Bool = MCPStatusServer.processIsAlive
+    var isRunning: (MCPockStatus) -> Bool = { MCPStatusServer.mcpockIsRunning($0) }
     var version: String = MCPJSONRPC.clientVersion
 
     /// Handle one line. Returns the response line (no trailing newline), or nil
@@ -148,5 +148,47 @@ struct MCPStatusServer {
     static func processIsAlive(_ pid: Int32) -> Bool {
         guard pid > 0 else { return false }
         return kill(pid, 0) == 0 || errno == EPERM
+    }
+
+    /// True only if the pid in the status file is still the mcpock that wrote
+    /// it. A pid alone is not enough: after a crash the system can give the
+    /// number to another program (review 2026-10-20, 7b1a). So the process must
+    /// also be named mcpock and must not have started after the file was written.
+    /// The three lookups come in as values so tests need no real process.
+    /// A lookup that fails (nil) is skipped, never counted against mcpock.
+    static func mcpockIsRunning(
+        _ status: MCPockStatus,
+        isAlive: (Int32) -> Bool = MCPStatusServer.processIsAlive,
+        executablePath: (Int32) -> String? = MCPStatusServer.executablePath,
+        startTime: (Int32) -> Date? = MCPStatusServer.startTime
+    ) -> Bool {
+        guard isAlive(status.pid) else { return false }
+        if let path = executablePath(status.pid),
+           (path as NSString).lastPathComponent != "mcpock" {
+            return false
+        }
+        // The app starts before it writes its first file; a few seconds of
+        // slack covers clock rounding (the kernel keeps whole seconds).
+        if let started = startTime(status.pid),
+           started > status.generated.addingTimeInterval(5) {
+            return false
+        }
+        return true
+    }
+
+    /// The path of the program behind a pid, or nil if the system won't say.
+    static func executablePath(_ pid: Int32) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(cString: buffer)
+    }
+
+    /// When the process behind a pid started, or nil if the system won't say.
+    static func startTime(_ pid: Int32) -> Date? {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(info.pbi_start_tvsec))
     }
 }
