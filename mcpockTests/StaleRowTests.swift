@@ -1,11 +1,11 @@
 import XCTest
 @testable import mcpock
 
-/// The "stale row" bug (HANDOFF Gotchas, TODO "Stale row after a section
-/// move"): a server that moved from "Everything else" into "Needs you" while
-/// the panel was open kept its old unknown ring and no note until a tab
-/// switch rebuilt the list. The data was always right (`HealthMonitor` and
-/// the status file); only the row's rendering lagged.
+/// The "stale row" bug (a stale row after a section move): a server that
+/// moved from "Everything else" into "Needs you" while the panel was open
+/// kept its old unknown ring and no note until a tab switch rebuilt the
+/// list. The data was always right (`HealthMonitor` and the status file);
+/// only the row's rendering lagged.
 ///
 /// Root cause: `serverList`'s two nested `ForEach`s (sections, then that
 /// section's groups) flatten into one list of rows inside a single

@@ -3,8 +3,7 @@ import SQLite3
 
 /// Usage counts (1.7) for Cursor: reads MCP tool calls out of Cursor's own
 /// IDE chat database, read-only. Checked against a real Cursor install on
-/// 2026-09-26 (see TODO.md "Usage counts per server" and
-/// `docs/OBSERVABILITY.md`).
+/// 2026-09-26 (see `docs/OBSERVABILITY.md`).
 ///
 /// **Where the data lives.** Cursor's IDE keeps every chat "bubble" as one
 /// row in a single key-value table, `cursorDiskKV` in
@@ -24,7 +23,7 @@ import SQLite3
 /// tries the longest dash-joined prefix (after `mcp-`) whose normalized form
 /// (`HealthMonitor.normalizedName`) is in `knownServers` first, then shorter
 /// ones; a server nothing configured recognizes falls back to the first
-/// segment up to the next dash, per TODO.md.
+/// segment up to the next dash.
 ///
 /// **Counting once.** `cursorDiskKV.key` is `UNIQUE ON CONFLICT REPLACE`,
 /// which SQLite implements as delete-then-insert, so a bubble Cursor

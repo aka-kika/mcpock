@@ -27,7 +27,7 @@ final class UpdateControllerTests: XCTestCase {
 
     func testFeedURLPointsAtMcpockDotCom() {
         XCTAssertEqual(info["SUFeedURL"] as? String, "https://mcpock.com/appcast.xml",
-                       "the repo is private, so the feed can't live on a GitHub release — see HANDOFF.md")
+                       "the appcast lives on mcpock.com, not on a GitHub release")
     }
 
     /// An EdDSA public key is 32 raw bytes, base64-encoded: 44 characters,

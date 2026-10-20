@@ -1,7 +1,7 @@
 import XCTest
 @testable import mcpock
 
-/// TODO 2026-09-26, "Show the real error line, not only the tail": a Node
+/// 2026-09-26, "Show the real error line, not only the tail": a Node
 /// stack trace's cause sits at the *top* of stderr, so `stderrTail()` alone
 /// only ever shows `at ...` frames. Real case: wigolo in aka's tail showed
 /// `at async main (...index.js:146:7)`, when the answer was the first line,

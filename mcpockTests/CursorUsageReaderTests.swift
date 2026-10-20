@@ -89,7 +89,7 @@ final class CursorUsageReaderTests: XCTestCase {
     }
 
     /// A name with no known server anywhere falls back to the first
-    /// dash-separated segment, per TODO.md.
+    /// dash-separated segment.
     func testUnknownServerFallsBackToFirstSegment() {
         let fixture = Fixture(at: root.appendingPathComponent("state.vscdb").path)
         fixture.putBubble(
