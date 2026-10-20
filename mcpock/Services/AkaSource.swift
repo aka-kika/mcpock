@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// aka (a desktop agent app, round 5) keeps its MCP servers in its own database,
@@ -39,8 +40,15 @@ enum AkaSource {
         (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/pipali")
     }
 
-    /// The sidecar's servers as configs, or none when it doesn't answer in time.
-    static func discover() async -> [ServerConfig] {
+    /// The sidecar's servers as configs, or none when it doesn't answer in time
+    /// or the port is not aka's (review 2026-10-20, 4a8f): mcpock starts the
+    /// commands in the answer, so whatever else binds 6464 while aka is down
+    /// must not choose them.
+    static func discover(
+        endpoint: URL = AkaSource.endpoint,
+        listenerIsAka: @Sendable () -> Bool = { AkaListener.isAka(port: AkaSource.endpoint.port ?? 6464) }
+    ) async -> [ServerConfig] {
+        guard listenerIsAka() else { return [] }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
@@ -73,7 +81,8 @@ enum AkaSource {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let servers = root["servers"] as? [[String: Any]] else { return [] }
         return servers.compactMap { server in
-            guard (server["enabled"] as? Bool) ?? true,
+            // Only a server aka says is on: a missing flag is not a yes.
+            guard (server["enabled"] as? Bool) == true,
                   let name = server["name"] as? String, !name.isEmpty,
                   let path = (server["path"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !path.isEmpty
@@ -159,5 +168,93 @@ enum AkaSource {
         }
         candidates.append((NSHomeDirectory() as NSString).appendingPathComponent(".bun/bin/bun"))
         return candidates.first(where: isExecutable) ?? "bun"
+    }
+}
+
+/// Who listens on aka's port. aka is the desktop app (bundle id `ai.pipali`,
+/// its sidecar is the bundled `bun` inside it) or a checkout run from source
+/// (`bun run src/server/index.ts` in a folder whose `package.json` is named
+/// `pipali`). Every listener must be the user's own process and one of those.
+enum AkaListener {
+    static let bundleID = "ai.pipali"
+    static let packageName = "pipali"
+
+    struct Process: Equatable {
+        let uid: uid_t
+        let executable: String?
+        let workingDirectory: String?
+    }
+
+    static func isAka(port: Int) -> Bool {
+        let processes = listeningPIDs(port: port).map(process(pid:))
+        return isAka(processes, uid: getuid())
+    }
+
+    /// Pure core: at least one listener, all of them the user's and aka.
+    static func isAka(
+        _ processes: [Process], uid: uid_t,
+        readFile: (String) -> Data? = { FileManager.default.contents(atPath: $0) }
+    ) -> Bool {
+        !processes.isEmpty && processes.allSatisfy { process in
+            process.uid == uid
+                && (isInsideAkaApp(process.executable, readFile: readFile)
+                    || isAkaCheckout(process.workingDirectory, readFile: readFile))
+        }
+    }
+
+    /// The executable sits inside an `.app` whose bundle id is aka's.
+    static func isInsideAkaApp(_ executable: String?, readFile: (String) -> Data?) -> Bool {
+        guard let executable, let range = executable.range(of: ".app/Contents/") else { return false }
+        let plist = String(executable[..<range.lowerBound]) + ".app/Contents/Info.plist"
+        guard let data = readFile(plist),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return false }
+        return info["CFBundleIdentifier"] as? String == bundleID
+    }
+
+    /// The working directory is aka's source folder.
+    static func isAkaCheckout(_ folder: String?, readFile: (String) -> Data?) -> Bool {
+        guard let folder, !folder.isEmpty,
+              let data = readFile((folder as NSString).appendingPathComponent("package.json")),
+              let package = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        return package["name"] as? String == packageName
+    }
+
+    /// PIDs listening on the TCP port (lsof, as `HostApps.listeningApp`).
+    static func listeningPIDs(port: Int) -> [pid_t] {
+        let task = Foundation.Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        task.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = Pipe()
+        guard (try? task.run()) != nil else { return [] }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+        return String(decoding: data, as: UTF8.self)
+            .split(whereSeparator: \.isNewline).compactMap { pid_t($0) }
+    }
+
+    /// Owner, executable and working directory of a running process. A
+    /// process mcpock may not inspect reads as uid -1 (never trusted).
+    static func process(pid: pid_t) -> Process {
+        var bsd = proc_bsdinfo()
+        let bsdSize = Int32(MemoryLayout<proc_bsdinfo>.size)
+        let uid: uid_t = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsd, bsdSize) == bsdSize ? bsd.pbi_uid : uid_t.max
+
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+        let executable = pathLength > 0 ? String(cString: pathBuffer) : nil
+
+        var vnode = proc_vnodepathinfo()
+        let vnodeSize = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        var cwd: String?
+        if proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vnode, vnodeSize) == vnodeSize {
+            cwd = withUnsafeBytes(of: &vnode.pvi_cdir.vip_path) { raw in
+                String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+            }
+        }
+        return Process(uid: uid, executable: executable, workingDirectory: cwd)
     }
 }

@@ -141,6 +141,70 @@ final class AkaSourceTests: XCTestCase {
         }
     }
 
+    /// Review 2026-10-20 (4a8f): the port is trusted only when aka listens on
+    /// it, as the desktop app or as its source checkout, and as this user.
+    func testOnlyAkaIsTrustedOnItsPort() {
+        let files: [String: Data] = [
+            "/Applications/Aka.app/Contents/Info.plist": try! PropertyListSerialization.data(
+                fromPropertyList: ["CFBundleIdentifier": "ai.pipali"], format: .xml, options: 0),
+            "/Applications/Other.app/Contents/Info.plist": try! PropertyListSerialization.data(
+                fromPropertyList: ["CFBundleIdentifier": "com.other"], format: .xml, options: 0),
+            "/src/aka/package.json": Data(#"{"name": "pipali"}"#.utf8),
+            "/src/other/package.json": Data(#"{"name": "evil"}"#.utf8),
+        ]
+        let read: (String) -> Data? = { files[$0] }
+        func trusted(_ list: [AkaListener.Process]) -> Bool { AkaListener.isAka(list, uid: 501, readFile: read) }
+        let app = AkaListener.Process(uid: 501, executable: "/Applications/Aka.app/Contents/MacOS/bun", workingDirectory: "/")
+        let source = AkaListener.Process(uid: 501, executable: "/Users/k/.bun/bin/bun", workingDirectory: "/src/aka")
+        XCTAssertTrue(trusted([app]))
+        XCTAssertTrue(trusted([source]))
+        XCTAssertFalse(trusted([]), "nothing listening")
+        XCTAssertFalse(trusted([.init(uid: 501, executable: "/usr/bin/python3", workingDirectory: "/tmp")]))
+        XCTAssertFalse(trusted([.init(uid: 501, executable: "/Applications/Other.app/Contents/MacOS/x", workingDirectory: "/")]))
+        XCTAssertFalse(trusted([.init(uid: 501, executable: "/x/bun", workingDirectory: "/src/other")]))
+        XCTAssertFalse(trusted([.init(uid: 502, executable: source.executable, workingDirectory: "/src/aka")]),
+                       "another user's process")
+        XCTAssertFalse(trusted([source, .init(uid: 501, executable: "/x", workingDirectory: "/tmp")]),
+                       "every listener must be aka")
+    }
+
+    /// A stand-in sidecar that is not aka gets no request and gives no servers.
+    func testAStrangerOnThePortStartsNothing() async throws {
+        let script = """
+        import sys, http.server, socketserver
+        body = b'{"servers": [{"name": "evil", "enabled": true, "path": "/bin/sh -c id"}]}'
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a): pass
+            def do_GET(self):
+                self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+        with socketserver.TCPServer(('127.0.0.1', 0), H) as httpd:
+            sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
+            httpd.serve_forever()
+        """
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("aka-stranger-\(UUID().uuidString).py")
+        try script.write(to: file, atomically: true, encoding: .utf8)
+        let server = Process()
+        server.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        server.arguments = [file.path]
+        let out = Pipe()
+        server.standardOutput = out
+        try server.run()
+        defer { server.terminate(); server.waitUntilExit() }
+        var buffer = Data()
+        while !buffer.contains(UInt8(ascii: "\n")) {
+            let chunk = out.fileHandleForReading.availableData
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+        }
+        let port = Int(String(decoding: buffer, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))!
+        let url = URL(string: "http://127.0.0.1:\(port)/api/mcp/servers")!
+        XCTAssertFalse(AkaListener.isAka(port: port), "python is not aka")
+        let real = await AkaSource.discover(endpoint: url, listenerIsAka: { AkaListener.isAka(port: port) })
+        XCTAssertTrue(real.isEmpty)
+        let trusted = await AkaSource.discover(endpoint: url, listenerIsAka: { true })
+        XCTAssertEqual(trusted.map(\.name), ["evil"], "the same answer from aka would count")
+    }
+
     func testNoSidecarPayloadMeansNoServers() {
         XCTAssertTrue(AkaSource.configs(fromJSON: Data("not json".utf8), bun: bun).isEmpty)
         XCTAssertTrue(AkaSource.configs(fromJSON: Data("{\"error\":\"x\"}".utf8), bun: bun).isEmpty)

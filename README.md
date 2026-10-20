@@ -211,7 +211,8 @@ by the scan, with no code change.
 Notes: servers turned off with `enabled: false` are skipped. Servers marked
 `"builtin": true` (they run inside their own app) are shown
 but never started. **aka** keeps its servers in its own database, so mcpock
-asks aka's local helper for the list and starts each server the way aka does;
+asks aka's local helper for the list (only when aka itself is the program on
+that port) and starts each server the way aka does;
 because aka launches servers its own way, it never counts toward "set up
 differently". **Tinycast** keeps its servers in its own settings and their
 keys and sign-ins in its own Keychain items, which mcpock never reads: a
