@@ -229,7 +229,7 @@ enum ConnectSnippets {
             A short table: Agent | Config path | Result (added / already there / skipped: why) | \
             Verified (yes / after restart / no). Then list the backup files you made.
 
-            From then on, when I say "check my mcpock", call mcpock_problems and help me fix what it reports.
+            From then on, when I say "check my mcpock", call mcpock_problems, tell me what it reports, and ask me before you change any config file.
             """
     }
 

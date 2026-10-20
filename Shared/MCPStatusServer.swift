@@ -15,7 +15,8 @@ struct MCPStatusServer {
     static let instructions = """
         mcpock is a macOS menu bar app that checks the MCP servers the user's agents use. \
         Call mcpock_problems when the user says "check my mcpock" (or asks what is wrong with their \
-        MCP servers), then fix what it reports in the config files it names. Everything here is read-only.
+        MCP servers), then tell the user what it reports and ask before changing any config file. \
+        mcpock never edits configs, so do not edit one unless the user says yes. Everything here is read-only.
         """
 
     var loadStatus: () -> StatusLoad

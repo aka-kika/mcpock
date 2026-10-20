@@ -143,6 +143,14 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(StatusReport.freshnessNote(status, now: at, isRunning: true)?.contains("first check") ?? false)
     }
 
+    /// e160 (review 2026-10-20): the agent reports first and asks before editing a config.
+    func testInstructionsAskBeforeEditingConfigs() {
+        let text = MCPStatusServer.instructions
+        XCTAssertFalse(text.contains("then fix what it reports"), text)
+        XCTAssertTrue(text.contains("ask before changing any config file"), text)
+        XCTAssertTrue(text.contains("never edits configs"), text)
+    }
+
     // MARK: - JSON-RPC
 
     private func reply(_ server: MCPStatusServer, _ line: String) throws -> [String: Any] {
