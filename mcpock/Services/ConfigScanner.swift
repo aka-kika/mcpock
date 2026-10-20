@@ -108,7 +108,9 @@ enum ConfigScanner {
             guard let attrs = try? fm.attributesOfItem(atPath: full),
                   attrs[.type] as? FileAttributeType == .typeRegular,
                   let size = attrs[.size] as? Int, size <= maxFileBytes else { continue }
-            guard let text = try? String(contentsOfFile: full, encoding: .utf8) else { continue }
+            guard let data = FileManager.default.contents(atPath: full),
+                  mightHoldServers(data, fileName: name),
+                  let text = String(data: data, encoding: .utf8) else { continue }
 
             for shape in scanShapes(forFileNamed: name) {
                 if let entries = shape.parse(text), entries.contains(where: \.hasEndpoint) {
@@ -118,6 +120,17 @@ enum ConfigScanner {
                 }
             }
         }
+    }
+
+    /// The keys the shapes read outside an MCP-named file. A file with none of
+    /// them is never decoded or parsed (review 2026-10-20, 5ae6): most JSON,
+    /// TOML and YAML in dot folders is other apps' settings.
+    static let serverKeys = ["mcpServers", "mcp_servers", "extensions"].map { Data($0.utf8) }
+
+    /// True when a file could declare servers: an MCP config by name, or one
+    /// that holds a key a shape reads.
+    static func mightHoldServers(_ data: Data, fileName: String) -> Bool {
+        mcpFileNames.contains(fileName.lowercased()) || serverKeys.contains { data.range(of: $0) != nil }
     }
 
     /// File names that are MCP configs by name (VS Code, Cursor, Windsurf, OpenCode

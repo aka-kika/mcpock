@@ -179,6 +179,19 @@ enum CardText {
     }
 
     /// `~/.cursor/mcp.json` instead of `/Users/me/.cursor/mcp.json`.
+    /// A paused row whose servers come from a file only the scan found
+    /// (review 2026-10-20, 5ae6), or nil.
+    static func awaitingFileNote(for group: ServerGroup, home: String = NSHomeDirectory()) -> String? {
+        var files: [String] = []
+        for source in group.sources where source.awaitingFileOK && !files.contains(source.path) {
+            files.append(source.path)
+        }
+        guard !files.isEmpty else { return nil }
+        let list = list(files.map { shortPath($0, home: home) })
+        return "Found in \(list), a file no agent mcpock knows reads. mcpock won't start it until you say so: "
+            + "Resume (right-click the row) checks it from now on."
+    }
+
     static func shortPath(_ path: String, home: String = NSHomeDirectory()) -> String {
         guard !home.isEmpty, path == home || path.hasPrefix(home + "/") else { return path }
         return "~" + path.dropFirst(home.count)

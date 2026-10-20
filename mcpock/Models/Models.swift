@@ -145,6 +145,9 @@ struct ServerSnapshot: Identifiable, Sendable, Hashable {
     var slowStartSeconds: Double?
     /// The closed app it waits for, while `state == .needsApp`.
     var hostApp: HostApp? = nil
+    /// From a file only the scan found, not allowed yet: shown paused, never
+    /// started (review 2026-10-20, 5ae6).
+    var awaitingFileOK = false
 
     init(
         config: ServerConfig,
@@ -220,6 +223,8 @@ struct GroupSource: Sendable, Hashable, Identifiable {
     /// the card's wording groups agents the same way the check does. Empty in
     /// fixtures that don't care: `target` stands in.
     var compareKey: String = ""
+    /// From a file only the scan found, waiting for her OK (`ServerSnapshot`).
+    var awaitingFileOK = false
 }
 
 /// A display row: all instances that share a server **name**, collapsed into one.

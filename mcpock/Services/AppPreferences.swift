@@ -37,6 +37,22 @@ enum AppPreferences {
         defaults.set(names.sorted(), forKey: pausedServersKey)
     }
 
+    /// Config files found only by the scan (no known agent reads them) whose
+    /// servers she allowed mcpock to start, by canonical path (review
+    /// 2026-10-20, 5ae6). `scanFilesSeeded`: set once; an update from an older
+    /// version allows every such file already there, so nothing she had
+    /// stops being checked.
+    static let allowedScanFilesKey = "allowedScanFiles"
+    static let scanFilesSeededKey = "allowedScanFilesSeeded"
+
+    static func loadAllowedScanFiles(from defaults: UserDefaults = store) -> Set<String> {
+        Set(defaults.stringArray(forKey: allowedScanFilesKey) ?? [])
+    }
+
+    static func saveAllowedScanFiles(_ paths: Set<String>, to defaults: UserDefaults = store) {
+        defaults.set(paths.sorted(), forKey: allowedScanFilesKey)
+    }
+
     /// Server names the user pinned to the top of the panel (v1.5), same
     /// normalized keying as `hiddenServers`. Pinned and hidden never overlap:
     /// `HealthMonitor.setPinned` unhides whatever it pins.

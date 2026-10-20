@@ -203,3 +203,63 @@ final class ConfigDiscoveryTests: XCTestCase {
         XCTAssertEqual(runner.terminationStatus, 0)
     }
 }
+
+/// Review 2026-10-20 (5ae6): a server from a file only the scan found waits
+/// for one OK (Resume) before mcpock starts it; an update keeps the files
+/// that were already there; a file without server keys is never parsed.
+final class ScanOnlyFileTests: XCTestCase {
+    private func config(_ id: String, name: String, path: String) -> ServerConfig {
+        ServerConfig(id: id, name: name, source: ServerSource(label: "x", path: path), projectPath: nil,
+                     transport: .stdio, command: "/usr/bin/true", args: [], env: [:], url: nil, headers: [:])
+    }
+
+    func testWhichFilesNeedAnOK() {
+        let scanned = config("scan:/u/.tool/mcp.json:global:a", name: "a", path: "/u/.tool/mcp.json")
+        let project = config("scan:/u/.p/.mcp.json:global:b", name: "b", path: "/u/.p/.mcp.json")
+        let registry = config("reg:Cursor:global:c", name: "c", path: "/u/.cursor/mcp.json")
+        XCTAssertEqual(HealthMonitor.scanOnlyFile(scanned), "/u/.tool/mcp.json")
+        XCTAssertNil(HealthMonitor.scanOnlyFile(project), "Claude Code's own approval decides .mcp.json")
+        XCTAssertNil(HealthMonitor.scanOnlyFile(registry))
+        let merged = HealthMonitor.merged([scanned, registry], into: [], pausedNames: [], allowedScanFiles: [])
+        XCTAssertEqual(merged.map(\.state), [.paused, .unknown])
+        XCTAssertEqual(merged.map(\.awaitingFileOK), [true, false])
+        XCTAssertFalse(HealthMonitor.shouldProbe(merged[0], pausedNames: [], force: true, now: Date()))
+        let allowed = HealthMonitor.merged([scanned], into: merged, pausedNames: [], allowedScanFiles: ["/u/.tool/mcp.json"])
+        XCTAssertEqual(allowed.map(\.state), [.unknown], "an allowed file starts over and is checked")
+    }
+
+    @MainActor
+    func testResumeGivesTheOKAndUpdatesKeepOldFiles() async {
+        let scanned = config("scan:/u/.tool/mcp.json:global:a", name: "tool", path: "/u/.tool/mcp.json")
+        let fresh = UserDefaults(suiteName: "mcpock.tests.scanok.\(UUID().uuidString)")!
+        let monitor = HealthMonitor(defaults: fresh, isUpdate: false)
+        monitor.discover = { [scanned] }
+        monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
+        await monitor.reloadConfigs()
+        XCTAssertEqual(monitor.servers.first?.state, .paused, "a first install asks")
+        let group = HealthMonitor.groupByName(monitor.servers).first!
+        XCTAssertNotNil(CardText.awaitingFileNote(for: group, home: "/u"))
+        XCTAssertTrue(CardText.awaitingFileNote(for: group, home: "/u")!.contains("~/.tool/mcp.json"))
+        monitor.setPaused(false, name: "tool")
+        XCTAssertEqual(monitor.allowedScanFiles, ["/u/.tool/mcp.json"])
+        XCTAssertFalse(monitor.servers.first!.awaitingFileOK)
+        XCTAssertEqual(AppPreferences.loadAllowedScanFiles(from: fresh), ["/u/.tool/mcp.json"], "remembered")
+
+        let upgraded = UserDefaults(suiteName: "mcpock.tests.scanok.\(UUID().uuidString)")!
+        let old = HealthMonitor(defaults: upgraded, isUpdate: true)
+        old.discover = { [scanned] }
+        await old.reloadConfigs()
+        XCTAssertEqual(old.servers.first?.awaitingFileOK, false, "an update keeps checking what was there")
+        let later = config("scan:/u/.new/mcp.json:global:n", name: "new", path: "/u/.new/mcp.json")
+        old.discover = { [scanned, later] }
+        await old.reloadConfigs()
+        XCTAssertEqual(old.servers.map(\.awaitingFileOK), [false, true], "a file that shows up later asks")
+    }
+
+    func testFilesWithoutServerKeysAreNotParsed() {
+        XCTAssertFalse(ConfigScanner.mightHoldServers(Data(#"{"theme": "dark"}"#.utf8), fileName: "settings.json"))
+        XCTAssertTrue(ConfigScanner.mightHoldServers(Data(#"{"mcpServers": {}}"#.utf8), fileName: "settings.json"))
+        XCTAssertTrue(ConfigScanner.mightHoldServers(Data(#"{"servers": {}}"#.utf8), fileName: "mcp.json"))
+        XCTAssertTrue(ConfigScanner.mightHoldServers(Data("[mcp_servers.x]".utf8), fileName: "config.toml"))
+    }
+}

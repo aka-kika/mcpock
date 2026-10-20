@@ -145,7 +145,8 @@ struct DetailCardView: View {
     private var quietNote: String? {
         switch group.state {
         case .paused:
-            return "Paused. mcpock won't launch this server until you resume it (right-click the row)."
+            return CardText.awaitingFileNote(for: group)
+                ?? "Paused. mcpock won't launch this server until you resume it (right-click the row)."
         case .selfManaged:
             let host = CardText.list(group.agents.map(AgentBadge.displayLabel))
             return "Built into \(host). It runs inside that app, so mcpock doesn't check it."

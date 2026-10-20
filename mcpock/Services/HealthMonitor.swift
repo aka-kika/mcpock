@@ -73,6 +73,11 @@ final class HealthMonitor {
     }
     private var hiddenNames: Set<String>
     private var pausedNames: Set<String>
+    /// Scan-only config files she allowed (review 2026-10-20, 5ae6).
+    private(set) var allowedScanFiles: Set<String>
+    /// An update from a version before 1.10.9: the first reload allows every
+    /// scan-only file already there. A first install asks for each one.
+    private var seedsScanFiles: Bool
     /// Normalized names the user pinned to the top of the panel (v1.5). Read by
     /// the views as `pinnedNames` and handed to `PanelSections.build`.
     private(set) var pinnedNames: Set<String>
@@ -241,11 +246,14 @@ final class HealthMonitor {
     /// Pausing takes effect at once (state flips to `.paused`, no more launches);
     /// resuming re-probes the row right away so the user sees a fresh verdict.
     func setPaused(_ paused: Bool, name: String) {
+        // Resume on a row waiting for its file's OK gives that OK.
+        if !paused { allowScanFiles(forGroup: name) }
         let key = Self.normalizedName(name)
         if paused { pausedNames.insert(key) } else { pausedNames.remove(key) }
         AppPreferences.savePausedServers(pausedNames, to: defaults)
         statusDidChange()
         for index in servers.indices where Self.normalizedName(servers[index].config.name) == key {
+            if servers[index].awaitingFileOK { continue }
             if paused {
                 servers[index].state = .paused
                 servers[index].failureReason = nil
@@ -350,12 +358,17 @@ final class HealthMonitor {
         await HealthMonitor.probeServer(config: config, fetchTools: fetchTools)
     }
 
-    init(defaults: UserDefaults = .standard) {
+    /// `isUpdate`: whether an older mcpock ran on this Mac before (nil: it
+    /// left its status file).
+    init(defaults: UserDefaults = .standard, isUpdate: Bool? = nil) {
         // No discovery here — it does filesystem I/O and would block whoever
         // constructs the monitor. `start()` kicks it off asynchronously.
         self.defaults = defaults
         hiddenNames = AppPreferences.loadHiddenServers(from: defaults)
         pausedNames = AppPreferences.loadPausedServers(from: defaults)
+        allowedScanFiles = AppPreferences.loadAllowedScanFiles(from: defaults)
+        seedsScanFiles = !defaults.bool(forKey: AppPreferences.scanFilesSeededKey)
+            && (isUpdate ?? Self.ranBefore())
         pinnedNames = AppPreferences.loadPinnedServers(from: defaults)
         differsAcknowledged = AppPreferences.loadDiffersAcknowledged(from: defaults)
         learnedHostPorts = AppPreferences.loadHostAppPorts(from: defaults)
@@ -396,7 +409,55 @@ final class HealthMonitor {
     /// with a 1.5 s timeout, and simply adds nothing when it isn't running.
     func reloadConfigs() async {
         let configs = await discover()
-        servers = Self.merged(configs, into: servers, pausedNames: pausedNames)
+        if seedsScanFiles {
+            allowedScanFiles.formUnion(configs.compactMap(Self.scanOnlyFile))
+            AppPreferences.saveAllowedScanFiles(allowedScanFiles, to: defaults)
+            seedsScanFiles = false
+        }
+        defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
+        servers = Self.merged(configs, into: servers, pausedNames: pausedNames, allowedScanFiles: allowedScanFiles)
+    }
+
+    /// The config file of a server found only by the scan, or nil for a known
+    /// agent's file, aka, or a project `.mcp.json` (Claude Code's own approval
+    /// decides those: `ClaudeProjectApproval`). The scan reads every MCP-shaped
+    /// file in dot folders and Application Support, so an example, a copy or
+    /// another app's file would otherwise have its command started every minute.
+    nonisolated static func scanOnlyFile(_ config: ServerConfig) -> String? {
+        guard config.id.hasPrefix("scan:"),
+              ConfigDiscovery.claudeProjectFolder(forScannedPath: config.source.path) == nil
+        else { return nil }
+        return config.source.path
+    }
+
+    /// True when the server comes from a scan-only file she has not allowed.
+    nonisolated static func awaitsFileOK(_ config: ServerConfig, allowed: Set<String>) -> Bool {
+        scanOnlyFile(config).map { !allowed.contains($0) } ?? false
+    }
+
+    /// Allow the scan-only files behind a row and check it at once (Resume,
+    /// right-click). Returns true when there was one to allow.
+    @discardableResult
+    func allowScanFiles(forGroup name: String) -> Bool {
+        let key = Self.normalizedName(name)
+        var allowedNow = false
+        for index in servers.indices where Self.normalizedName(servers[index].config.name) == key
+            && servers[index].awaitingFileOK {
+            if let path = Self.scanOnlyFile(servers[index].config) { allowedScanFiles.insert(path) }
+            servers[index].awaitingFileOK = false
+            if !isPaused(name) { servers[index].state = .unknown }
+            allowedNow = true
+        }
+        guard allowedNow else { return false }
+        AppPreferences.saveAllowedScanFiles(allowedScanFiles, to: defaults)
+        statusDidChange()
+        return true
+    }
+
+    /// An older mcpock wrote its status file on this Mac.
+    nonisolated static func ranBefore() -> Bool {
+        FileManager.default.fileExists(
+            atPath: MCPockStatus.defaultDirectory().appendingPathComponent(MCPockStatus.fileName).path)
     }
 
     /// Merge freshly-discovered configs into the current snapshots. A server that
@@ -413,19 +474,23 @@ final class HealthMonitor {
     nonisolated static func merged(
         _ configs: [ServerConfig],
         into existing: [ServerSnapshot],
-        pausedNames: Set<String>
+        pausedNames: Set<String>,
+        allowedScanFiles: Set<String>? = nil
     ) -> [ServerSnapshot] {
         let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var seenIDs = Set<String>()
         return configs.compactMap { config in
             guard seenIDs.insert(config.id).inserted else { return nil }
-            if let prev = byID[config.id], probeSpec(prev.config) == probeSpec(config) {
+            let awaiting = allowedScanFiles.map { awaitsFileOK(config, allowed: $0) } ?? false
+            if let prev = byID[config.id], probeSpec(prev.config) == probeSpec(config), prev.awaitingFileOK == awaiting {
                 var snap = prev
                 snap.config = config
                 return snap
             }
-            let paused = pausedNames.contains(normalizedName(config.name))
-            return ServerSnapshot(config: config, state: paused ? .paused : .unknown)
+            let paused = awaiting || pausedNames.contains(normalizedName(config.name))
+            var snap = ServerSnapshot(config: config, state: paused ? .paused : .unknown)
+            snap.awaitingFileOK = awaiting
+            return snap
         }
     }
 
@@ -540,7 +605,7 @@ final class HealthMonitor {
             let ids = Set(Self.instanceIDs(forGroup: groupName, in: self.servers))
             guard !ids.isEmpty else { return }
 
-            let targets = self.servers.filter { ids.contains($0.id) }
+            let targets = self.servers.filter { ids.contains($0.id) && !$0.awaitingFileOK }
             let specGroups = Dictionary(grouping: targets, by: { Self.probeSpec($0.config) })
             let probe = self.probeWithHostApp()
             let results = await withTaskGroup(of: ([String], (ProbeResult, HostLookup)).self) { group in
@@ -671,7 +736,8 @@ final class HealthMonitor {
                     headerKeys: v.config.headers.keys.sorted(),
                     state: v.state,
                     failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) },
-                    compareKey: Differs.launchTarget(v.config).parts.joined(separator: "\u{1F}")
+                    compareKey: Differs.launchTarget(v.config).parts.joined(separator: "\u{1F}"),
+                    awaitingFileOK: v.awaitingFileOK
                 )
             }
             let configs = variants.map(\.config)
@@ -900,6 +966,7 @@ final class HealthMonitor {
         _ snapshot: ServerSnapshot, pausedNames: Set<String>, force: Bool, now: Date
     ) -> Bool {
         if pausedNames.contains(normalizedName(snapshot.config.name)) { return false }
+        if snapshot.awaitingFileOK { return false }
         return force || isDue(snapshot, now: now)
     }
 
