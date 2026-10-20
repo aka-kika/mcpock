@@ -28,6 +28,7 @@
 		215297740D2BFA69338E8E34 /* StatusIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38CD64F6A6D9832D00F8D5B /* StatusIconView.swift */; };
 		256141C88FF56743C886330E /* AppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB8DB58B294596CA01E69EC /* AppearanceTests.swift */; };
 		27057821ECDB4190C8961E78 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC2D9DE193DB838D652DFE6 /* AppGroup.swift */; };
+		273DAACF6B539BC99363DD51 /* ClaudeProjectApproval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733E2668702D555A2080B7EE /* ClaudeProjectApproval.swift */; };
 		280EBECAACFB2A923171C957 /* CardText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869BE8212501929260C61251 /* CardText.swift */; };
 		281BCB20DEF741A405C611BD /* UsageReaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2768CE45B7D0E0AB286A985B /* UsageReaders.swift */; };
 		28337570805DE4FEEFD1BD3F /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A98661598453A5D2CB19FEA /* WhatsNewTests.swift */; };
@@ -321,6 +322,7 @@
 		6E6F98A45B5815F04DA9D005 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		6FA3F23B5FC1490EAA2F24D4 /* SpinnableIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpinnableIcon.swift; sourceTree = "<group>"; };
 		72EEB5C009333D0DA35F9B7F /* ConfigScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigScanner.swift; sourceTree = "<group>"; };
+		733E2668702D555A2080B7EE /* ClaudeProjectApproval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProjectApproval.swift; sourceTree = "<group>"; };
 		7874494E7CE378CA4E6E7226 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		7876E4D27E20FAAD47B81527 /* ErrorExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorExport.swift; sourceTree = "<group>"; };
 		78931860EE005FF56726AA8A /* StderrReasonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StderrReasonTests.swift; sourceTree = "<group>"; };
@@ -566,6 +568,7 @@
 				E5C3C8AD2835FA47F0DAFC6A /* AkaSource.swift */,
 				C3B421B565393E5EA0385A7D /* AppPreferences.swift */,
 				869BE8212501929260C61251 /* CardText.swift */,
+				733E2668702D555A2080B7EE /* ClaudeProjectApproval.swift */,
 				084053D17945570F9E70B29D /* ConfigDiscovery.swift */,
 				72EEB5C009333D0DA35F9B7F /* ConfigScanner.swift */,
 				83EAE760B3AD36CAEFF67C0D /* ConfigShape.swift */,
@@ -899,6 +902,7 @@
 				4AA9FE23943F599F441D094D /* AppPreferences.swift in Sources */,
 				280EBECAACFB2A923171C957 /* CardText.swift in Sources */,
 				AEA7D341A5848AB19C6F3050 /* ClaudeCodeUsageReader.swift in Sources */,
+				273DAACF6B539BC99363DD51 /* ClaudeProjectApproval.swift in Sources */,
 				5B3D4D3C2DAEF2A71F80D561 /* ConfigDiscovery.swift in Sources */,
 				1FC73BFE599B85F7BA2E7D87 /* ConfigPathMenu.swift in Sources */,
 				379B7A459438D1C36D4461CE /* ConfigScanner.swift in Sources */,

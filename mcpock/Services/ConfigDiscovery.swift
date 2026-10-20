@@ -38,11 +38,16 @@ enum ConfigDiscovery {
             servers.append(contentsOf: configs(from: entries, source: source, idPrefix: "reg:\(agent.label)"))
         }
 
-        // A project's `.mcp.json` servers that Claude Code was told to leave
-        // off there (Argon 2026-10-17 #8).
-        let mcpjsonOff = registry.first { $0.label == AgentRegistry.claudeCodeLabel }
-            .flatMap { try? String(contentsOfFile: $0.path, encoding: .utf8) }
-            .map(JSONConfigShape.disabledMcpjsonServers) ?? [:]
+        // A project's `.mcp.json` servers run only when Claude Code was told to
+        // run them there (review 2026-10-20 db0c; off ones: Argon 2026-10-17 #8).
+        let claudeJSON = registry.first { $0.label == AgentRegistry.claudeCodeLabel }?.path
+        let approvals = claudeJSON
+            .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+            .map { ClaudeProjectApproval.projects(claudeJSON: $0) } ?? [:]
+        let userSettings = claudeJSON
+            .map { (($0 as NSString).deletingLastPathComponent as NSString).appendingPathComponent(".claude/settings.json") }
+            .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+            .flatMap(ClaudeProjectApproval.object)
 
         // 2. Scan: everything else, deduped against the registry.
         for hit in ConfigScanner.scan(roots: scanRoots) where !claimedPaths.contains(hit.path) {
@@ -52,9 +57,11 @@ enum ConfigDiscovery {
                 path: hit.path
             )
             let folder = claudeProjectFolder(forScannedPath: hit.path)
-            let off = folder.flatMap { mcpjsonOff[($0 as NSString).standardizingPath] } ?? []
+            let approval = folder.map {
+                ClaudeProjectApproval.forFolder($0, projects: approvals, userSettings: userSettings)
+            }
             servers.append(contentsOf: configs(
-                from: droppingStaleProjects(hit.entries, folderExists: folderExists).filter { !off.contains($0.name) },
+                from: droppingStaleProjects(hit.entries, folderExists: folderExists).filter { approval?.allows($0.name) ?? true },
                 source: source,
                 idPrefix: "scan:\(hit.path)",
                 projectPath: folder

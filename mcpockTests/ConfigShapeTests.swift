@@ -152,9 +152,34 @@ final class ConfigShapeTests: XCTestCase {
                        "the project's own server is dropped; a global one it names stays for other projects")
     }
 
-    func testDisabledMcpjsonServersByFolder() {
-        let text = #"{"projects":{"/repo/./app":{"disabledMcpjsonServers":["a"]},"/other":{"disabledMcpjsonServers":[]}}}"#
-        XCTAssertEqual(JSONConfigShape.disabledMcpjsonServers(text), ["/repo/app": ["a"]])
-        XCTAssertEqual(JSONConfigShape.disabledMcpjsonServers("nope"), [:])
+    func testClaudeProjectApprovalByFolder() {
+        let text = #"{"projects":{"/repo/./app":{"disabledMcpjsonServers":["a"],"enabledMcpjsonServers":["b"],"hasTrustDialogAccepted":true},"/all":{"enableAllProjectMcpServers":true}}}"#
+        let projects = ClaudeProjectApproval.projects(claudeJSON: text)
+        let app = ClaudeProjectApproval.forFolder("/repo/app", projects: projects, userSettings: nil, readFile: { _ in nil })
+        XCTAssertEqual(app.enabled, ["b"])
+        XCTAssertEqual(app.disabled, ["a"])
+        XCTAssertTrue(app.trusted)
+        XCTAssertTrue(app.allows("b"))
+        XCTAssertFalse(app.allows("a"))
+        XCTAssertFalse(app.allows("c"), "not approved yet")
+        let all = ClaudeProjectApproval.forFolder("/all", projects: projects, userSettings: nil, readFile: { _ in nil })
+        XCTAssertTrue(all.allows("anything"))
+        XCTAssertEqual(ClaudeProjectApproval.projects(claudeJSON: "nope"), [:])
+    }
+
+    /// Project settings count only in a trusted folder; a disabled name wins.
+    func testClaudeProjectApprovalSettingsFiles() {
+        let files = ["/p/.claude/settings.json": #"{"enableAllProjectMcpServers": true}"#,
+                     "/p/.claude/settings.local.json": #"{"disabledMcpjsonServers": ["bad"]}"#]
+        let untrusted = ClaudeProjectApproval.forFolder("/p", projects: [:], userSettings: nil, readFile: { files[$0] })
+        XCTAssertFalse(untrusted.allows("x"), "a repo cannot approve itself")
+        var trusted = ClaudeProjectApproval(); trusted.trusted = true
+        let approval = ClaudeProjectApproval.forFolder("/p", projects: [ConfigScanner.canonicalPath("/p"): trusted],
+                                                       userSettings: nil, readFile: { files[$0] })
+        XCTAssertTrue(approval.allows("x"))
+        XCTAssertFalse(approval.allows("bad"))
+        let user = ClaudeProjectApproval.forFolder("/q", projects: [:], userSettings: ["enabledMcpjsonServers": ["u"]],
+                                                   readFile: { _ in nil })
+        XCTAssertTrue(user.allows("u"), "the user's own settings count everywhere")
     }
 }

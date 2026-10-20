@@ -106,22 +106,6 @@ enum JSONConfigShape {
         return entries.contains(where: \.hasEndpoint) ? entries : nil
     }
 
-    /// Claude Code's per-project lists of `.mcp.json` servers switched off in
-    /// that project (`projects.<path>.disabledMcpjsonServers`), by folder.
-    static func disabledMcpjsonServers(_ text: String) -> [String: Set<String>] {
-        guard let data = text.data(using: .utf8),
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              let projects = root["projects"] as? [String: Any]
-        else { return [:] }
-        var result: [String: Set<String>] = [:]
-        for (path, value) in projects {
-            guard let names = (value as? [String: Any])?["disabledMcpjsonServers"] as? [String], !names.isEmpty
-            else { continue }
-            result[(path as NSString).standardizingPath] = Set(names)
-        }
-        return result
-    }
-
     private static func extract(_ dict: [String: Any], projectPath: String?) -> [DiscoveredEntry] {
         dict.compactMap { name, value in
             guard var entry = value as? [String: Any] else { return nil }

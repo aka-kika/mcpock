@@ -191,7 +191,7 @@ by the scan, with no code change.
 
 | Agent | Config file | Format |
 |-------|-------------|--------|
-| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds | JSON |
+| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds (only the servers you approved in Claude Code) | JSON |
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | JSON |
 | Cursor | `~/.cursor/mcp.json` | JSON |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | JSON |

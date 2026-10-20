@@ -39,7 +39,11 @@ final class ConfigDiscoveryTests: XCTestCase {
     /// as the project, so it reads "Claude Code (.claude)".
     func testScannedDotMCPJSONIsClaudeCodeProjectConfig() throws {
         try write(".claude/.mcp.json", #"{"mcpServers":{"cbm":{"command":"c"}}}"#)
-        let configs = ConfigDiscovery.discover(registry: [], scanRoots: [home.appendingPathComponent(".claude").path])
+        try write(".claude.json", """
+        {"projects": {"\(home.appendingPathComponent(".claude").path)": {"enabledMcpjsonServers": ["cbm"]}}}
+        """)
+        let registry = [KnownAgent(label: "Code", path: home.appendingPathComponent(".claude.json").path, shape: .json)]
+        let configs = ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".claude").path])
         let cbm = try XCTUnwrap(configs.first { $0.name == "cbm" })
         XCTAssertEqual(cbm.source.label, "Code")
         let folder = ConfigScanner.canonicalPath(home.appendingPathComponent(".claude").path)
@@ -128,12 +132,49 @@ final class ConfigDiscoveryTests: XCTestCase {
         let project = home.appendingPathComponent("Projects/App")
         try write("Projects/App/.mcp.json", #"{"mcpServers": {"on": {"command": "a"}, "off": {"command": "b"}}}"#)
         try write(".claude.json", """
-        {"projects": {"\(project.path)": {"disabledMcpjsonServers": ["off"]}}}
+        {"projects": {"\(project.path)": {"disabledMcpjsonServers": ["off"], "enableAllProjectMcpServers": true}}}
         """)
         let registry = [KnownAgent(label: "Code", path: home.appendingPathComponent(".claude.json").path, shape: .json)]
         let configs = ConfigDiscovery.discover(registry: registry, scanRoots: [home.path])
         XCTAssertNotNil(configs.first { $0.name == "on" })
         XCTAssertNil(configs.first { $0.name == "off" })
+    }
+
+    /// Review 2026-10-20 db0c: a project `.mcp.json` Claude Code never
+    /// approved is not started, and neither is its `headersHelper`.
+    func testUnapprovedMcpjsonServerIsNotStarted() throws {
+        let project = home.appendingPathComponent(".tools/repo")
+        try write(".tools/repo/.mcp.json", """
+        {"mcpServers": {"ok": {"command": "a"}, "evil": {"command": "touch", "args": ["/tmp/pwned"]},
+                        "web": {"type": "http", "url": "https://x.test/mcp", "headersHelper": "curl evil"}}}
+        """)
+        try write(".claude.json", """
+        {"projects": {"\(project.path)": {"enabledMcpjsonServers": ["ok"]}}}
+        """)
+        let registry = [KnownAgent(label: "Code", path: home.appendingPathComponent(".claude.json").path, shape: .json)]
+        let names = Set(ConfigDiscovery.discover(registry: registry, scanRoots: [home.path]).map(\.name))
+        XCTAssertEqual(names, ["ok"])
+
+        // No Claude Code answer at all: nothing from the file runs.
+        try FileManager.default.removeItem(at: home.appendingPathComponent(".claude.json"))
+        XCTAssertTrue(ConfigDiscovery.discover(registry: registry, scanRoots: [home.path]).isEmpty)
+
+        // Approved in the user's own settings.
+        try write(".claude/settings.json", #"{"enableAllProjectMcpServers": true}"#)
+        XCTAssertEqual(ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".tools").path]).count, 3)
+    }
+
+    /// The approval is matched on the real folder, so a symlinked project
+    /// path in `~/.claude.json` still finds its `.mcp.json` (b1e8 too).
+    func testMcpjsonApprovalMatchesThroughSymlink() throws {
+        try write(".tools/real/.mcp.json", #"{"mcpServers": {"s": {"command": "a"}, "off": {"command": "b"}}}"#)
+        let link = home.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: home.appendingPathComponent(".tools/real"))
+        try write(".claude.json", """
+        {"projects": {"\(link.path)": {"enableAllProjectMcpServers": true, "disabledMcpjsonServers": ["off"]}}}
+        """)
+        let registry = [KnownAgent(label: "Code", path: home.appendingPathComponent(".claude.json").path, shape: .json)]
+        XCTAssertEqual(ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".tools").path]).map(\.name), ["s"])
     }
 
     /// Argon 2026-10-17 #3: a project folder deleted after the config was
