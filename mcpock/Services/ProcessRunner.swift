@@ -275,7 +275,7 @@ final class ProcessRunner: @unchecked Sendable {
         setLive(false)
 
         // List the tree BEFORE closing stdin (1.9.0): a server that exits on
-        // stdin EOF gets reparented children that `pgrep -P` can no longer find
+        // stdin EOF gets reparented children that a parent-pid lookup can no longer find
         // from its PID. Each member keeps its start time, so a PID reused by an
         // unrelated process later is never signalled.
         let rootPIDBeforeClose = process.processIdentifier
@@ -285,7 +285,7 @@ final class ProcessRunner: @unchecked Sendable {
         try? stdinPipe.fileHandleForWriting.close()
 
         // Only signal while the root is still alive: once it exits and is reaped,
-        // its PID (and pgrep -P results for it) may describe an unrelated process.
+        // its PID (and its child list) may describe an unrelated process.
         // A root that already exited cannot have findable descendants either —
         // orphaned children are reparented away from it.
         let rootPID = process.processIdentifier
@@ -314,7 +314,7 @@ final class ProcessRunner: @unchecked Sendable {
         // Whatever outlived the root (it exited on its own, or its children
         // ignored SIGTERM): SIGTERM, a short wait, then SIGKILL. The process
         // group catches children a launcher left behind when it exited before
-        // teardown: reparented to launchd, `pgrep -P` can't find them, but they
+        // teardown: reparented to launchd, the parent-pid lookup can't find them, but they
         // keep the group (Argon 2026-10-16 #3). Killing them also ends the
         // stdout/stderr reader threads, which only stop at EOF.
         var survivors = Self.merged(tree, groupMembers(of: rootPIDBeforeClose))
@@ -391,10 +391,12 @@ final class ProcessRunner: @unchecked Sendable {
         }
     }
 
-    /// Depth-first SIG to all descendants, then the root.
+    /// SIG to all descendants (deepest first), then the root. One process-table
+    /// snapshot lists the tree, and a member is only signalled while its start
+    /// time still matches, so a reused PID is never hit (r3 a557).
     private func signalProcessTree(root: Int32, signal: Int32) {
-        for child in descendantPIDs(of: root) {
-            signalProcessTree(root: child, signal: signal)
+        for member in treeSnapshot(of: root) where member.isStillTheSameProcess {
+            kill(member.pid, signal)
         }
         kill(root, signal)
     }
@@ -411,16 +413,55 @@ final class ProcessRunner: @unchecked Sendable {
         }
     }
 
-    /// Every descendant of `root` (not the root itself), depth first.
+    /// Every descendant of `root` (not the root itself), children before
+    /// their parent, from one process-table snapshot.
     private func treeSnapshot(of root: Int32) -> [TreeMember] {
-        var members: [TreeMember] = []
-        for child in descendantPIDs(of: root) {
-            members += treeSnapshot(of: child)
-            if let started = Self.startTime(of: child) {
-                members.append(TreeMember(pid: child, started: started))
+        Self.descendants(of: root, in: Self.processTable()).map { TreeMember(pid: $0.pid, started: $0.started) }
+    }
+
+    /// One row of the kernel's process table.
+    struct ProcessEntry {
+        let pid: Int32
+        let parent: Int32
+        let started: timeval
+    }
+
+    /// Every live process (zombies left out) with its parent and start time,
+    /// in one `KERN_PROC_ALL` call instead of a `pgrep` per node (r3 a557).
+    static func processTable() -> [ProcessEntry] {
+        let stride = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        // The table can grow between the size query and the read: retry a few times.
+        for _ in 0..<4 {
+            var size = 0
+            guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0, size > 0 else { return [] }
+            var procs = [kinfo_proc](repeating: kinfo_proc(), count: size / stride + 32)
+            size = procs.count * stride
+            guard sysctl(&mib, u_int(mib.count), &procs, &size, nil, 0) == 0 else { continue }
+            return procs.prefix(size / stride).compactMap { info in
+                let pid = info.kp_proc.p_pid
+                guard pid > 0, info.kp_proc.p_stat != SZOMB else { return nil }
+                return ProcessEntry(pid: pid, parent: info.kp_eproc.e_ppid, started: info.kp_proc.p_un.__p_starttime)
             }
         }
-        return members
+        return []
+    }
+
+    /// The descendants of `root` in `table`, deepest first. Pure, so a test
+    /// can feed it a table; the visited set makes a loop in odd data harmless.
+    static func descendants(of root: Int32, in table: [ProcessEntry]) -> [(pid: Int32, started: timeval)] {
+        var children: [Int32: [ProcessEntry]] = [:]
+        for entry in table where entry.pid != entry.parent { children[entry.parent, default: []].append(entry) }
+        var seen: Set<Int32> = [root]
+        var out: [(pid: Int32, started: timeval)] = []
+        func walk(_ pid: Int32) {
+            for child in children[pid] ?? [] where seen.insert(child.pid).inserted {
+                walk(child.pid)
+                out.append((child.pid, child.started))
+            }
+        }
+        walk(root)
+        return out
     }
 
     /// The live members of process group `pgid` that started no earlier than
@@ -463,28 +504,6 @@ final class ProcessRunner: @unchecked Sendable {
         // A zombie still has a start time but is already dead.
         if info.kp_proc.p_stat == SZOMB { return nil }
         return info.kp_proc.p_un.__p_starttime
-    }
-
-    private func descendantPIDs(of pid: Int32) -> [Int32] {
-        // Use sysctl-free pgrep for simplicity and reliability on macOS.
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-P", "\(pid)"]
-        let out = Pipe()
-        task.standardOutput = out
-        task.standardError = Pipe()
-        do {
-            try task.run()
-            task.waitUntilExit()
-        } catch {
-            return []
-        }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        guard let text = String(data: data, encoding: .utf8) else { return [] }
-        return text
-            .split(whereSeparator: \.isNewline)
-            .compactMap { Int32($0) }
-            .filter { $0 > 0 }
     }
 
     var terminationStatus: Int32 {
