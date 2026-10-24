@@ -170,7 +170,8 @@ enum ConfigDiscovery {
         idPrefix: String
     ) -> ServerConfig? {
         let typeString = (entry["type"] as? String)?.lowercased()
-        let urlString = entry["url"] as? String
+        // Antigravity and Windsurf write a remote server's address as `serverUrl` (1.12).
+        let urlString = (entry["url"] as? String) ?? (entry["serverUrl"] as? String)
         // A command given as a list (["npx", "pkg"]) runs its first word with
         // the rest in front of `args`, as the agents that accept it do (r3 e412).
         let listed = (entry["command"] as? [String])?.filter { !$0.isEmpty }

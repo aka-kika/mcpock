@@ -275,8 +275,12 @@ enum ConnectSnippets {
             let files = (paths[label] ?? []).joined(separator: " or ")
             return "- \(name): \(files) (\(formatNote(label: label, shape: shapes[label])))"
         }
-        let settingsLines = appSettings.map {
-            "- \(AgentBadge.displayLabel($0)): no file; add \(serverName) in its own MCP settings"
+        let settingsLines = appSettings.map { label -> String in
+            // Grok Bot's servers run in xAI's cloud, where mcpock's helper can't (1.12).
+            if let cloud = AgentRegistry.cloudHosts[label] {
+                return "- \(AgentBadge.displayLabel(label)): skip it; its servers run in \(cloud), not on this Mac"
+            }
+            return "- \(AgentBadge.displayLabel(label)): no file; add \(serverName) in its own MCP settings"
         }
         return lines + settingsLines + ["- aka: no file; it keeps its servers in its own settings"]
     }

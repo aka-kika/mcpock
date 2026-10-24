@@ -183,9 +183,12 @@ enum AgentSections {
             let waits = sources.contains(where: \.awaitingFileOK)
                 && !sources.contains { $0.state == .paused && !$0.awaitingFileOK }
             note = waits ? ShortReason.waitingNote : nil
-        case .unknown, .selfManaged:
+        case .unknown:
             rank = nil
             note = nil
+        case .selfManaged:
+            rank = nil
+            note = AgentRegistry.cloudHost(forAgents: [agent]).map { "Runs in \($0)" }
         case .needsApp:
             rank = nil
             note = group.needsAppName.map { "Needs \($0) open" }

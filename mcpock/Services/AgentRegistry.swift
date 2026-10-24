@@ -26,6 +26,20 @@ enum AgentRegistry {
     /// (`AgentBadge.displayNames`).
     static let claudeCodeLabel = "Code"
 
+    static let grokBotLabel = "Grok Bot"
+
+    /// Agents whose servers run on their maker's computers, not this Mac:
+    /// label -> where (1.12). Their rows are listed, never started.
+    static let cloudHosts: [String: String] = [grokBotLabel: "xAI's cloud"]
+
+    /// Where the servers of a row's agents run, when every one of them is a
+    /// cloud agent; nil when any runs on this Mac.
+    static func cloudHost(forAgents agents: [String]) -> String? {
+        let hosts = Set(agents.map { cloudHosts[AgentBadge.agentName(fromLabel: $0)] })
+        guard hosts.count == 1, let host = hosts.first else { return nil }
+        return host
+    }
+
     static var known: [KnownAgent] {
         [
             KnownAgent(label: claudeCodeLabel, path: home(".claude.json"), shape: .json),
@@ -46,6 +60,12 @@ enum AgentRegistry {
             KnownAgent(label: "Hermes", path: home(".hermes/config.yaml"), shape: .mcpServersYAML),
             KnownAgent(label: "Kimi Code", path: home(".kimi-code/mcp.json"), shape: .json),
             KnownAgent(label: "OpenCode", path: home(".config/opencode/opencode.json"), shape: .json),
+            // 1.12: Antigravity's own file (antigravity.google/docs/mcp and
+            // developers.google.com/workspace/guides/configure-mcp-servers).
+            KnownAgent(label: "Antigravity", path: home(".gemini/config/mcp_config.json"), shape: .json),
+            // 1.12: Grok Bot lists its servers in its settings; they run in xAI's
+            // cloud, so they are listed and never started (`GrokBotConfig`).
+            KnownAgent(label: grokBotLabel, path: home(".grokbot/settings.json"), shape: .grokBotSettings),
             // 1.10.1: Tinycast keeps its servers in its own preferences.
             KnownAgent(label: "Tinycast", path: home("Library/Preferences/com.tinycast.app.plist"),
                        shape: .tinycastDefaults),
@@ -169,6 +189,8 @@ struct AgentBadge: Hashable, Sendable {
         "Windsurf": "Ws",
         "VS Code": "VS",
         "Tinycast": "Tc",
+        "Antigravity": "Ag",
+        "Grok Bot": "GB",
     ]
 
     /// Badge for any source label: a registry label ("Cursor"), a scanned one

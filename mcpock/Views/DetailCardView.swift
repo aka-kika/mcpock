@@ -160,6 +160,9 @@ struct DetailCardView: View {
             return CardText.awaitingFileNote(for: group)
                 ?? "Paused. mcpock won't launch this server until you resume it (right-click the row)."
         case .selfManaged:
+            if let cloud = AgentRegistry.cloudHost(forAgents: group.agents) {
+                return CardText.cloudNote(agents: group.agents, cloud: cloud)
+            }
             let host = CardText.list(group.agents.map(AgentBadge.displayLabel))
             return "Built into \(host). It runs inside that app, so mcpock doesn't check it."
         case .unknown:

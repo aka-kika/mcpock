@@ -26,6 +26,12 @@ enum CardText {
         return parts.joined(separator: " \u{00B7} ")
     }
 
+    /// A row whose agents run their servers in the cloud (Grok Bot, 1.12).
+    static func cloudNote(agents: [String], cloud: String) -> String {
+        let host = list(agents.map(AgentBadge.displayLabel))
+        return "Runs in \(cloud) for \(host), not on this Mac, so mcpock lists it and doesn't check it."
+    }
+
     /// "Slow to start (over 20 s)": the first try timed out, the retry answered.
     /// N is how long the first try waited (the limit), because that is the cold
     /// start she may want to know about; the retry is usually quicker. Nil when

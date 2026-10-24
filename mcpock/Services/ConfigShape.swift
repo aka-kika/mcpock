@@ -17,6 +17,7 @@ struct DiscoveredEntry {
     var hasEndpoint: Bool {
         (entry["command"] as? String)?.isEmpty == false
             || (entry["url"] as? String)?.isEmpty == false
+            || (entry["serverUrl"] as? String)?.isEmpty == false
     }
 }
 
@@ -47,6 +48,11 @@ struct ConfigShape {
     /// Tinycast (1.10.1): its MCP servers live in its preferences plist.
     static let tinycastDefaults = ConfigShape(id: "tinycast-defaults", parse: { _ in nil }) {
         TinycastConfig.parse($0)
+    }
+
+    /// Grok Bot (1.12): the names in its settings' `mcpBoxServers`.
+    static let grokBotSettings = ConfigShape(id: "grokbot-settings", parse: { _ in nil }) {
+        GrokBotConfig.parse($0)
     }
 
     /// Order matters only for scan detection (first non-nil wins); JSON is cheapest.
@@ -174,6 +180,25 @@ enum JSONC {
         var view = String.UnicodeScalarView()
         view.append(contentsOf: out)
         return String(view)
+    }
+}
+
+/// Grok Bot (xAI's desktop app) keeps its MCP servers in the xAI account, and
+/// they run there: HTTP servers on xAI's backend, stdio ones on "Grok Bot's
+/// computer", a cloud sandbox (its own app code, 0.75.5). On this Mac its
+/// `~/.grokbot/settings.json` holds only `mcpBoxServers`, a list of names.
+/// Each becomes a row marked `builtin` with no command, so mcpock lists it
+/// and never starts or calls it; the row says where it runs.
+enum GrokBotConfig {
+    static func parse(_ data: Data) -> [DiscoveredEntry]? {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let names = root["mcpBoxServers"] as? [Any] else { return nil }
+        var seen = Set<String>()
+        let entries = names.compactMap { $0 as? String }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+            .map { DiscoveredEntry(name: $0, entry: ["builtin": true]) }
+        return entries.isEmpty ? nil : entries
     }
 }
 
