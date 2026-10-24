@@ -25,11 +25,11 @@ enum ConfigDiscovery {
         // 1. Registry: exact paths with friendly labels.
         for agent in registry {
             let canonical = ConfigScanner.canonicalPath(agent.path)
-            let parsed: [DiscoveredEntry]?
-            if let parseData = agent.shape.parseData {
-                parsed = (try? Data(contentsOf: URL(fileURLWithPath: agent.path))).flatMap(parseData)
-            } else {
-                parsed = (try? String(contentsOfFile: agent.path, encoding: .utf8)).flatMap(agent.shape.parse)
+            let parsed: [DiscoveredEntry]? = ParsedFileCache.value(path: agent.path, kind: "registry") {
+                if let parseData = agent.shape.parseData {
+                    return (try? Data(contentsOf: URL(fileURLWithPath: agent.path))).flatMap(parseData)
+                }
+                return (try? String(contentsOfFile: agent.path, encoding: .utf8)).flatMap(agent.shape.parse)
             }
             guard let parsed else { continue }
             let entries = droppingStaleProjects(parsed, folderExists: folderExists)
@@ -41,9 +41,11 @@ enum ConfigDiscovery {
         // A project's `.mcp.json` servers run only when Claude Code was told to
         // run them there (review 2026-10-20 db0c; off ones: Argon 2026-10-17 #8).
         let claudeJSON = registry.first { $0.label == AgentRegistry.claudeCodeLabel }?.path
-        let approvals = claudeJSON
-            .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
-            .map { ClaudeProjectApproval.projects(claudeJSON: $0) } ?? [:]
+        let approvals = claudeJSON.flatMap { path in
+            ParsedFileCache.value(path: path, kind: "approvals") {
+                (try? String(contentsOfFile: path, encoding: .utf8)).map { ClaudeProjectApproval.projects(claudeJSON: $0) }
+            }
+        } ?? [:]
         let userSettings = claudeJSON
             .map { (($0 as NSString).deletingLastPathComponent as NSString).appendingPathComponent(".claude/settings.json") }
             .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
@@ -235,5 +237,43 @@ enum ConfigDiscovery {
             }
         }
         return result
+    }
+}
+
+/// Parsed config files, kept until the file changes (r3 d40b): the
+/// multi-MB `~/.claude.json` was read and parsed twice every round. Keyed
+/// by path and kind; a file's modification time, size and inode say
+/// whether it changed. A file over `maxBytes` is not read at all.
+enum ParsedFileCache {
+    static let maxBytes = 64 * 1024 * 1024
+
+    private struct Stamp: Equatable {
+        let modified: Date
+        let size: Int
+        let inode: Int
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var entries: [String: (stamp: Stamp, value: Any?)] = [:]
+
+    static func value<T>(path: String, kind: String, _ make: () -> T?) -> T? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attributes[.size] as? Int, size <= maxBytes else { return nil }
+        let stamp = Stamp(modified: attributes[.modificationDate] as? Date ?? .distantPast, size: size,
+                          inode: attributes[.systemFileNumber] as? Int ?? 0)
+        let key = kind + "\u{1F}" + path
+        lock.lock()
+        let hit = entries[key]
+        lock.unlock()
+        if let hit, hit.stamp == stamp, let value = hit.value as? T? { return value }
+        let value = make()
+        lock.lock()
+        entries[key] = (stamp, value)
+        lock.unlock()
+        return value
+    }
+
+    static func removeAll() {
+        lock.lock(); entries.removeAll(); lock.unlock()
     }
 }

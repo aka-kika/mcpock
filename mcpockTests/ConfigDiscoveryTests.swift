@@ -233,6 +233,24 @@ final class ScanOnlyFileTests: XCTestCase {
         XCTAssertEqual(allowed.map(\.state), [.unknown], "an allowed file starts over and is checked")
     }
 
+    /// r3 d40b: a config file is parsed again only once it changed.
+    func testParsedFilesAreCachedUntilTheyChange() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-cache-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try "one".write(to: url, atomically: true, encoding: .utf8)
+        var made = 0
+        func read() -> String? {
+            ParsedFileCache.value(path: url.path, kind: "test") { made += 1; return try? String(contentsOf: url, encoding: .utf8) }
+        }
+        XCTAssertEqual(read(), "one")
+        XCTAssertEqual(read(), "one")
+        XCTAssertEqual(made, 1)
+        try "two!".write(to: url, atomically: true, encoding: .utf8)
+        XCTAssertEqual(read(), "two!")
+        XCTAssertEqual(made, 2)
+        XCTAssertNil(ParsedFileCache.value(path: "/no/such/file", kind: "test") { "x" })
+    }
+
     /// r3 e46f: an allowed scan-only file whose command changes later (an
     /// edit, a git pull) is paused again until she allows it again.
     @MainActor
