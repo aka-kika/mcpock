@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Security
 
 /// aka (a desktop agent app, round 5) keeps its MCP servers in its own database,
 /// not in a config file. Its local sidecar lists them read-only at
@@ -193,23 +194,37 @@ enum AkaListener {
     /// Pure core: at least one listener, all of them the user's and aka.
     static func isAka(
         _ processes: [Process], uid: uid_t,
-        readFile: (String) -> Data? = { FileManager.default.contents(atPath: $0) }
+        readFile: (String) -> Data? = { FileManager.default.contents(atPath: $0) },
+        signingID: (String) -> String? = AkaListener.validSigningIdentifier
     ) -> Bool {
         !processes.isEmpty && processes.allSatisfy { process in
             process.uid == uid
-                && (isInsideAkaApp(process.executable, readFile: readFile)
+                && (isInsideAkaApp(process.executable, signingID: signingID)
                     || isAkaCheckout(process.workingDirectory, readFile: readFile))
         }
     }
 
-    /// The executable sits inside an `.app` whose bundle id is aka's.
-    static func isInsideAkaApp(_ executable: String?, readFile: (String) -> Data?) -> Bool {
+    /// The executable sits inside an `.app` validly signed as aka's bundle
+    /// id. An Info.plist alone can say anything (r3 f19a).
+    static func isInsideAkaApp(_ executable: String?, signingID: (String) -> String?) -> Bool {
         guard let executable, let range = executable.range(of: ".app/Contents/") else { return false }
-        let plist = String(executable[..<range.lowerBound]) + ".app/Contents/Info.plist"
-        guard let data = readFile(plist),
-              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-        else { return false }
-        return info["CFBundleIdentifier"] as? String == bundleID
+        return signingID(String(executable[..<range.lowerBound]) + ".app") == bundleID
+    }
+
+    /// The signing identifier of an app whose signature checks out against
+    /// Apple's roots, or nil (unsigned, ad hoc, tampered).
+    static func validSigningIdentifier(_ appPath: String) -> String? {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: appPath) as CFURL, [], &code) == errSecSuccess,
+              let code else { return nil }
+        var requirement: SecRequirement?
+        guard SecRequirementCreateWithString("anchor apple generic" as CFString, [], &requirement) == errSecSuccess,
+              SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures), requirement)
+                == errSecSuccess else { return nil }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(code, [], &info) == errSecSuccess,
+              let dict = info as? [String: Any] else { return nil }
+        return dict[kSecCodeInfoIdentifier as String] as? String
     }
 
     /// The working directory is aka's source folder.

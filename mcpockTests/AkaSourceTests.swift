@@ -153,12 +153,20 @@ final class AkaSourceTests: XCTestCase {
             "/src/other/package.json": Data(#"{"name": "evil"}"#.utf8),
         ]
         let read: (String) -> Data? = { files[$0] }
-        func trusted(_ list: [AkaListener.Process]) -> Bool { AkaListener.isAka(list, uid: 501, readFile: read) }
+        // r3 f19a: the app is trusted by its signature, not its Info.plist.
+        let signed: (String) -> String? = { $0 == "/Applications/Aka.app" ? "ai.pipali" : nil }
+        func trusted(_ list: [AkaListener.Process]) -> Bool {
+            AkaListener.isAka(list, uid: 501, readFile: read, signingID: signed)
+        }
         let app = AkaListener.Process(uid: 501, executable: "/Applications/Aka.app/Contents/MacOS/bun", workingDirectory: "/")
         let source = AkaListener.Process(uid: 501, executable: "/Users/k/.bun/bin/bun", workingDirectory: "/src/aka")
         XCTAssertTrue(trusted([app]))
         XCTAssertTrue(trusted([source]))
         XCTAssertFalse(trusted([]), "nothing listening")
+        XCTAssertFalse(trusted([.init(uid: 501, executable: "/tmp/Fake.app/Contents/MacOS/bun", workingDirectory: "/")]),
+                       "an unsigned app that only claims aka's bundle id")
+        XCTAssertEqual(AkaListener.validSigningIdentifier("/System/Applications/Calculator.app"), "com.apple.calculator")
+        XCTAssertNil(AkaListener.validSigningIdentifier("/tmp/no-such.app"))
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/usr/bin/python3", workingDirectory: "/tmp")]))
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/Applications/Other.app/Contents/MacOS/x", workingDirectory: "/")]))
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/x/bun", workingDirectory: "/src/other")]))
