@@ -530,10 +530,27 @@ final class ProcessRunner: @unchecked Sendable {
     static let stderrHeadCap = 512 * 1024
     static let stderrTailCap = 512 * 1024
 
-    /// The last few non-empty stderr lines, joined — for surfacing why a probe failed.
-    func stderrTail(maxLines: Int = 2, maxLength: Int = 240) -> String {
-        let tail = Self.nonEmptyLines(stderrString).suffix(maxLines).joined(separator: " ")
-        return Self.truncate(tail, maxLength: maxLength)
+    /// The last few meaningful stderr lines, joined — for surfacing why a probe
+    /// failed. Lines that are only punctuation (the `}` ending an error
+    /// object), `at ...` stack frames and Node's version banner are left out
+    /// (r3 0bb0); `raw: true` keeps them.
+    func stderrTail(maxLines: Int = 2, maxLength: Int = 240, raw: Bool = false) -> String {
+        let lines = Self.nonEmptyLines(stderrString)
+        let kept = raw ? lines : lines.filter { !Self.isStderrNoise($0) }
+        return Self.truncate(kept.suffix(maxLines).joined(separator: " "), maxLength: maxLength)
+    }
+
+    private static let nodeBannerRegex = try! NSRegularExpression(pattern: #"^Node\.js v\d"#)
+    private static let stackFrameRegex = try! NSRegularExpression(pattern: #"^at\s"#)
+
+    /// A stderr line that says nothing on its own: only punctuation or
+    /// symbols, a `at ...` stack frame, or a `Node.js v22.1.0` banner.
+    static func isStderrNoise(_ line: String) -> Bool {
+        let range = NSRange(line.startIndex..., in: line)
+        return line.unicodeScalars.allSatisfy { CharacterSet.punctuationCharacters.contains($0)
+                || CharacterSet.symbols.contains($0) || CharacterSet.whitespaces.contains($0) }
+            || stackFrameRegex.firstMatch(in: line, range: range) != nil
+            || nodeBannerRegex.firstMatch(in: line, range: range) != nil
     }
 
     /// A line that looks like the start of the real error: a `SomethingError:`
@@ -564,7 +581,10 @@ final class ProcessRunner: @unchecked Sendable {
     /// Python traceback's cause is at the bottom, so it's already there).
     func stderrReason(maxTailLines: Int = 2, maxLength: Int = 240) -> String {
         let tail = stderrTail(maxLines: maxTailLines, maxLength: maxLength)
-        guard let first = firstErrorLine(maxLength: maxLength), !tail.contains(first) else {
+        let firstLine = firstErrorLine(maxLength: maxLength)
+        // Nothing but noise: show it rather than an empty reason.
+        if tail.isEmpty, firstLine == nil { return stderrTail(maxLines: maxTailLines, maxLength: maxLength, raw: true) }
+        guard let first = firstLine, !tail.contains(first) else {
             return tail
         }
         return tail.isEmpty ? first : "\(first) — \(tail)"
