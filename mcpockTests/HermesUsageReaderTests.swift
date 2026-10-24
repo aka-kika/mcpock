@@ -184,6 +184,16 @@ final class HermesUsageReaderTests: XCTestCase {
         XCTAssertEqual(next.values["main"], 2)
     }
 
+    /// r3 df08: a path with a space, `#`, `?` and `%` still opens (the file:
+    /// URI is percent-encoded).
+    func testHomePathWithURISpecialCharactersIsRead() throws {
+        let odd = home.appendingPathComponent("a b#c?d%e").path
+        try makeStateDB(at: odd + "/state.db", rows: [Row(toolName: "mcp_reed_note_save")])
+        let result = HermesUsageReader(hermesHome: odd).read(since: .empty, knownServers: [])
+        XCTAssertEqual(result.events.map(\.server), ["reed"])
+        XCTAssertEqual(result.cursor.values["main"], 1)
+    }
+
     func testBadLineIsSkipped() throws {
         try makeStateDB(at: home.appendingPathComponent("state.db").path, rows: [
             Row(toolName: "mcp_", timestamp: 1_780_000_000),
