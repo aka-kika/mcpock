@@ -82,7 +82,9 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertLessThan(firecrawl.lowerBound, figma.lowerBound)
         XCTAssertLessThan(figma.lowerBound, wake.lowerBound)
         XCTAssertTrue(text.contains("- /Users/k/.cursor/mcp.json"))
-        XCTAssertTrue(text.contains("error: Non-zero exit (1) — Invalid key ••••"))
+        XCTAssertTrue(text.contains("error:\n"))
+        XCTAssertTrue(text.contains("\(StatusReport.untrustedIntro)\n"), "server output is fenced as untrusted (r3 42bd)")
+        XCTAssertTrue(text.contains("Non-zero exit (1) — Invalid key ••••"))
         XCTAssertTrue(text.contains("Set up differently: Grok points at a different command than Cursor."))
         XCTAssertTrue(text.contains("runs: /opt/old/wake-mcp"))
         XCTAssertFalse(text.contains("tinycast"), "fine servers are left out")
@@ -96,6 +98,18 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(text.contains("- broken: 2"))
         XCTAssertTrue(text.contains("- needs sign-in: 1"))
         XCTAssertTrue(text.contains("3 need attention: call mcpock_problems"))
+    }
+
+    /// r3 be34: a server with hundreds of tools does not flood the answer.
+    func testToolNamesAreCapped() {
+        let few = (1...3).map { "t\($0)" }
+        XCTAssertEqual(StatusReport.toolNames(few), "t1, t2, t3")
+        let exact = (1...40).map { "t\($0)" }
+        XCTAssertFalse(StatusReport.toolNames(exact).contains("more"))
+        let many = (1...100).map { "t\($0)" }
+        let text = StatusReport.toolNames(many)
+        XCTAssertTrue(text.hasSuffix("t40, and 60 more"), text)
+        XCTAssertFalse(text.contains("t41"))
     }
 
     func testServerDetailsMatchLooselyAndListEverything() throws {
@@ -234,6 +248,39 @@ final class MCPStatusServerTests: XCTestCase {
         let oldVersion = try reply(s, #"{"jsonrpc":"2.0","id":6,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}"#)
         XCTAssertEqual((oldVersion["result"] as? [String: Any])?["protocolVersion"] as? String,
                        MCPStatusServer.supportedVersions[0])
+    }
+
+    // MARK: - Stdin reading with a size cap (r3 b1c9)
+
+    func testReaderSplitsLinesAcrossPieces() {
+        var reader = StdinLineReader()
+        XCTAssertEqual(reader.feed(Data("ab".utf8)), [])
+        XCTAssertEqual(reader.feed(Data("c\nde\nf".utf8)), [.line("abc"), .line("de")])
+        XCTAssertEqual(reader.finish(), .line("f"))
+        XCTAssertNil(reader.finish())
+    }
+
+    func testReaderAnswersATooLongMessageOnceAndKeepsServing() {
+        var reader = StdinLineReader(maxBytes: 8)
+        // Over the cap across several pieces, then a good line.
+        var events = reader.feed(Data("123456".utf8))
+        events += reader.feed(Data("789012".utf8))
+        events += reader.feed(Data("3456\nok\n".utf8))
+        XCTAssertEqual(events, [.tooLong, .line("ok")])
+        // Over the cap inside one piece that also holds a newline.
+        XCTAssertEqual(reader.feed(Data("0123456789\nnext\n".utf8)), [.tooLong, .line("next")])
+        // Exactly at the cap is fine.
+        XCTAssertEqual(reader.feed(Data("12345678\n".utf8)), [.line("12345678")])
+        // A too-long tail with no newline at the end of input says nothing more.
+        _ = reader.feed(Data("123456789".utf8))
+        XCTAssertNil(reader.finish())
+    }
+
+    func testTooLongReplyIsInvalidRequest() throws {
+        let s = server(at: try fixtureFile())
+        let object = try MCPJSONRPC.parseJSONObject(Data(s.tooLongReply().utf8))
+        XCTAssertEqual((object["error"] as? [String: Any])?["code"] as? Int, -32600)
+        XCTAssertTrue(object["id"] is NSNull)
     }
 
     // MARK: - The real helper, end to end

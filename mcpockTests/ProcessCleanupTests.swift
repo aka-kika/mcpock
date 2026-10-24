@@ -174,6 +174,9 @@ final class ProcessCleanupTests: XCTestCase {
             env: [:]
         )
         let pid = runner.processIdentifier
+        // Let the shell install its trap first: the tree walk is now one fast
+        // table read, so SIGTERM could land before `trap` ran (r3 a557).
+        try await Task.sleep(for: .milliseconds(300))
         let clock = ContinuousClock()
         let start = clock.now
         let task = Task {

@@ -125,7 +125,7 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(status.schema, MCPockStatus.currentSchema)
         XCTAssertEqual(status.pid, 4242)
         XCTAssertEqual(status.checkEverySeconds, 900)
-        XCTAssertEqual(status.counts.total, 5)
+        XCTAssertEqual(status.counts.total, 4, "the shown rows only: the hidden one is in `hidden` (r3 09ec)")
         XCTAssertEqual(status.counts.broken, 2, "the broken hidden one is back, so it counts")
         XCTAssertEqual(status.counts.needsSignIn, 1)
         XCTAssertEqual(status.counts.differs, 1)
@@ -152,6 +152,52 @@ final class StatusSnapshotTests: XCTestCase {
         let markdown = try String(contentsOf: dir.appendingPathComponent("status.md"), encoding: .utf8)
         XCTAssertTrue(markdown.hasPrefix("# mcpock status"))
         XCTAssertTrue(markdown.contains("firecrawl — broken"))
+    }
+
+    /// r3 247f: files 0600 in a 0700 folder, and a wider existing folder is fixed.
+    func testFilesAreOwnerOnlyAndAnOpenFolderIsTightened() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-mode-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
+        try StatusWriter.write(build(), to: dir)
+        try StatusWriter.writePrivate(Data("{}".utf8), to: dir.appendingPathComponent("usage.json"))
+        func mode(_ url: URL) throws -> Int {
+            (try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1
+        }
+        XCTAssertEqual(try mode(dir), 0o700)
+        for name in ["status.json", "status.md", "usage.json"] {
+            XCTAssertEqual(try mode(dir.appendingPathComponent(name)), 0o600, name)
+        }
+    }
+
+    /// r3 09ec: a snapshot older than one already written never lands after it.
+    func testWriteOrderSkipsAnOlderSnapshot() {
+        let order = StatusWriter.WriteOrder()
+        XCTAssertTrue(order.claim(1))
+        XCTAssertTrue(order.claim(3))
+        XCTAssertFalse(order.claim(2), "2 is older than the 3 already written")
+        XCTAssertFalse(order.claim(3))
+        XCTAssertTrue(order.claim(4))
+    }
+
+    /// Two quick schedules leave the newest state on disk.
+    @MainActor
+    func testTwoSchedulesLeaveTheNewestOnDisk() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-order-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let writer = StatusWriter(directory: dir)
+        var written = 0
+        writer.onWrite = { _ in written += 1 }
+        var first = build()
+        first.pid = 1
+        writer.schedule { first }
+        for _ in 0..<100 where written < 1 { try await Task.sleep(for: .milliseconds(30)) }
+        var second = build()
+        second.pid = 2
+        writer.schedule { second }
+        for _ in 0..<100 where written < 2 { try await Task.sleep(for: .milliseconds(30)) }
+        guard case .loaded(let read) = StatusLoad.read(from: writer.statusURL) else { return XCTFail("status.json should read back") }
+        XCTAssertEqual(read.pid, 2)
     }
 
     func testTestMonitorHasNoWriter() {

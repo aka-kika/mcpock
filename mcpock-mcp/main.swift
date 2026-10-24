@@ -27,7 +27,24 @@ if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-
 let server = MCPStatusServer(loadStatus: { StatusLoad.read(from: statusURL) })
 let output = FileHandle.standardOutput
 
-while let line = readLine(strippingNewline: true) {
-    guard let reply = server.handle(line: line) else { continue }
-    output.write(Data((reply + "\n").utf8))
+// Read in pieces and cap a message at 1 MB: `readLine` would grow without limit
+// on a client that never sends a newline (r3 b1c9). A too-long message gets
+// -32600 and the server keeps serving.
+var reader = StdinLineReader()
+let input = FileHandle.standardInput
+
+func answer(_ event: StdinLineReader.Event) {
+    let reply: String?
+    switch event {
+    case .line(let line): reply = server.handle(line: line)
+    case .tooLong: reply = server.tooLongReply()
+    }
+    if let reply { output.write(Data((reply + "\n").utf8)) }
 }
+
+while true {
+    let chunk = input.availableData
+    if chunk.isEmpty { break }
+    reader.feed(chunk).forEach(answer)
+}
+if let last = reader.finish() { answer(last) }

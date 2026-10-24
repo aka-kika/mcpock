@@ -37,11 +37,39 @@ final class StderrReasonTests: XCTestCase {
 
         XCTAssertTrue(reason.contains("Error: Could not locate the bindings file"),
                       "Expected the real cause up front, got: \(reason)")
-        XCTAssertTrue(reason.contains("frame12"), "Expected the tail's last frame too, got: \(reason)")
+        XCTAssertFalse(reason.contains("frame12"), "Stack frames are left out of the reason (r3 0bb0), got: \(reason)")
         XCTAssertEqual(
             reason.components(separatedBy: "Error: Could not locate the bindings file").count - 1, 1,
             "The cause line must not be duplicated, got: \(reason)"
         )
+    }
+
+    /// r3 0bb0: braces, `at ...` frames and the Node banner never reach the card.
+    func testNoiseLinesAreLeftOutOfTheReason() async throws {
+        let script = """
+        echo 'Error: listen EADDRINUSE: address already in use :::3000' >&2
+        echo '    at Server.setupListenHandle (node:net:1817:16)' >&2
+        echo '  code: EADDRINUSE' >&2
+        echo '}' >&2
+        echo '' >&2
+        echo 'Node.js v22.1.0' >&2
+        exit 1
+        """
+        let result = await probe(script: script, name: "noise-crash")
+        let reason = result.failureReason ?? ""
+        XCTAssertTrue(reason.contains("code: EADDRINUSE"), "got: \(reason)")
+        XCTAssertFalse(reason.contains("Node.js v22"), "got: \(reason)")
+        XCTAssertFalse(reason.contains("    at ") || reason.contains("at Server"), "got: \(reason)")
+        XCTAssertFalse(reason.hasSuffix("}"), "got: \(reason)")
+    }
+
+    func testIsStderrNoise() {
+        for noise in ["}", "});", "  ]", "at async main (/x/index.js:1:1)", "Node.js v22.1.0"] {
+            XCTAssertTrue(ProcessRunner.isStderrNoise(noise), noise)
+        }
+        for line in ["Error: bad", "attempt failed", "Node.js is missing", "code: 1"] {
+            XCTAssertFalse(ProcessRunner.isStderrNoise(line), line)
+        }
     }
 
     /// A Python traceback puts its cause at the *bottom* — already inside the
