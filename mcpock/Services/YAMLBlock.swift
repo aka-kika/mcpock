@@ -658,10 +658,19 @@ private struct FlowReader {
 
     private let chars: [Character]
     private var i = 0
+    /// How many collections deep the read is: each `[` or `{` is one
+    /// recursion, so a file of thousands of `[[[[` would overflow the scan
+    /// thread's stack and crash mcpock at every launch (r3 eee1). Past
+    /// `maxDepth` the whole flow value is unreadable, like any malformed one.
+    private var depth = 0
+    static let maxDepth = 64
 
     init(_ chars: [Character]) { self.chars = chars }
 
     mutating func value() -> Node? {
+        depth += 1
+        defer { depth -= 1 }
+        guard depth <= Self.maxDepth else { return nil }
         skipSpace()
         skipProperties()
         guard i < chars.count else { return nil }

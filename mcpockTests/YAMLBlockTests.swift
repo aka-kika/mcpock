@@ -360,4 +360,24 @@ final class YAMLBlockTests: XCTestCase {
         thread.start()
         XCTAssertEqual(done.wait(timeout: .now() + 10), .success)
     }
+
+    /// r3 eee1: the flow reader recursed once per `[` or `{` with no cap, so a
+    /// small file of nested brackets crashed mcpock at every launch.
+    func testDeepFlowNestingDoesNotOverflowTheStack() {
+        let brackets = "mcp_servers:\n  x:\n    args: " + String(repeating: "[", count: 20_000)
+            + String(repeating: "]", count: 20_000) + "\n"
+        let braces = "mcp_servers:\n  x:\n    env: " + String(repeating: "{a: ", count: 20_000)
+            + "1" + String(repeating: "}", count: 20_000) + "\n"
+        let done = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            _ = YAMLBlock.parse(brackets)
+            _ = YAMLBlock.parse(braces)
+            done.signal()
+        }
+        thread.stackSize = 512 * 1024
+        thread.start()
+        XCTAssertEqual(done.wait(timeout: .now() + 10), .success)
+        let shallow = "a: " + String(repeating: "[", count: 10) + "x" + String(repeating: "]", count: 10) + "\n"
+        XCTAssertNotNil(YAMLBlock.parse(shallow)?["a"], "ordinary nesting still reads")
+    }
 }
