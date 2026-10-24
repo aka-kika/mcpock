@@ -135,7 +135,7 @@ final class SSEProbeTests: XCTestCase {
             with: "body = json.dumps(msg, indent=1).encode().replace(b'\\n', b'\\ndata: '); self.wfile.write(b'event: message\\ndata: ' + body + b'\\n\\n'); self.wfile.flush()")
         XCTAssertNotEqual(split, many)
         let (server, port) = try startMock(split)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let started = ContinuousClock.now
         let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!, headers: [:], fetchTools: true)
         XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
@@ -172,7 +172,7 @@ final class SSEProbeTests: XCTestCase {
             with: "b'event: endpoint\\ndata: http://127.0.0.1:%d/messages?session=s1\\n\\n' % httpd.server_address[1]")
         XCTAssertNotEqual(alias, mock)
         let (aliasServer, aliasPort) = try startMock(alias)
-        defer { aliasServer.terminate(); aliasServer.waitUntilExit() }
+        defer { aliasServer.stopForTest() }
         let result = await SSEProbe.probe(url: URL(string: "http://localhost:\(aliasPort)/sse")!, headers: [:], fetchTools: false)
         XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
     }

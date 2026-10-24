@@ -56,7 +56,7 @@ final class ProbeR3Tests: XCTestCase {
             sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
             httpd.serve_forever()
         """)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let (bytes, _) = try await ProbeSession.shared.bytes(for: URLRequest(url: URL(string: "http://127.0.0.1:\(port)/")!))
         defer { bytes.task.cancel() }
         let started = ContinuousClock.now
@@ -105,7 +105,7 @@ final class ProbeR3Tests: XCTestCase {
             sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
             httpd.serve_forever()
         """)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let started = ContinuousClock.now
         let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: false)
         XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
@@ -123,7 +123,7 @@ final class ProbeR3Tests: XCTestCase {
         s = socket.socket(); s.bind(('127.0.0.1', 0))
         sys.stdout.write(str(s.getsockname()[1]) + "\\n"); sys.stdout.flush()
         """)
-        server.waitUntilExit()
+        server.stopForTest()   // it exits on its own; bounded either way
         let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: false)
         XCTAssertEqual(result.state, .broken)
         XCTAssertFalse(result.transientFailure, "connection refused is not slow")
@@ -151,7 +151,7 @@ final class ProbeR3Tests: XCTestCase {
             sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
             httpd.serve_forever()
         """)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let config = httpConfig(
             "http://127.0.0.1:\(port)/mcp", headers: ["accept": "application/json", "Content-Type": "text/plain"])
         let result = await HTTPProbe.probe(config: config, fetchTools: false)
@@ -192,7 +192,7 @@ final class ProbeR3Tests: XCTestCase {
                 sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
                 httpd.serve_forever()
             """)
-            defer { server.terminate(); server.waitUntilExit() }
+            defer { server.stopForTest() }
             let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: true)
             XCTAssertEqual(result.state, .healthy, "status \(status): \(result.failureReason ?? "")")
             XCTAssertEqual(result.tools?.map(\.name), ["echo"])

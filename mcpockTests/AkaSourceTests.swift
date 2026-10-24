@@ -166,10 +166,15 @@ final class AkaSourceTests: XCTestCase {
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/tmp/Fake.app/Contents/MacOS/bun", workingDirectory: "/")]),
                        "an unsigned app that only claims aka's bundle id")
         // Off the main thread, as in the app: the Security call warns there.
-        let (calculator, missing) = DispatchQueue.global().sync {
-            (AkaListener.validSigningIdentifier("/System/Applications/Calculator.app"),
-             AkaListener.validSigningIdentifier("/tmp/no-such.app"))
-        }
+        var calculator: String?
+        var missing: String? = "unset"
+        let done = DispatchSemaphore(value: 0)
+        Thread {
+            calculator = AkaListener.validSigningIdentifier("/System/Applications/Calculator.app")
+            missing = AkaListener.validSigningIdentifier("/tmp/no-such.app")
+            done.signal()
+        }.start()
+        done.wait()
         XCTAssertEqual(calculator, "com.apple.calculator")
         XCTAssertNil(missing)
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/usr/bin/python3", workingDirectory: "/tmp")]))
