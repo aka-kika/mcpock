@@ -22,10 +22,16 @@ settings:
     SWIFT_STRICT_CONCURRENCY: targeted
     CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER: YES
     CLANG_ENABLE_MODULES: YES
-    ENABLE_TESTABILITY: YES
     # Shared by the app and its bundled mcpock-mcp helper, so the two can't drift.
     MARKETING_VERSION: "1.10.9"
     CURRENT_PROJECT_VERSION: "37"
+  configs:
+    # Tests (@testable import) build Debug; a Release app doesn't need its
+    # internals exported (r3 049d).
+    Debug:
+      ENABLE_TESTABILITY: YES
+    Release:
+      ENABLE_TESTABILITY: NO
 targets:
   mcpock:
     type: application
