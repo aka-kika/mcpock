@@ -123,6 +123,36 @@ final class SSEProbeTests: XCTestCase {
         XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "file:///etc/passwd")!, as: base))
     }
 
+    /// r3 669e: a pretty-printed message of many thousand lines is joined and
+    /// read once; re-parsing it on every line took minutes.
+    func testHugeSplitMessageIsReadInOnePass() async throws {
+        let many = mock.replacingOccurrences(
+            of: "[{'name':'echo','description':'Echo'}]",
+            with: "[{'name':'t%d' % i,'description':'d'} for i in range(6000)]")
+        XCTAssertNotEqual(many, mock)
+        let split = many.replacingOccurrences(
+            of: "self.wfile.write(b'event: message\\ndata: ' + json.dumps(msg).encode() + b'\\n\\n'); self.wfile.flush()",
+            with: "body = json.dumps(msg, indent=1).encode().replace(b'\\n', b'\\ndata: '); self.wfile.write(b'event: message\\ndata: ' + body + b'\\n\\n'); self.wfile.flush()")
+        XCTAssertNotEqual(split, many)
+        let (server, port) = try startMock(split)
+        defer { server.terminate(); server.waitUntilExit() }
+        let started = ContinuousClock.now
+        let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!, headers: [:], fetchTools: true)
+        XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
+        XCTAssertEqual(result?.tools?.count, 6000)
+        XCTAssertLessThan(ContinuousClock.now - started, .seconds(5))
+    }
+
+    func testBraceScannerIgnoresBracesInStrings() {
+        var scanner = SSEProbe.BraceScanner()
+        scanner.feed(#"{"a": "}\"{","#[...])
+        XCTAssertTrue(scanner.isOpen)
+        scanner.feed(#""b": [1, 2]"#[...])
+        XCTAssertTrue(scanner.isOpen)
+        scanner.feed("}")
+        XCTAssertFalse(scanner.isOpen)
+    }
+
     /// r3 d0d1: localhost, 127.0.0.1 and ::1 are one origin; the port and scheme still count.
     func testLoopbackNamesAreOneOrigin() {
         let base = URL(string: "http://localhost:8080/sse")!

@@ -152,6 +152,41 @@ enum SSEProbe {
         return ["localhost", "127.0.0.1", "::1"].contains(lower) ? "localhost" : lower
     }
 
+    /// The most a message split over `data:` lines may grow while waiting for
+    /// its closing brace. Past it the text goes out as it is (it will not parse
+    /// and is skipped), so a stream that never closes cannot grow without end.
+    /// A real tools list, pretty-printed, can be a few hundred KB.
+    static let maxJoinedBytes = 1024 * 1024
+
+    /// Follows `{` and `}` (and brackets) through text a line at a time,
+    /// ignoring those inside strings, so a split message is known to be
+    /// complete without parsing it again.
+    struct BraceScanner {
+        private var depth = 0
+        private var inString = false
+        private var escaped = false
+
+        var isOpen: Bool { depth > 0 }
+
+        mutating func feed(_ text: Substring) {
+            for byte in text.utf8 {
+                if inString {
+                    if escaped { escaped = false } else if byte == 0x5C { escaped = true } else if byte == 0x22 { inString = false }
+                    continue
+                }
+                switch byte {
+                case 0x22: inString = true
+                case 0x7B, 0x5B: depth += 1
+                case 0x7D, 0x5D: depth = max(0, depth - 1)
+                default: break
+                }
+            }
+            // A raw newline cannot sit inside a JSON string: one still open here is malformed.
+            inString = false
+            escaped = false
+        }
+    }
+
     /// One parsed SSE event: `event:` name (default `message`) and its `data:` line.
     private struct Event {
         let name: String
@@ -163,11 +198,15 @@ enum SSEProbe {
     /// `AsyncLineSequence` swallows the blank lines that delimit SSE events, so an
     /// event is taken as complete at its `data:` line; the `event:` line before it
     /// names it. A message whose JSON is split over several `data:` lines is
-    /// joined with newlines, as SSE says, until it reads as one JSON object
-    /// (review 2026-10-20, 8c5b; the HTTP probe's streamed answers do the same).
+    /// joined with newlines, as SSE says, until its braces close (review
+    /// 2026-10-20, 8c5b). Each line is scanned once and the pieces are joined
+    /// once: re-parsing the growing text on every line burned a core on a
+    /// chatty stream (r3 669e).
     private static func nextEvent(_ lines: inout Lines, named wanted: String? = nil) async throws -> Event? {
         var name = "message"
-        var pending: String?
+        var pending: [Substring] = []
+        var pendingBytes = 0
+        var scanner = BraceScanner()
         while let line = try await lines.next() {
             if line.isEmpty || line.hasPrefix(":") { continue }   // keep-alive / comment
             guard let colon = line.firstIndex(of: ":") else { continue }
@@ -177,18 +216,22 @@ enum SSEProbe {
             switch field {
             case "event":
                 name = String(value)
-                pending = nil
+                pending = []
+                pendingBytes = 0
+                scanner = BraceScanner()
             case "data":
-                let data = pending.map { $0 + "\n" + value } ?? String(value)
+                pending.append(value)
+                pendingBytes += value.utf8.count + 1
                 // The endpoint is plain text on one line; a message is JSON.
-                if name != "endpoint", (try? MCPJSONRPC.parseJSONObject(Data(data.utf8))) == nil,
-                   data.utf8.count <= MCPMessageBuffer.maxBodyBytes {
-                    pending = data
-                    continue
+                if name != "endpoint" {
+                    scanner.feed(value)
+                    if scanner.isOpen, pendingBytes <= maxJoinedBytes { continue }
                 }
-                let event = Event(name: name, data: data)
+                let event = Event(name: name, data: pending.joined(separator: "\n"))
                 name = "message"
-                pending = nil
+                pending = []
+                pendingBytes = 0
+                scanner = BraceScanner()
                 if wanted == nil || event.name == wanted { return event }
             default:
                 break
