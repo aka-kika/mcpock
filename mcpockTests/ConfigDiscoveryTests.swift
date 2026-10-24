@@ -233,6 +233,22 @@ final class ScanOnlyFileTests: XCTestCase {
         XCTAssertEqual(allowed.map(\.state), [.unknown], "an allowed file starts over and is checked")
     }
 
+    /// r3 801b: a config read mid-write keeps its rows until the next read;
+    /// a file that really lost its servers (not just changed) drops them.
+    func testRowsSurviveAFileReadMidWrite() {
+        let a = config("reg:Cursor:global:a", name: "a", path: "/u/.cursor/mcp.json")
+        let b = config("reg:Grok:global:b", name: "b", path: "/u/.grok/config.toml")
+        let now = Date()
+        let fresh = HealthMonitor.midWriteSurvivors(previous: [a, b], found: [b], now: now,
+                                                    modified: { _ in now.addingTimeInterval(-2) })
+        XCTAssertEqual(fresh.map(\.id), [a.id])
+        let old = HealthMonitor.midWriteSurvivors(previous: [a, b], found: [b], now: now,
+                                                  modified: { _ in now.addingTimeInterval(-600) })
+        XCTAssertTrue(old.isEmpty)
+        XCTAssertTrue(HealthMonitor.midWriteSurvivors(previous: [a], found: [], now: now, modified: { _ in nil }).isEmpty,
+                      "a deleted file drops its rows")
+    }
+
     /// r3 f9f2: a row that reads healthy (one source checked) with a second
     /// source waiting for its file's OK. Pause used to read the row as paused,
     /// so it approved and started the file and the healthy server kept running.

@@ -419,7 +419,8 @@ final class HealthMonitor {
     /// aka (round 5) has no config file: its sidecar is asked at the same time,
     /// with a 1.5 s timeout, and simply adds nothing when it isn't running.
     func reloadConfigs() async {
-        let configs = await discover()
+        let found = await discover()
+        let configs = found + Self.midWriteSurvivors(previous: servers.map(\.config), found: found)
         if seedsScanFiles {
             allowedScanFiles.formUnion(configs.compactMap(Self.scanOnlyFile))
             AppPreferences.saveAllowedScanFiles(allowedScanFiles, to: defaults)
@@ -427,6 +428,28 @@ final class HealthMonitor {
         }
         defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
         servers = Self.merged(configs, into: servers, pausedNames: pausedNames, allowedScanFiles: allowedScanFiles)
+    }
+
+    /// Servers whose config file is being written right now (changed in the
+    /// last few seconds) and read as nothing this time: kept as they were
+    /// until the next read, instead of vanishing from the panel (r3 801b).
+    nonisolated static func midWriteSurvivors(
+        previous: [ServerConfig],
+        found: [ServerConfig],
+        now: Date = Date(),
+        modified: (String) -> Date? = { try? FileManager.default.attributesOfItem(atPath: $0)[.modificationDate] as? Date }
+    ) -> [ServerConfig] {
+        let foundPaths = Set(found.map(\.source.path))
+        let foundIDs = Set(found.map(\.id))
+        var recent: [String: Bool] = [:]
+        return previous.filter { config in
+            let path = config.source.path
+            guard !path.isEmpty, !foundPaths.contains(path), !foundIDs.contains(config.id) else { return false }
+            if let known = recent[path] { return known }
+            let changed = modified(path).map { now.timeIntervalSince($0) < 10 } ?? false
+            recent[path] = changed
+            return changed
+        }
     }
 
     /// The config file of a server found only by the scan, or nil for a known
