@@ -107,6 +107,17 @@ struct MCPockApp: App {
         // mounts its panel view only on the first left-click, so installing it
         // there left right-click dead until then (Argon 2026-10-16 #12).
         StatusItemRightClick.install()
+        // Run from the disk image: say so once per launch (r3 102c).
+        if !isDemo && ConnectSnippets.isTemporaryLocation(Bundle.main.bundlePath) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                let alert = NSAlert()
+                alert.messageText = ConnectSnippets.moveTitle
+                alert.informativeText = ConnectSnippets.moveText
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
         // What's new, once after an update (1.10.7). Not in demo mode.
         if !isDemo { WhatsNewLauncher.showIfUpdated() }
         // Quitting or updating mid-check stops the servers being checked;

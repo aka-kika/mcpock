@@ -12,6 +12,17 @@ enum ConnectSnippets {
     /// One line under the pane's title.
     static let intro = "Let your agents read what needs attention."
 
+    /// True when mcpock runs from the disk image or a translocated copy:
+    /// a helper path from there stops working once the image is ejected
+    /// (r3 102c).
+    static func isTemporaryLocation(_ path: String) -> Bool {
+        path.contains("/AppTranslocation/") || path.hasPrefix("/Volumes/")
+    }
+
+    static let moveTitle = "Move mcpock to Applications"
+    static let moveText = "mcpock is running from the disk image. Drag it to your Applications folder and open it "
+        + "from there, so updates, Open at Login and your agents\u{2019} connection keep working."
+
     /// Where the helper lives inside an app bundle.
     static func helperPath(appBundle: URL = Bundle.main.bundleURL) -> String {
         appBundle.appendingPathComponent("Contents/Helpers/mcpock-mcp").path

@@ -52,6 +52,16 @@ struct SettingsConnectPane: View {
                 )
             }
 
+            if ConnectSnippets.isTemporaryLocation(helperPath) {
+                Section {
+                    Text(ConnectSnippets.moveText)
+                        .foregroundStyle(theme.statusBroken)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: {
+                    Text(ConnectSnippets.moveTitle)
+                }
+            }
+
             Section {
                 // An HStack, not LabeledContent: a long path must truncate on
                 // the row, not drop under its label.

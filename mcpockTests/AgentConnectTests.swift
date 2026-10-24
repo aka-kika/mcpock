@@ -113,4 +113,12 @@ final class AgentConnectTests: XCTestCase {
         XCTAssertTrue(prompt[grok.upperBound..<goose.lowerBound].contains("enabled = true"))
         XCTAssertFalse(prompt.contains("TOML (Codex, Grok)"))
     }
+
+    /// r3 102c: run from the disk image, the helper path would die on eject.
+    func testDiskImageAndTranslocatedPathsAreTemporary() {
+        XCTAssertTrue(ConnectSnippets.isTemporaryLocation("/Volumes/mcpock/mcpock.app/Contents/Helpers/mcpock-mcp"))
+        XCTAssertTrue(ConnectSnippets.isTemporaryLocation(
+            "/private/var/folders/x/AppTranslocation/ABC/d/mcpock.app/Contents/Helpers/mcpock-mcp"))
+        XCTAssertFalse(ConnectSnippets.isTemporaryLocation("/Applications/mcpock.app/Contents/Helpers/mcpock-mcp"))
+    }
 }
