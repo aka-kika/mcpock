@@ -156,6 +156,9 @@ final class PanelState {
     /// She pressed the attention toggle since the panel opened. From then on the
     /// panel never switches the filter for her, whatever the results say.
     @ObservationIgnored private(set) var userPickedFilter = false
+    /// The panel switched itself to Needs you this open: once nothing needs
+    /// her any more it switches back to All (r3 1228).
+    @ObservationIgnored private var didJumpToNeedsYou = false
 
     /// How long the footer offers "Undo" after a Hide.
     nonisolated static let undoSeconds: Double = 5
@@ -271,6 +274,7 @@ final class PanelState {
         installKeyMonitor()
         isPanelOpen = true
         userPickedFilter = false
+        didJumpToNeedsYou = false
         // Start from her own saved choice: an earlier automatic jump to Needs
         // you is not remembered, so without this the panel stayed on it after
         // every server recovered (Argon 2026-10-16 #11).
@@ -332,6 +336,21 @@ final class PanelState {
     func resultsChanged() {
         guard isPanelOpen else { return }
         jumpToNeedsYouIfBroken()
+        // The last broken server is fixed: the jump is undone, rather than
+        // leaving "Nothing needs you" with no way out.
+        if Self.shouldReturnToAll(didJump: didJumpToNeedsYou, filter: filter,
+                                  userPickedFilter: userPickedFilter, needsYouCount: needsYouCount) {
+            isAutoFiltering = true
+            filter = .all
+            isAutoFiltering = false
+            didJumpToNeedsYou = false
+        }
+    }
+
+    /// Whether to undo the panel's own jump to Needs you. Pure.
+    nonisolated static func shouldReturnToAll(didJump: Bool, filter: PanelFilter,
+                                              userPickedFilter: Bool, needsYouCount: Int) -> Bool {
+        didJump && filter == .problems && !userPickedFilter && needsYouCount == 0
     }
 
     private func jumpToNeedsYouIfBroken() {
@@ -342,6 +361,7 @@ final class PanelState {
         isAutoFiltering = true
         filter = .problems
         isAutoFiltering = false
+        didJumpToNeedsYou = true
         // The selected row may not be a problem; don't leave its card open over a
         // list that no longer shows it.
         if let selectedName, !orderedNames.contains(selectedName) {

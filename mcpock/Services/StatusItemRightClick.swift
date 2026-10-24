@@ -50,6 +50,22 @@ enum StatusItemRightClick {
     /// here; the panel's "Refresh now" now re-runs discovery itself, so the
     /// separate action was a second spelling of the same thing.
     private static func showContextMenu(for event: NSEvent) {
+        let menu = appMenu()
+        if let view = event.window?.contentView {
+            let point = event.locationInWindow
+            menu.popUp(positioning: nil, at: NSPoint(x: point.x, y: point.y - 4), in: view)
+        } else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+    }
+
+    /// The same menu from the panel footer's gear (r3 2c37): before, Quit
+    /// lived only behind a right-click on the icon.
+    static func showFromFooter() {
+        appMenu().popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    static func appMenu() -> NSMenu {
         let menu = NSMenu(title: "mcpock")
 
         let settings = NSMenuItem(
@@ -94,13 +110,7 @@ enum StatusItemRightClick {
         quit.target = MenuTarget.shared
 
         menu.addItem(quit)
-
-        if let view = event.window?.contentView {
-            let point = event.locationInWindow
-            menu.popUp(positioning: nil, at: NSPoint(x: point.x, y: point.y - 4), in: view)
-        } else {
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-        }
+        return menu
     }
 }
 

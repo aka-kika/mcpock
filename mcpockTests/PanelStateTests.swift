@@ -61,6 +61,11 @@ final class PanelStateTests: XCTestCase {
     /// first open after launch once the results arrive. A toggle she pressed in
     /// this panel session always wins.
     func testJumpToNeedsYouOnlyWhenBrokenAndNotPickedByHand() {
+        // r3 1228: the panel's own jump is undone once nothing needs her; her own choice never is.
+        XCTAssertTrue(PanelState.shouldReturnToAll(didJump: true, filter: .problems, userPickedFilter: false, needsYouCount: 0))
+        XCTAssertFalse(PanelState.shouldReturnToAll(didJump: true, filter: .problems, userPickedFilter: false, needsYouCount: 1))
+        XCTAssertFalse(PanelState.shouldReturnToAll(didJump: false, filter: .problems, userPickedFilter: false, needsYouCount: 0))
+        XCTAssertFalse(PanelState.shouldReturnToAll(didJump: true, filter: .problems, userPickedFilter: true, needsYouCount: 0))
         XCTAssertTrue(PanelState.shouldJumpToNeedsYou(hasBroken: true, filter: .all, userPickedFilter: false))
         XCTAssertFalse(PanelState.shouldJumpToNeedsYou(hasBroken: false, filter: .all, userPickedFilter: false))
         XCTAssertFalse(PanelState.shouldJumpToNeedsYou(hasBroken: true, filter: .problems, userPickedFilter: false))

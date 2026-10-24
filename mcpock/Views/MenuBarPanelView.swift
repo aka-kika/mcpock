@@ -276,13 +276,15 @@ struct MenuBarPanelView: View {
         } else if monitor.visibleGroups.isEmpty {
             emptyState("All servers hidden", detail: "Bring them back in Settings > Servers.")
         } else if panel.filter == .problems {
-            emptyState("Nothing needs you", detail: "Every server answered normally.")
+            emptyState("Nothing needs you", detail: "Every server answered normally.",
+                       action: ("Show all servers", { panel.pickFilter(.all) }))
         } else {
             emptyState("No servers", detail: "")
         }
     }
 
-    private func emptyState(_ title: String, detail: String) -> some View {
+    private func emptyState(_ title: String, detail: String,
+                            action: (title: String, perform: () -> Void)? = nil) -> some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(Theme.body)
@@ -293,6 +295,13 @@ struct MenuBarPanelView: View {
                     .font(Theme.caption)
                     .foregroundStyle(theme.textTertiary)
                     .multilineTextAlignment(.center)
+            }
+            // A way out of an empty Needs you (r3 1228).
+            if let action {
+                Button(action.title, action: action.perform)
+                    .buttonStyle(.link)
+                    .font(Theme.caption)
+                    .padding(.top, 2)
             }
         }
         .padding(24)
@@ -344,8 +353,8 @@ struct MenuBarPanelView: View {
                 guard !isChecking else { return }
                 monitor.startRefreshAll()   // spins at once, not after discovery
             }
-            FooterGlyphButton(systemImage: "gearshape", title: "Settings\u{2026}", theme: theme) {
-                SettingsLauncher.open(tab: .general)
+            FooterGlyphButton(systemImage: "gearshape", title: "Settings, updates and Quit", theme: theme) {
+                StatusItemRightClick.showFromFooter()
             }
         }
         .padding(.leading, 14)
