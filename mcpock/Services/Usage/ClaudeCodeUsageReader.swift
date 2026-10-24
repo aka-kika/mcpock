@@ -35,7 +35,9 @@ struct ClaudeCodeUsageReader: UsageReader {
         for file in transcriptFiles() {
             let path = file.path
             let size = fileSize(file)
-            var offset = cursor.values[path] ?? 0
+            // A damaged usage.json can hold a negative offset; `UInt64(offset)`
+            // in `scan` would trap on it (r3 394d).
+            var offset = max(0, cursor.values[path] ?? 0)
             // Shrank or was replaced with something shorter: nothing at the
             // old offset can still be valid, so start this file over,
             // counting only calls newer than the ones it already gave, now
@@ -67,6 +69,9 @@ struct ClaudeCodeUsageReader: UsageReader {
         ) else { return [] }
         var files: [URL] = []
         for case let url as URL in enumerator where url.pathExtension == "jsonl" {
+            // Regular files only: opening a FIFO named `.jsonl` would block
+            // the refresh, and a symlink could lead anywhere (r3 394d).
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
             files.append(url)
         }
         return files

@@ -162,6 +162,30 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         XCTAssertEqual(reader.read(since: saved, knownServers: []).events.map(\.server), ["eventkit"])
     }
 
+    /// r3 394d: a damaged cursor with a negative offset must not trap.
+    func testNegativeStoredOffsetIsClampedToStart() {
+        let url = write([line(name: "mcp__skill-librarian__librarian_find")])
+        let reader = ClaudeCodeUsageReader(root: root)
+        let key = url.resolvingSymlinksInPath().path
+        var damaged = UsageCursor.empty
+        damaged.values[key] = -5
+        damaged.values[url.path] = -5
+        let (events, _) = reader.read(since: damaged, knownServers: [])
+        XCTAssertEqual(events.count, 1, "read from the start instead of crashing")
+    }
+
+    /// r3 394d: a FIFO or a symlink named `.jsonl` is skipped, never opened.
+    func testFifoAndSymlinkNamedJsonlAreSkipped() {
+        let real = write([line(name: "mcp__skill-librarian__librarian_find")], to: "real.txt")
+        try! FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("link.jsonl"), withDestinationURL: real)
+        XCTAssertEqual(mkfifo(root.appendingPathComponent("pipe.jsonl").path, 0o600), 0)
+        let reader = ClaudeCodeUsageReader(root: root)
+        let (events, cursor) = reader.read(since: .empty, knownServers: [])
+        XCTAssertTrue(events.isEmpty)
+        XCTAssertTrue(cursor.values.isEmpty, "neither was even looked at")
+    }
+
     func testIncompleteTrailingLineIsNotConsumedYet() {
         let directory = root!
         let url = directory.appendingPathComponent("live.jsonl")
