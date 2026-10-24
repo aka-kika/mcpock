@@ -93,6 +93,12 @@ final class Round8SettingsTests: XCTestCase {
         XCTAssertFalse(MenuText.configPathHelp(path: "/a").contains("double-click"))
         XCTAssertEqual(MenuText.openConfigQuestion(path: "/Users/k/.cursor/mcp.json"), "Open mcp.json?")
         XCTAssertTrue(MenuText.openConfigWarning.contains("mcpock itself only reads it"))
+        // r3 e2d0: the full path and the app it opens in, TextEdit warned about.
+        let details = MenuText.openConfigDetails(path: "/u/.cursor/mcp.json", appName: "TextEdit")
+        XCTAssertTrue(details.hasPrefix("/u/.cursor/mcp.json"))
+        XCTAssertTrue(details.contains("It opens in TextEdit."))
+        XCTAssertTrue(details.contains("curly"))
+        XCTAssertFalse(MenuText.openConfigDetails(path: "/x", appName: "Zed").contains("curly"))
     }
 
     // MARK: - Servers pane

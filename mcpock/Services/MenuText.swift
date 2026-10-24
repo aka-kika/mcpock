@@ -115,8 +115,15 @@ enum MenuText {
         "Open \((path as NSString).lastPathComponent)?"
     }
 
-    static let openConfigWarning = "It opens in its default app. One accidental change can stop an agent "
+    static let openConfigWarning = "One accidental change can stop an agent "
         + "from loading its servers, so edit it only if you know what you're changing. mcpock itself only reads it."
+
+    /// The full path and the app it opens in, then the warning (r3 e2d0).
+    static func openConfigDetails(path: String, appName: String?) -> String {
+        let app = appName.map { "It opens in \($0)." } ?? "It opens in its default app."
+        let textEdit = appName == "TextEdit" ? " TextEdit can turn straight quotes into curly ones, which breaks the file." : ""
+        return path + "\n\n" + app + textEdit + " " + openConfigWarning
+    }
     static let openConfigConfirm = "Open"
 
     /// Tooltip on a config path: the path, then the hint.

@@ -10,8 +10,35 @@ import AppKit
 enum ConfigFileActions {
     /// Asks first (the menu item's "…"), then opens the file in its default app.
     static func confirmAndOpen(_ path: String) {
-        guard confirmOpen(path) else { return }
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        let url = URL(fileURLWithPath: path)
+        let editor = editor(for: url)
+        guard confirmOpen(path, appName: editor.map(appName)) else { return }
+        if let editor {
+            NSWorkspace.shared.open([url], withApplicationAt: editor, configuration: NSWorkspace.OpenConfiguration())
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Code editors that keep straight quotes, in the order they are tried
+    /// when the file's default app is TextEdit (r3 e2d0): TextEdit can turn
+    /// `"` into curly quotes and break a JSON or TOML file.
+    static let plainTextEditors = [
+        "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed",
+        "com.barebones.bbedit", "com.sublimetext.4", "com.apple.dt.Xcode",
+    ]
+
+    /// The app the file opens in: its default app, unless that is TextEdit
+    /// and a code editor is installed.
+    static func editor(for url: URL) -> URL? {
+        let workspace = NSWorkspace.shared
+        let fallback = workspace.urlForApplication(toOpen: url)
+        guard fallback.flatMap({ Bundle(url: $0)?.bundleIdentifier }) == "com.apple.TextEdit" else { return fallback }
+        return plainTextEditors.lazy.compactMap { workspace.urlForApplication(withBundleIdentifier: $0) }.first ?? fallback
+    }
+
+    private static func appName(_ url: URL) -> String {
+        FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 
     static func copy(_ path: String) {
@@ -24,12 +51,12 @@ enum ConfigFileActions {
 
     /// "Open claude_desktop_config.json?" with Cancel as the default button, so
     /// Return or Escape never opens it by accident.
-    private static func confirmOpen(_ path: String) -> Bool {
+    private static func confirmOpen(_ path: String, appName: String?) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = MenuText.openConfigQuestion(path: path)
-        alert.informativeText = MenuText.openConfigWarning
+        alert.informativeText = MenuText.openConfigDetails(path: path, appName: appName)
         let cancel = alert.addButton(withTitle: "Cancel")
         let open = alert.addButton(withTitle: MenuText.openConfigConfirm)
         cancel.keyEquivalent = "\r"
