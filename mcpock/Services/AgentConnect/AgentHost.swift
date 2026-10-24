@@ -102,8 +102,16 @@ struct AgentHost: Identifiable, Sendable {
             if case .json(let t, _) = format { top = t } else { top = "mcpServers" }
             let object = (try? JSONSerialization.jsonObject(with: Data(text.utf8)))
                 ?? (try? JSONSerialization.jsonObject(with: Data(JSONC.plainJSON(text).utf8)))
-            guard let root = object as? [String: Any], let servers = root[top] as? [String: Any],
-                  let value = servers[Self.entry] else { return .none }
+            guard let root = object as? [String: Any] else { return .none }
+            var value = (root[top] as? [String: Any])?[Self.entry]
+            // Claude Code at local scope keeps it under projects.<folder>
+            // (`claude mcp add` without --scope user): connected all the same (r3 7642).
+            if value == nil, case .claudeCode = format, let projects = root["projects"] as? [String: Any] {
+                value = projects.values.lazy
+                    .compactMap { (($0 as? [String: Any])?["mcpServers"] as? [String: Any])?[Self.entry] }
+                    .first
+            }
+            guard let value else { return .none }
             let fields = value as? [String: Any] ?? [:]
             let off = (fields["enabled"] as? Bool) == false || (fields["disabled"] as? Bool) == true
             return off ? .off : .on
@@ -116,8 +124,8 @@ struct AgentHost: Identifiable, Sendable {
             guard let fields = YAMLBlock.entries(in: text, under: section)[Self.entry] else { return .none }
             let enabled = fields["enabled"]?.scalar
             switch style {
-            case .goose: return enabled == nil || enabled == "true" ? .on : .off
-            case .hermes: return enabled == "false" ? .off : .on
+            case .goose: return enabled == nil || enabled?.lowercased() == "true" ? .on : .off
+            case .hermes: return enabled.map(MCPServersYAML.isYAMLFalse) == true ? .off : .on
             }
         }
     }

@@ -47,6 +47,14 @@ final class AgentConnectTests: XCTestCase {
         XCTAssertEqual(try host("kimi-code").status(home: home), .notConnected, "the agent's folder is enough")
     }
 
+    /// r3 7642: mcpock added to Claude Code at local scope still reads Connected.
+    func testClaudeCodeLocalScopeReadsConnected() throws {
+        try write(#"{"mcpServers": {}, "projects": {"/u/app": {"mcpServers": {"mcpock": {"command": "x"}}}}}"#, ".claude.json")
+        XCTAssertEqual(try host("claude-code").status(home: home), .connected)
+        try write("mcp_servers:\n  mcpock:\n    command: /x\n    enabled: False\n", ".hermes/config.yaml")
+        XCTAssertEqual(try host("hermes").status(home: home), .turnedOff)
+    }
+
     /// Argon 2026-10-17 #15: a switched-off entry read "Connected", and
     /// OpenCode's opencode.jsonc was never read.
     func testSwitchedOffEntryAndJSONCFile() throws {

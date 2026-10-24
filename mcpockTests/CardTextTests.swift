@@ -253,4 +253,18 @@ final class DetailCardPlacementTests: XCTestCase {
         let frame = DetailCardPresenter.frame(besides: middle, contentHeight: 300, screen: narrow)
         XCTAssertEqual(frame.minX, narrow.minX)
     }
+
+    /// r3 c5e8: keys sent over plain http to another machine get a warning.
+    func testPlainHTTPKeysAreWarnedAbout() {
+        func group(_ url: String, headers: [String]) -> ServerGroup {
+            let source = GroupSource(configID: "c", label: "Cursor", agent: "Cursor", path: "", transport: .http,
+                                     target: url, envKeys: [], headerKeys: headers, state: .healthy, failureReason: nil)
+            return ServerGroup(name: "s", state: .healthy, sourceLabels: ["Cursor"], tools: [], issues: [],
+                               variantCount: 1, sources: [source])
+        }
+        XCTAssertNotNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5:8080/mcp", headers: ["Authorization"])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group("http://127.0.0.1:8080/mcp", headers: ["Authorization"])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group("https://x.test/mcp", headers: ["Authorization"])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5:8080/mcp", headers: [])))
+    }
 }

@@ -186,6 +186,22 @@ enum CardText {
             + "Allow this file (right-click the row) checks it from now on."
     }
 
+    /// A source that sends header keys over plain http to another machine:
+    /// anyone on the network can read them (r3 c5e8). Nil when none does.
+    static func plainHTTPWarning(for group: ServerGroup) -> String? {
+        let exposed = group.sources.filter { source in
+            guard source.transport != .stdio, !source.headerKeys.isEmpty,
+                  let url = URLComponents(string: source.target), url.scheme?.lowercased() == "http",
+                  let host = url.host?.lowercased() else { return false }
+            return !["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)
+        }
+        guard !exposed.isEmpty else { return nil }
+        let labels = exposed.map { AgentBadge.displayLabel($0.label) }
+        let agents = list(labels)
+        return "\(agents) \(labels.count == 1 ? "sends its" : "send their") keys to this server over plain http, so anyone on the network can read them. "
+            + "Use https if the server offers it."
+    }
+
     /// The config file of the first failing source, for the Why box's
     /// Show in Finder link; nil when none is known.
     static func failingConfigPath(for group: ServerGroup) -> String? {

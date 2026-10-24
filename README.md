@@ -245,6 +245,9 @@ letters.
   servers in your configs, to aka on your own Mac if you use it, and
   to mcpock.com to check for app updates (Settings > About). No
   accounts, no analytics, nothing else phones home.
+  mcpock calls a remote server the way your config says, `http://` too. A
+  server whose config sends keys over plain `http://` to another machine
+  gets a warning on its card: anyone on that network can read those keys.
 - **Updates are signed, and you're asked before the first automatic check.**
   mcpock checks mcpock.com for a newer version (Sparkle, its one dependency —
   see [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md)); every update is verified

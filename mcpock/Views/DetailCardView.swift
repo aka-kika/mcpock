@@ -106,6 +106,18 @@ struct DetailCardView: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill)
                     }
             }
+            if let warning = CardText.plainHTTPWarning(for: group) {
+                Text(warning)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.statusDegraded)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill)
+                    }
+            }
             usedBy
             tools
             actions
@@ -668,7 +680,8 @@ struct ToolsList: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if !tool.firstLineDescription.isEmpty {
-                        Text(tool.firstLineDescription)
+                        // Masked: a server that got a header could echo it here (r3 505c).
+                        Text(SecretMask.scrub(tool.firstLineDescription))
                             .font(.system(size: 11))
                             .foregroundStyle(theme.textSecondary)
                             .lineLimit(2)
@@ -679,7 +692,7 @@ struct ToolsList: View {
                 .padding(.horizontal, rowInset)
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(tool.description.isEmpty ? tool.name : tool.description)
+                .help(tool.description.isEmpty ? tool.name : SecretMask.scrub(tool.description))
             }
         }
     }
