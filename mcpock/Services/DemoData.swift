@@ -66,7 +66,13 @@ enum DemoData {
     /// unit tests use (`UserDefaults(suiteName:)`), except this suite is
     /// meant to be reused between demo launches, not deleted afterward.
     static func makeThrowawayDefaults() -> UserDefaults {
-        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        // Never `.standard` as a fallback: demo clicks would land in her real
+        // settings (r3 71ae). A one-off suite instead, and if even that is
+        // refused, demo mode stops rather than touch the real domain.
+        guard let defaults = UserDefaults(suiteName: suiteName)
+                ?? UserDefaults(suiteName: suiteName + "." + UUID().uuidString) else {
+            preconditionFailure("demo mode has no throwaway settings suite")
+        }
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
     }
