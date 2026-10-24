@@ -141,12 +141,13 @@ enum HTTPProbe {
     }
 
     /// A slow-starting or momentarily-unreachable HTTP server is transient (smoothed to amber);
-    /// an explicit protocol/HTTP error is definitive.
+    /// an explicit protocol/HTTP error is definitive. A refused connection is
+    /// definitive too: nothing listens, which is not slow (r3 a9ec).
     static func isTransient(_ error: Error) -> Bool {
         if let probeError = error as? ProbeError { return probeError.isTransient }
         if let urlError = error as? URLError {
             switch urlError.code {
-            case .timedOut, .cannotConnectToHost, .networkConnectionLost, .notConnectedToInternet:
+            case .timedOut, .networkConnectionLost, .notConnectedToInternet:
                 return true
             default:
                 return false

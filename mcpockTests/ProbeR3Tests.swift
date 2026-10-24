@@ -111,4 +111,21 @@ final class ProbeR3Tests: XCTestCase {
         XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
         XCTAssertLessThan(ContinuousClock.now - started, .seconds(8))
     }
+
+    // MARK: a9ec
+
+    func testRefusedConnectionIsDefinite() async throws {
+        XCTAssertFalse(HTTPProbe.isTransient(URLError(.cannotConnectToHost)))
+        XCTAssertTrue(HTTPProbe.isTransient(URLError(.timedOut)))
+        // A port that was just open and is closed again.
+        let (server, port) = try startServer("""
+        import sys, socket
+        s = socket.socket(); s.bind(('127.0.0.1', 0))
+        sys.stdout.write(str(s.getsockname()[1]) + "\\n"); sys.stdout.flush()
+        """)
+        server.waitUntilExit()
+        let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: false)
+        XCTAssertEqual(result.state, .broken)
+        XCTAssertFalse(result.transientFailure, "connection refused is not slow")
+    }
 }
