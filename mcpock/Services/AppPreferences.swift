@@ -52,6 +52,19 @@ enum AppPreferences {
         defaults.set(paths.sorted(), forKey: allowedScanFilesKey)
     }
 
+    /// What each allowed file starts, as she allowed it (a hash, path ->
+    /// fingerprint): a later edit or git pull that changes a command pauses
+    /// the file again (r3 e46f).
+    static let allowedScanFingerprintsKey = "allowedScanFingerprints"
+
+    static func loadAllowedScanFingerprints(from defaults: UserDefaults = store) -> [String: String] {
+        defaults.dictionary(forKey: allowedScanFingerprintsKey) as? [String: String] ?? [:]
+    }
+
+    static func saveAllowedScanFingerprints(_ prints: [String: String], to defaults: UserDefaults = store) {
+        defaults.set(prints, forKey: allowedScanFingerprintsKey)
+    }
+
     /// Server names the user pinned to the top of the panel (v1.5), same
     /// normalized keying as `hiddenServers`. Pinned and hidden never overlap:
     /// `HealthMonitor.setPinned` unhides whatever it pins.

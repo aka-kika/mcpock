@@ -75,6 +75,10 @@ final class HealthMonitor {
     private var pausedNames: Set<String>
     /// Scan-only config files she allowed (review 2026-10-20, 5ae6).
     private(set) var allowedScanFiles: Set<String>
+    /// What each allowed file started when she allowed it (r3 e46f).
+    private var allowedScanFingerprints: [String: String]
+    /// Each scan-only file's fingerprint as last read.
+    private var scanFingerprints: [String: String] = [:]
     /// An update from a version before 1.10.9: the first reload allows every
     /// scan-only file already there. A first install asks for each one.
     private var seedsScanFiles: Bool
@@ -373,6 +377,7 @@ final class HealthMonitor {
         hiddenNames = AppPreferences.loadHiddenServers(from: defaults)
         pausedNames = AppPreferences.loadPausedServers(from: defaults)
         allowedScanFiles = AppPreferences.loadAllowedScanFiles(from: defaults)
+        allowedScanFingerprints = AppPreferences.loadAllowedScanFingerprints(from: defaults)
         seedsScanFiles = !defaults.bool(forKey: AppPreferences.scanFilesSeededKey)
             && (isUpdate ?? Self.ranBefore())
         pinnedNames = AppPreferences.loadPinnedServers(from: defaults)
@@ -427,7 +432,37 @@ final class HealthMonitor {
             seedsScanFiles = false
         }
         defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
-        servers = Self.merged(configs, into: servers, pausedNames: pausedNames, allowedScanFiles: allowedScanFiles)
+        scanFingerprints = Self.scanFileFingerprints(configs)
+        // A file allowed before fingerprints existed keeps what it starts now.
+        var recorded = false
+        for path in allowedScanFiles where allowedScanFingerprints[path] == nil {
+            guard let fingerprint = scanFingerprints[path] else { continue }
+            allowedScanFingerprints[path] = fingerprint
+            recorded = true
+        }
+        if recorded { AppPreferences.saveAllowedScanFingerprints(allowedScanFingerprints, to: defaults) }
+        servers = Self.merged(configs, into: servers, pausedNames: pausedNames,
+                              allowedScanFiles: Self.stillAllowed(allowedScanFiles, prints: allowedScanFingerprints,
+                                                                  now: scanFingerprints))
+    }
+
+    /// The allowed files whose commands are still what she allowed.
+    nonisolated static func stillAllowed(
+        _ allowed: Set<String>, prints: [String: String], now: [String: String]
+    ) -> Set<String> {
+        allowed.filter { path in prints[path] == nil || prints[path] == now[path] }
+    }
+
+    /// A hash of what each scan-only file starts: every server's name,
+    /// transport, command, args and url (not env or header values).
+    nonisolated static func scanFileFingerprints(_ configs: [ServerConfig]) -> [String: String] {
+        var lines: [String: [String]] = [:]
+        for config in configs {
+            guard let path = scanOnlyFile(config) else { continue }
+            let parts = [config.name, config.transport.rawValue, config.command ?? "", config.url ?? ""] + config.args
+            lines[path, default: []].append(parts.joined(separator: "\u{1F}"))
+        }
+        return lines.mapValues { UsageCursor.stableHash($0.sorted().joined(separator: "\n")) }
     }
 
     /// Servers whose config file is being written right now (changed in the
@@ -483,13 +518,19 @@ final class HealthMonitor {
         var allowedNow = false
         for index in servers.indices where Self.normalizedName(servers[index].config.name) == key
             && servers[index].awaitingFileOK {
-            if let path = Self.scanOnlyFile(servers[index].config) { allowedScanFiles.insert(path) }
+            if let path = Self.scanOnlyFile(servers[index].config) {
+                allowedScanFiles.insert(path)
+                if let fingerprint = scanFingerprints[path] ?? Self.scanFileFingerprints(servers.map(\.config))[path] {
+                    allowedScanFingerprints[path] = fingerprint
+                }
+            }
             servers[index].awaitingFileOK = false
             if !isPaused(name) { servers[index].state = .unknown }
             allowedNow = true
         }
         guard allowedNow else { return false }
         AppPreferences.saveAllowedScanFiles(allowedScanFiles, to: defaults)
+        AppPreferences.saveAllowedScanFingerprints(allowedScanFingerprints, to: defaults)
         statusDidChange()
         return true
     }

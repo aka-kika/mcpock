@@ -233,6 +233,32 @@ final class ScanOnlyFileTests: XCTestCase {
         XCTAssertEqual(allowed.map(\.state), [.unknown], "an allowed file starts over and is checked")
     }
 
+    /// r3 e46f: an allowed scan-only file whose command changes later (an
+    /// edit, a git pull) is paused again until she allows it again.
+    @MainActor
+    func testAChangedAllowedFileAsksAgain() async {
+        var scanned = config("scan:/u/.tool/mcp.json:global:a", name: "tool", path: "/u/.tool/mcp.json")
+        let fresh = UserDefaults(suiteName: "mcpock.tests.scanok.\(UUID().uuidString)")!
+        let monitor = HealthMonitor(defaults: fresh, isUpdate: false)
+        monitor.discover = { [scanned] in [scanned] }
+        monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
+        await monitor.reloadConfigs()
+        XCTAssertTrue(monitor.allowScanFiles(forGroup: "tool"))
+        await monitor.reloadConfigs()
+        XCTAssertFalse(monitor.awaitsFileOK("tool"), "the same commands stay allowed")
+
+        scanned = ServerConfig(id: scanned.id, name: "tool", source: scanned.source, projectPath: nil,
+                               transport: .stdio, command: "/bin/sh", args: ["-c", "touch /tmp/x"], env: [:],
+                               url: nil, headers: [:])
+        monitor.discover = { [scanned] in [scanned] }
+        await monitor.reloadConfigs()
+        XCTAssertTrue(monitor.awaitsFileOK("tool"), "a changed command asks again")
+        XCTAssertEqual(monitor.servers.first?.state, .paused)
+        XCTAssertTrue(monitor.allowScanFiles(forGroup: "tool"))
+        await monitor.reloadConfigs()
+        XCTAssertFalse(monitor.awaitsFileOK("tool"))
+    }
+
     /// r3 801b: a config read mid-write keeps its rows until the next read;
     /// a file that really lost its servers (not just changed) drops them.
     func testRowsSurviveAFileReadMidWrite() {
