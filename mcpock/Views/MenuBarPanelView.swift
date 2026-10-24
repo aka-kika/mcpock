@@ -63,14 +63,16 @@ struct MenuBarPanelView: View {
                     .frame(height: Self.searchHeight)
             }
             rule
-            content
-                .frame(height: Self.listHeight(searchOpen: panel.isSearchOpen))
-                .overlay(alignment: .bottom) {
-                    VStack(spacing: 0) {
-                        if panel.showsUsageNote { usageNote }
-                        if panel.showsWelcome { welcomeLine }
-                    }
-                }
+            // The one-time notes sit under the list in the layout (1.12.1): the
+            // list gives up their height and scrolls in what is left, so a note
+            // never covers a row.
+            VStack(spacing: 0) {
+                content
+                    .frame(maxHeight: .infinity)
+                if panel.showsUsageNote { usageNote }
+                if panel.showsWelcome { welcomeLine }
+            }
+            .frame(height: Self.listHeight(searchOpen: panel.isSearchOpen))
             rule
             footer
                 .frame(height: Self.footerHeight)
