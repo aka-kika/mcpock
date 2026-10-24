@@ -65,6 +65,9 @@ struct MenuBarPanelView: View {
             rule
             content
                 .frame(height: Self.listHeight(searchOpen: panel.isSearchOpen))
+                .overlay(alignment: .bottom) {
+                    if panel.showsWelcome { welcomeLine }
+                }
             rule
             footer
                 .frame(height: Self.footerHeight)
@@ -281,6 +284,25 @@ struct MenuBarPanelView: View {
         } else {
             emptyState("No servers", detail: "")
         }
+    }
+
+    /// The first launch's one line (r3 ad7a), over the bottom of the list.
+    private var welcomeLine: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(PanelState.welcomeText)
+                .font(Theme.caption)
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("OK") { panel.dismissWelcome() }
+                .buttonStyle(.link)
+                .font(Theme.caption)
+        }
+        .padding(10)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill)
+        }
+        .padding(10)
     }
 
     private func emptyState(_ title: String, detail: String,

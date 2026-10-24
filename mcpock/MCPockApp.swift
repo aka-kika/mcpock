@@ -107,6 +107,16 @@ struct MCPockApp: App {
         // mounts its panel view only on the first left-click, so installing it
         // there left right-click dead until then (Argon 2026-10-16 #12).
         StatusItemRightClick.install()
+        // First launch on this Mac: open the panel once with a line on where
+        // mcpock lives (r3 ad7a). Read before the first status write.
+        if !isDemo && PanelState.shouldWelcome(defaults: monitorDefaults, ranBefore: HealthMonitor.ranBefore()) {
+            monitorDefaults.set(true, forKey: PanelState.welcomeShownKey)
+            panel.showsWelcome = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                PanelToggle.toggle()
+            }
+        }
         // Run from the disk image: say so once per launch (r3 102c).
         if !isDemo && ConnectSnippets.isTemporaryLocation(Bundle.main.bundlePath) {
             Task { @MainActor in

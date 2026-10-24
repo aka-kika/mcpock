@@ -161,6 +161,22 @@ final class PanelState {
     /// her any more it switches back to All (r3 1228).
     @ObservationIgnored private var didJumpToNeedsYou = false
 
+    /// The first launch on this Mac opens the panel once with a line saying
+    /// where mcpock lives (r3 ad7a): before, nothing showed and nothing said so.
+    var showsWelcome = false
+    nonisolated static let welcomeShownKey = "welcomeShown"
+    nonisolated static let welcomeText = "mcpock lives in the menu bar. Click its icon to open this panel; "
+        + "right-click it, or use the gear below, for Settings and Quit."
+
+    /// True once per Mac: never shown before, and no earlier mcpock ran here.
+    nonisolated static func shouldWelcome(defaults: UserDefaults, ranBefore: Bool) -> Bool {
+        !ranBefore && !defaults.bool(forKey: welcomeShownKey)
+    }
+
+    func dismissWelcome() {
+        showsWelcome = false
+    }
+
     /// How long the footer offers "Undo" after a Hide.
     nonisolated static let undoSeconds: Double = 5
 

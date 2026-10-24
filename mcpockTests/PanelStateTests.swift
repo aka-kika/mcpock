@@ -241,6 +241,14 @@ final class PanelStateTests: XCTestCase {
         XCTAssertFalse(state.firstAgentsViewWindowOpen, "a later view never reopens it")
     }
 
+    /// r3 ad7a: the welcome line shows once, on a Mac where mcpock never ran.
+    func testWelcomeOnlyOnAFirstInstall() {
+        XCTAssertTrue(PanelState.shouldWelcome(defaults: defaults, ranBefore: false))
+        XCTAssertFalse(PanelState.shouldWelcome(defaults: defaults, ranBefore: true), "an update never sees it")
+        defaults.set(true, forKey: PanelState.welcomeShownKey)
+        XCTAssertFalse(PanelState.shouldWelcome(defaults: defaults, ranBefore: false), "only once")
+    }
+
     /// r3 40f5: Undo after hiding a pinned server pins it again.
     func testUndoHideKeepsThePin() {
         let state = makeState()
