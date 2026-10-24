@@ -66,7 +66,7 @@ enum Differs {
         case .stdio:
             let command = comparedCommand(config.command ?? "")
             var previous: String?
-            let args = config.args.map { arg -> String in
+            let args = runnerArgs(config.args, command: command).map { arg -> String in
                 defer { previous = arg }
                 return SecretMask.maskArgument(PathResolver.expandTilde(arg), after: previous, known: known)
             }
@@ -76,6 +76,16 @@ enum Differs {
             // when one agent spells the transport differently.
             return LaunchTarget(parts: ["url", normalizedURL(SecretMask.url(config.url ?? "", known: known))])
         }
+    }
+
+    /// Package runners' spelling that changes nothing about what runs (r3
+    /// e59e): `npx -y pkg` and `npx pkg@latest` start the same server, so
+    /// `-y` / `--yes` and a trailing `@latest` are left out of the comparison.
+    static func runnerArgs(_ args: [String], command: String) -> [String] {
+        guard ["npx", "bunx", "bun", "pnpm", "uvx"].contains(command) else { return args }
+        return args
+            .filter { $0 != "-y" && $0 != "--yes" }
+            .map { $0.hasSuffix("@latest") && $0.count > "@latest".count ? String($0.dropLast("@latest".count)) : $0 }
     }
 
     /// Trims whitespace and a trailing slash, so `…/mcp` and `…/mcp/` match.

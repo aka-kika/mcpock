@@ -31,6 +31,15 @@ final class DiffersTests: XCTestCase {
         )
     }
 
+    /// r3 e59e: npx -y pkg and npx pkg@latest start the same server.
+    func testRunnerYesFlagAndLatestTagAreTheSameServer() {
+        XCTAssertTrue(Differs.detect([stdio(.code, args: ["-y", "reed-md"]),
+                                      stdio(.cursor, args: ["reed-md@latest"]),
+                                      stdio(.grok, args: ["--yes", "reed-md"])]).isEmpty)
+        XCTAssertFalse(Differs.detect([stdio(.code, args: ["reed-md@1.0.0"]),
+                                       stdio(.cursor, args: ["reed-md@2.0.0"])]).isEmpty, "a pinned version still counts")
+    }
+
     func testSameCommandInThreeAgentsGivesNoDiff() {
         XCTAssertTrue(Differs.detect([stdio(.code), stdio(.cursor), stdio(.grok)]).isEmpty)
     }
