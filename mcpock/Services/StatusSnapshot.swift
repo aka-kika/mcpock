@@ -192,11 +192,26 @@ final class StatusWriter {
     }
 
     nonisolated static func write(_ status: MCPockStatus, to directory: URL) throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try ensurePrivateDirectory(directory)
         let json = try MCPockStatus.encoder().encode(status)
-        try json.write(to: directory.appendingPathComponent(MCPockStatus.fileName), options: .atomic)
+        try writePrivate(json, to: directory.appendingPathComponent(MCPockStatus.fileName))
         let markdown = markdown(status)
-        try Data(markdown.utf8).write(to: directory.appendingPathComponent(MCPockStatus.markdownFileName), options: .atomic)
+        try writePrivate(Data(markdown.utf8), to: directory.appendingPathComponent(MCPockStatus.markdownFileName))
+    }
+
+    /// The folder, mode 0700, fixed if it already exists with a wider mode
+    /// (r3 247f): server names and error text are for this user only.
+    nonisolated static func ensurePrivateDirectory(_ directory: URL) throws {
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+    }
+
+    /// Atomic write, then mode 0600. The folder is 0700, so the file is never
+    /// readable by others in between (r3 247f).
+    nonisolated static func writePrivate(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// `status.md`: the same text `mcpock_problems` returns, for an agent that

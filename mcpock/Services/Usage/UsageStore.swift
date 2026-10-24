@@ -276,8 +276,8 @@ final class UsageStore {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(payload)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try data.write(to: directory.appendingPathComponent(fileName), options: .atomic)
+        try StatusWriter.ensurePrivateDirectory(directory)
+        try StatusWriter.writePrivate(data, to: directory.appendingPathComponent(fileName))
     }
 }
 

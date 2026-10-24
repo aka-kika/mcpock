@@ -154,6 +154,22 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertTrue(markdown.contains("firecrawl — broken"))
     }
 
+    /// r3 247f: files 0600 in a 0700 folder, and a wider existing folder is fixed.
+    func testFilesAreOwnerOnlyAndAnOpenFolderIsTightened() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-mode-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
+        try StatusWriter.write(build(), to: dir)
+        try StatusWriter.writePrivate(Data("{}".utf8), to: dir.appendingPathComponent("usage.json"))
+        func mode(_ url: URL) throws -> Int {
+            (try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1
+        }
+        XCTAssertEqual(try mode(dir), 0o700)
+        for name in ["status.json", "status.md", "usage.json"] {
+            XCTAssertEqual(try mode(dir.appendingPathComponent(name)), 0o600, name)
+        }
+    }
+
     func testTestMonitorHasNoWriter() {
         // The test host is the app: a monitor built here must never touch the real file.
         let suite = "status-tests"
