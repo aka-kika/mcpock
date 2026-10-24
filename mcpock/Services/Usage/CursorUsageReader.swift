@@ -67,8 +67,14 @@ struct CursorUsageReader: UsageReader {
     /// point this at a temp file built with the real table shape instead.
     private let databasePath: String
 
-    init(databasePath: String = CursorUsageReader.defaultDatabasePath) {
+    /// Rows per query. Each batch is its own statement, so no read
+    /// transaction stays open across a first scan of a huge database
+    /// (r3 6c1d). A parameter so a test can use a tiny one.
+    private let batchSize: Int
+
+    init(databasePath: String = CursorUsageReader.defaultDatabasePath, batchSize: Int = 2_000) {
         self.databasePath = databasePath
+        self.batchSize = max(1, batchSize)
     }
 
     static var defaultDatabasePath: String {
@@ -104,7 +110,7 @@ struct CursorUsageReader: UsageReader {
         guard let (scan, sinceRowid, tableMax) = Self.withOpenDatabase(at: databasePath, body: { db -> (ScanResult, Int64, Int64) in
             let tableMax = Self.queryMaxRowid(db) ?? storedRowid
             let since = storedRowid > tableMax ? 0 : storedRowid
-            return (Self.scan(db, sinceRowid: since, knownServers: knownServers), since, tableMax)
+            return (Self.scan(db, sinceRowid: since, batchSize: batchSize, knownServers: knownServers), since, tableMax)
         }) else {
             // Neither the direct open nor the copy-and-read fallback worked
             // (e.g. the file vanished between the exists check and here).
@@ -194,14 +200,41 @@ struct CursorUsageReader: UsageReader {
         var isComplete = false
     }
 
-    /// Reads every `bubbleId:` row past `sinceRowid`, in rowid order, and
-    /// turns the terminal MCP-call ones into events. `maxRowid` is the
-    /// highest rowid seen among *all* matching rows (even ones that were
-    /// skipped), so a run of non-MCP or mid-stream bubbles still advances
-    /// the cursor and is never rescanned.
+    /// Reads every `bubbleId:` row past `sinceRowid`, in rowid order and in
+    /// batches of `batchSize`, and turns the terminal MCP-call ones into
+    /// events. `maxRowid` is the highest rowid seen among *all* matching rows
+    /// (even ones that were skipped), so a run of non-MCP or mid-stream
+    /// bubbles still advances the cursor and is never rescanned.
     private static func scan(
-        _ db: OpaquePointer, sinceRowid: Int64, knownServers: Set<String>
+        _ db: OpaquePointer, sinceRowid: Int64, batchSize: Int, knownServers: Set<String>
     ) -> ScanResult {
+        var result = ScanResult(calls: [], maxRowid: sinceRowid, isComplete: false)
+        while true {
+            let batch = scanBatch(db, afterRowid: result.maxRowid, limit: batchSize, knownServers: knownServers)
+            result.calls.append(contentsOf: batch.calls)
+            result.maxRowid = max(result.maxRowid, batch.lastRowid)
+            guard batch.isComplete else { return result } // BUSY or an error: stop here
+            if batch.rowCount < batchSize {
+                result.isComplete = true
+                return result
+            }
+        }
+    }
+
+    private struct Batch {
+        var calls: [Call] = []
+        var lastRowid: Int64 = 0
+        var rowCount = 0
+        /// Read to SQLITE_DONE, not stopped by SQLITE_BUSY or an error.
+        var isComplete = false
+    }
+
+    /// One batch. `json_valid(value)` leaves out a row that is not JSON: one
+    /// bad row made `json_extract` fail and stopped Cursor usage for good
+    /// (r3 6c1d).
+    private static func scanBatch(
+        _ db: OpaquePointer, afterRowid: Int64, limit: Int, knownServers: Set<String>
+    ) -> Batch {
         let sql = """
         SELECT rowid,
                json_extract(value, '$.toolFormerData.name'),
@@ -209,21 +242,21 @@ struct CursorUsageReader: UsageReader {
                json_extract(value, '$.createdAt'),
                key
         FROM cursorDiskKV
-        WHERE key LIKE ? AND rowid > ?
+        WHERE key LIKE ? AND rowid > ? AND json_valid(value)
         ORDER BY rowid ASC
+        LIMIT ?
         """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
-            return ScanResult(calls: [], maxRowid: sinceRowid, isComplete: false)
+            return Batch(lastRowid: afterRowid)
         }
         defer { sqlite3_finalize(statement) }
 
         sqlite3_bind_text(statement, 1, rowLikePattern, -1, Self.sqliteTransient)
-        sqlite3_bind_int64(statement, 2, sinceRowid)
+        sqlite3_bind_int64(statement, 2, afterRowid)
+        sqlite3_bind_int64(statement, 3, Int64(limit))
 
-        var calls: [Call] = []
-        var maxRowid = sinceRowid
-        var isComplete = false
+        var batch = Batch(lastRowid: afterRowid)
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoFormatterNoFraction = ISO8601DateFormatter()
@@ -231,15 +264,16 @@ struct CursorUsageReader: UsageReader {
         while true {
             let step = sqlite3_step(statement)
             guard step == SQLITE_ROW else {
-                // SQLITE_DONE ends the scan; SQLITE_BUSY (or any other
+                // SQLITE_DONE ends the batch; SQLITE_BUSY (or any other
                 // error) stops here rather than looping forever — whatever
                 // rows were already read still count, and the cursor only
                 // advances to the last one actually seen.
-                isComplete = step == SQLITE_DONE
+                batch.isComplete = step == SQLITE_DONE
                 break
             }
             let rowid = sqlite3_column_int64(statement, 0)
-            if rowid > maxRowid { maxRowid = rowid }
+            batch.rowCount += 1
+            if rowid > batch.lastRowid { batch.lastRowid = rowid }
 
             guard let name = Self.columnText(statement, 1),
                   name.hasPrefix(mcpPrefix), name != "mcp--" else { continue }
@@ -251,10 +285,9 @@ struct CursorUsageReader: UsageReader {
             }
 
             let key = Self.columnText(statement, 4) ?? "rowid:\(rowid)"
-            calls.append(Call(key: key, event: UsageEvent(agent: "Cursor", server: split.server, date: date)))
+            batch.calls.append(Call(key: key, event: UsageEvent(agent: "Cursor", server: split.server, date: date)))
         }
-
-        return ScanResult(calls: calls, maxRowid: maxRowid, isComplete: isComplete)
+        return batch
     }
 
     private static func columnText(_ statement: OpaquePointer?, _ index: Int32) -> String? {

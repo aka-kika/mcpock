@@ -4,7 +4,7 @@ import Foundation
 /// under `<project>/<session>/subagents/` — for MCP tool calls. An MCP call
 /// is an assistant `tool_use` block named `mcp__<server>__<tool>`; the line's
 /// own `timestamp` is the call's time. Read-only, and it keeps only the
-/// agent, the server and that time.
+/// agent, the server and that time (cursor keys are hashes of the file path).
 ///
 /// Checked against real transcripts on this Mac (`grep -m3 '"name":"mcp__'`):
 /// a line looks like
@@ -33,9 +33,15 @@ struct ClaudeCodeUsageReader: UsageReader {
         var nextCursor = cursor
         var events: [UsageEvent] = []
         for file in transcriptFiles() {
-            let path = file.path
+            // Keyed by a hash, not the path: the path holds the project's name,
+            // and usage.json keeps only agent, server and day (r3 b935). An
+            // old full-path key moves to its hash once, offset and all.
+            let path = Self.cursorKey(for: file.path)
+            nextCursor.rekey(file.path, to: path)
             let size = fileSize(file)
-            var offset = cursor.values[path] ?? 0
+            // A damaged usage.json can hold a negative offset; `UInt64(offset)`
+            // in `scan` would trap on it (r3 394d).
+            var offset = max(0, nextCursor.values[path] ?? 0)
             // Shrank or was replaced with something shorter: nothing at the
             // old offset can still be valid, so start this file over,
             // counting only calls newer than the ones it already gave, now
@@ -52,7 +58,16 @@ struct ClaudeCodeUsageReader: UsageReader {
             events.append(contentsOf: found)
             nextCursor.values[path] = newOffset
         }
+        // Old full-path keys of transcripts that are gone: drop them, so no
+        // project name stays in usage.json (r3 b935).
+        nextCursor.values = nextCursor.values.filter { !$0.key.hasPrefix("/") }
+        nextCursor.newest = nextCursor.newest.filter { !$0.key.hasPrefix("/") }
+        nextCursor.restartCutoff = nextCursor.restartCutoff.filter { !$0.key.hasPrefix("/") }
         return (events, nextCursor)
+    }
+
+    static func cursorKey(for path: String) -> String {
+        "cc:" + UsageCursor.stableHash(path)
     }
 
     // MARK: - Discovery
@@ -67,6 +82,9 @@ struct ClaudeCodeUsageReader: UsageReader {
         ) else { return [] }
         var files: [URL] = []
         for case let url as URL in enumerator where url.pathExtension == "jsonl" {
+            // Regular files only: opening a FIFO named `.jsonl` would block
+            // the refresh, and a symlink could lead anywhere (r3 394d).
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
             files.append(url)
         }
         return files

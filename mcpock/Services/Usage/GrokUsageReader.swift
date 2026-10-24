@@ -199,12 +199,6 @@ struct GrokUsageReader: UsageReader {
     /// across launches. Swift's `Hashable` is seeded per-process and would
     /// not round-trip through `UsageCursor`'s persisted `[String: Int64]`.
     static func cursorKey(for path: String) -> String {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        let prime: UInt64 = 0x0000_0100_0000_01b3
-        for byte in path.utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* prime
-        }
-        return "grok:" + String(hash, radix: 16)
+        "grok:" + UsageCursor.stableHash(path)
     }
 }

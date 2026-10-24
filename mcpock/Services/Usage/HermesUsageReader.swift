@@ -82,14 +82,26 @@ struct HermesUsageReader: UsageReader {
     ) -> (events: [UsageEvent], lastID: Int64?, restarted: Bool) {
         guard FileManager.default.fileExists(atPath: path) else { return ([], nil, false) }
 
+        // Percent-encoded: a `?`, `#` or `%` in the path (or a space) would
+        // otherwise be read as part of the URI, not the file name (r3 df08).
+        var components = URLComponents()
+        components.scheme = "file"
+        components.path = path
+        components.query = "mode=ro"
+        guard let uri = components.string else { return ([], nil, false) }
         var db: OpaquePointer?
-        let uri = "file:\(path)?mode=ro"
         guard sqlite3_open_v2(uri, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db else {
             sqlite3_close(db)
             return ([], nil, false)
         }
         defer { sqlite3_close(db) }
         sqlite3_busy_timeout(db, 200)
+
+        // One read transaction for the max id and the rows: a row Hermes adds
+        // between two separate reads was counted now and again next time,
+        // because the cursor only reached the older max (r3 df08).
+        guard sqlite3_exec(db, "BEGIN", nil, nil, nil) == SQLITE_OK else { return ([], nil, false) }
+        defer { sqlite3_exec(db, "COMMIT", nil, nil, nil) }
 
         guard let maxID = queryMaxID(db) else { return ([], nil, false) }
         let restarted = since > maxID
