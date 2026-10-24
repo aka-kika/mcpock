@@ -126,6 +126,9 @@ private struct Parser {
     /// that block is skipped, like any other part mcpock can't read.
     private var depth = 0
     private static let maxDepth = 64
+    /// How far a quoted scalar or flow collection may run on before mcpock
+    /// stops looking for its end (r3 669e).
+    static let maxContinuationLines = 50
     /// Whether the last line ends in a line break (block scalars keep it or not).
     private let endsWithNewline: Bool
 
@@ -291,7 +294,9 @@ private struct Parser {
             }
             raw.append(current)
             j += 1
-            guard j < lines.count else { return nil }
+            // An unclosed quote on every line read to the end of the file
+            // each time: quadratic on an odd file (r3 669e).
+            guard j < lines.count, j - pos <= Self.maxContinuationLines else { return nil }
             current = lines[j]
         }
     }
@@ -377,7 +382,7 @@ private struct Parser {
         var j = pos
         while !closed {
             j += 1
-            guard j < lines.count else { return nil }
+            guard j < lines.count, j - pos <= Self.maxContinuationLines else { return nil }
             let part = Self.stripFlowComment(lines[j].trimmingCharacters(in: .whitespaces))
             parts.append(part)
             closed = balance.feed(" " + part)

@@ -380,4 +380,15 @@ final class YAMLBlockTests: XCTestCase {
         let shallow = "a: " + String(repeating: "[", count: 10) + "x" + String(repeating: "]", count: 10) + "\n"
         XCTAssertNotNil(YAMLBlock.parse(shallow)?["a"], "ordinary nesting still reads")
     }
+
+    /// r3 669e: thousands of lines each opening a quote or a bracket that
+    /// never closes no longer read to the end of the file from every line.
+    func testUnclosedQuotesAndBracketsStayFast() {
+        let quotes = "a:\n" + (0..<5_000).map { "  k\($0): \"open" }.joined(separator: "\n") + "\n"
+        let brackets = "a:\n" + (0..<5_000).map { "  k\($0): [open" }.joined(separator: "\n") + "\n"
+        let start = Date()
+        _ = YAMLBlock.parse(quotes)
+        _ = YAMLBlock.parse(brackets)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
 }
