@@ -6,6 +6,18 @@ enum ConfigDiscovery {
         discover(registry: AgentRegistry.known, scanRoots: ConfigScanner.defaultRoots)
     }
 
+    /// A timer round's read (9180): the known agents' files and the files the
+    /// last full scan found, no folder walk. Unchanged files are not parsed
+    /// again (`ParsedFileCache`).
+    static func discover(knownScanFiles: [String]) -> [ServerConfig] {
+        discover(registry: AgentRegistry.known, scanRoots: [], knownScanFiles: knownScanFiles)
+    }
+
+    /// The scan-found files among `configs`, for the next timer round.
+    static func scanFiles(in configs: [ServerConfig]) -> [String] {
+        Array(Set(configs.filter { $0.id.hasPrefix("scan:") }.map(\.source.path))).sorted()
+    }
+
     /// Testable core: registry entries + a scan of `scanRoots`, deduped by canonical
     /// file path (registry wins), normalized to `ServerConfig`s.
     ///
@@ -17,6 +29,7 @@ enum ConfigDiscovery {
     static func discover(
         registry: [KnownAgent],
         scanRoots: [String],
+        knownScanFiles: [String]? = nil,
         folderExists: (String) -> Bool = ConfigDiscovery.isExistingFolder
     ) -> [ServerConfig] {
         var servers: [ServerConfig] = []
@@ -52,7 +65,8 @@ enum ConfigDiscovery {
             .flatMap(ClaudeProjectApproval.object)
 
         // 2. Scan: everything else, deduped against the registry.
-        for hit in ConfigScanner.scan(roots: scanRoots) where !claimedPaths.contains(hit.path) {
+        let hits = knownScanFiles.map(ConfigScanner.scan(files:)) ?? ConfigScanner.scan(roots: scanRoots)
+        for hit in hits where !claimedPaths.contains(hit.path) {
             claimedPaths.insert(hit.path)
             let source = ServerSource(
                 label: label(forScannedPath: hit.path, derived: hit.label, registry: registry),

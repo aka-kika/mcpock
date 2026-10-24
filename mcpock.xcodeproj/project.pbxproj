@@ -117,6 +117,7 @@
 		850B33630EE30C9FFEDDDA66 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE05F2B0E8DFF6C972EA8A62 /* LaunchAtLogin.swift */; };
 		882D8F5D9D37BB89BCF91CF9 /* AgentSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6766AE0FF7F136B82DFFF6B5 /* AgentSections.swift */; };
 		8835DEB2287F98F183B51AF5 /* MCPMessageBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3612ECFC077A77BF9C6ED284 /* MCPMessageBufferTests.swift */; };
+		8A92AF8A3F70489FDE858965 /* TimerRoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3BB31AE1CFFF0A3EE0A2F59 /* TimerRoundTests.swift */; };
 		8A9E10E1553F602FF92406C5 /* WidgetSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D410C5BD065362F3163029 /* WidgetSnapshotTests.swift */; };
 		8B3B60EDEA7E5E2CB68317EA /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA59574B047CB376A17C6816 /* DemoData.swift */; };
 		8BFBC0040A9A7A7A142838A0 /* ShortReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6666A0C03AB65C936C6492BA /* ShortReason.swift */; };
@@ -402,6 +403,7 @@
 		C0E5AE0600A8E45307B57D1B /* mcpockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mcpockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C12B1204C0AEEA2F0E5B19E3 /* mcpock-mcp */ = {isa = PBXFileReference; includeInIndex = 0; path = "mcpock-mcp"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3B421B565393E5EA0385A7D /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		C3BB31AE1CFFF0A3EE0A2F59 /* TimerRoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerRoundTests.swift; sourceTree = "<group>"; };
 		CA59574B047CB376A17C6816 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		CBA0422E4328AA172827BBD6 /* WidgetReloadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetReloadPolicy.swift; sourceTree = "<group>"; };
 		CC43763B73F2D384F40D04C3 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
@@ -566,6 +568,7 @@
 				CC8B41723C99A1672DD754DD /* TestProcess.swift */,
 				CC43763B73F2D384F40D04C3 /* TestSupport.swift */,
 				8D354EF49B4DADDD58F07225 /* ThemeTests.swift */,
+				C3BB31AE1CFFF0A3EE0A2F59 /* TimerRoundTests.swift */,
 				F2CE608C22C1FB8E72A9DB85 /* TinycastConfigTests.swift */,
 				604C66D104D046D2409E3E5F /* UpdateControllerTests.swift */,
 				878B863EF5565076330EEE51 /* UsageTests.swift */,
@@ -1110,6 +1113,7 @@
 				96756244392D0F55E146DB62 /* TestProcess.swift in Sources */,
 				B964FCC5F49190DCAF43E6FD /* TestSupport.swift in Sources */,
 				E470A52B4097D0404D38E355 /* ThemeTests.swift in Sources */,
+				8A92AF8A3F70489FDE858965 /* TimerRoundTests.swift in Sources */,
 				F00A62EAD7E861ED7C0CA1EE /* TinycastConfigTests.swift in Sources */,
 				52B50363CFA9EFFBF5D3FC93 /* UpdateControllerTests.swift in Sources */,
 				614771CBE72D3933C1C4A91A /* UsageTests.swift in Sources */,

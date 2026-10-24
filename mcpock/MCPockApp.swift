@@ -57,6 +57,17 @@ struct MCPockApp: App {
             monitor.discover = { DemoData.configs }
             monitor.probe = { config, _ in DemoData.probeResult(for: config) }
         }
+        // Timer rounds re-read only the files already found; the home-folder
+        // scan runs at launch and on Refresh (9180).
+        if !isHostingTests && !isDemo {
+            monitor.discoverKnownFiles = { files in
+                async let aka = AkaSource.discover()
+                let configs = await Task.detached(priority: .utility) {
+                    ConfigDiscovery.discover(knownScanFiles: files)
+                }.value
+                return configs + (await aka)
+            }
+        }
         // Servers start with the login shell's PATH and keys, like an agent
         // started from a terminal (r3 3c03). Read once, before the first check.
         if !isHostingTests && !isDemo { monitor.prepareEnvironment = { await ShellEnvironment.loadOnce() } }

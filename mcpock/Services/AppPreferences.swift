@@ -236,7 +236,9 @@ enum ProbeInterval: Int, CaseIterable, Identifiable {
     case fourHours = 14400
     case manual = 0
 
-    static let `default` = ProbeInterval.oneMinute
+    /// 15 minutes since 1.12 (9180; 1 min before): every round starts every
+    /// server. Only a saved choice keeps its own interval.
+    static let `default` = ProbeInterval.fifteenMinutes
 
     var id: Int { rawValue }
 

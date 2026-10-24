@@ -357,6 +357,14 @@ final class HealthMonitor {
         return configs + (await aka)
     }
 
+    /// A timer round's read (9180): only the known agents' files and the
+    /// files the last full scan found, no home-folder walk. Nil (tests, demo
+    /// mode) reads with `discover`, as every round did before.
+    @ObservationIgnored var discoverKnownFiles: (@Sendable ([String]) async -> [ServerConfig])?
+
+    /// The scan-found files of the last full read, for `discoverKnownFiles`.
+    private var knownScanFiles: [String] = []
+
     /// One server's probe. Replaceable like `discover`, so demo mode
     /// (`DemoData`) and tests never spawn a process or open a network
     /// connection: a canned `ProbeResult` per server instead. Runs inside a
@@ -405,7 +413,7 @@ final class HealthMonitor {
         Task {
             await prepareEnvironment()
             await awaitInFlightCycle()
-            await reloadThenProbe(force: false)
+            await reloadThenProbe(force: false, fullScan: true)
         }
     }
 
@@ -423,8 +431,18 @@ final class HealthMonitor {
     /// directories, so it must never run synchronously on the main thread.
     /// aka (round 5) has no config file: its sidecar is asked at the same time,
     /// with a 1.5 s timeout, and simply adds nothing when it isn't running.
-    func reloadConfigs() async {
-        let found = await discover()
+    ///
+    /// `fullScan: false` (a timer round) skips the folder walk when
+    /// `discoverKnownFiles` is set: the full scan runs at launch, on Refresh
+    /// and on Check again (9180).
+    func reloadConfigs(fullScan: Bool = true) async {
+        let found: [ServerConfig]
+        if !fullScan, let discoverKnownFiles {
+            found = await discoverKnownFiles(knownScanFiles)
+        } else {
+            found = await discover()
+            knownScanFiles = ConfigDiscovery.scanFiles(in: found)
+        }
         let configs = found + Self.midWriteSurvivors(previous: servers.map(\.config), found: found)
         if seedsScanFiles {
             allowedScanFiles.formUnion(configs.compactMap(Self.scanOnlyFile))
@@ -600,9 +618,9 @@ final class HealthMonitor {
     /// that window saw no cycle in flight, read the configs again and replaced
     /// `servers` while the first cycle probed, and both probed at once. Call it
     /// right after `awaitInFlightCycle()`, with no suspension in between.
-    private func reloadThenProbe(force: Bool) async {
+    private func reloadThenProbe(force: Bool, fullScan: Bool) async {
         let task = Task {
-            await self.reloadConfigs()
+            await self.reloadConfigs(fullScan: fullScan)
             await self.runProbeCycle(force: force)
         }
         probeTask = task
@@ -636,8 +654,8 @@ final class HealthMonitor {
     /// server. Discovery is included on purpose — the button answers "what is the
     /// state of my MCP setup *right now*", and a server added to a config a minute
     /// ago is part of that answer. The scan runs off the main actor and costs a
-    /// fraction of the probe pass that follows it. Each timer round rediscovers
-    /// too (`timerTick`).
+    /// fraction of the probe pass that follows it. A timer round re-reads only
+    /// the files already known (`timerTick`, 9180).
     func refreshAll() async {
         refreshHolds += 1
         defer { refreshHolds -= 1 }
@@ -645,7 +663,7 @@ final class HealthMonitor {
         // finished after the reload wrote its result over a server just fixed
         // (Argon 2026-10-16 #8).
         await awaitInFlightCycle()
-        await reloadThenProbe(force: true)
+        await reloadThenProbe(force: true, fullScan: true)
     }
 
     /// The footer's Refresh button. Synchronous on purpose: `isRefreshing` turns
@@ -929,12 +947,13 @@ final class HealthMonitor {
     /// Claude Code and was deleted from aka; two rounds later both still showed the
     /// old entries). `merged` restarts a changed server from `.unknown`, so the
     /// probe below checks the new config at once instead of waiting out a backoff.
+    /// Since 1.12 (9180) the round reads the known files only, no folder walk.
     func timerTick() async {
         // A full cycle that was in flight already covered this round; reading
         // the configs while it ran let its old result overwrite a fixed server
         // (Argon 2026-10-16 #8).
         if await awaitInFlightCycle() { return }
-        await reloadThenProbe(force: false)
+        await reloadThenProbe(force: false, fullScan: false)
     }
 
     private func runProbeCycle(force: Bool) async {

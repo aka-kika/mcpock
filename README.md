@@ -34,9 +34,10 @@ them, checks every server, and shows you what needs attention and why, so you
   agents and also scans the usual config folders for anything written in a
   standard MCP format. The same server in several agents shows as one row.
 - **Checks each one.** It starts a local server (or calls a remote one), does
-  the MCP handshake, asks for its tool list, then closes it. Every 1 minute to
-  4 hours, or only when you click Refresh. Each round also reads the configs
-  again, so new and changed servers show up. A server that is already fine
+  the MCP handshake, asks for its tool list, then closes it. Every 15 minutes
+  by default (1 minute to 4 hours, or only when you click Refresh). Each round
+  reads the config files it already knows again, so changed servers show up; a
+  config file in a new place is found at launch or when you click Refresh. A server that is already fine
   keeps its tool list between rounds; Refresh and Check again ask for it anew.
 - **Shows health as a shape, not only a colour:**
 

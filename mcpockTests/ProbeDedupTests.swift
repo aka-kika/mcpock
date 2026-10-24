@@ -69,7 +69,7 @@ final class ProbeIntervalTests: XCTestCase {
         defer { defaults.retireSuite(named: suite) }
 
         XCTAssertEqual(AppPreferences.loadProbeInterval(from: defaults), .default,
-                       "no stored value → default (every minute)")
+                       "no stored value → default (every 15 minutes since 1.12)")
 
         AppPreferences.saveProbeInterval(.manual, to: defaults)
         XCTAssertEqual(AppPreferences.loadProbeInterval(from: defaults), .manual)
@@ -80,7 +80,7 @@ final class ProbeIntervalTests: XCTestCase {
 
         // An odd stored value snaps to the nearest automatic stop (1 min here), never crashes.
         defaults.set(42, forKey: AppPreferences.probeIntervalKey)
-        XCTAssertEqual(AppPreferences.loadProbeInterval(from: defaults), .default)
+        XCTAssertEqual(AppPreferences.loadProbeInterval(from: defaults), .oneMinute)
     }
 }
 

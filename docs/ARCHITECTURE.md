@@ -178,15 +178,18 @@ and signed with the app.
 **Two cadences, kept apart on purpose.**
 
 - **Discovery** (registry + scan + aka) runs when the monitor starts (at
-  launch, 1.7.1), at the start of every timer round (`timerTick`), on
-  **Check again**, and on **Refresh** in the footer (`startRefreshAll()`
-  → `refreshAll()`). It runs in `Task.detached(priority: .utility)` (the
+  launch, 1.7.1), on **Check again**, and on **Refresh** in the footer
+  (`startRefreshAll()` → `refreshAll()`). A timer round (`timerTick`, 1.12)
+  reads only the known files: the registry paths and the files the last full
+  scan found (`discoverKnownFiles` → `ConfigDiscovery.discover(knownScanFiles:)`
+  → `ConfigScanner.scan(files:)`), no folder walk; `ParsedFileCache` parses a
+  file again only when its stamp changed. It runs in `Task.detached(priority: .utility)` (the
   replaceable `HealthMonitor.discover` closure, stubbed in tests), then `HealthMonitor.merged`
   folds it into `servers` on the main actor: a server whose id and probe spec
   are unchanged keeps its health, tools and backoff; a changed spec starts over
   as `.unknown`. Hidden, pinned and paused choices are never pruned.
 - **Probing** runs on the timer (Settings > General > Check servers: 1 min to
-  4 h, or Manual = no timer), after a Refresh, and per server on **Check
+  4 h, 15 min by default since 1.12, or Manual = no timer), after a Refresh, and per server on **Check
   again**. Everything goes through `refreshNow(force:)` → `runProbeCycle`.
 
 **Who gets launched.** Spawning has side effects (an OAuth server can open a

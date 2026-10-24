@@ -123,25 +123,46 @@ enum ConfigScanner {
                 continue
             }
 
-            let ext = (name as NSString).pathExtension.lowercased()
-            guard candidateExtensions.contains(ext), !isExcludedFile(full) else { continue }
-            // Regular files only: reading a named pipe (FIFO) or a socket that
-            // happens to end in .json would block the scan forever.
-            guard let attrs = try? fm.attributesOfItem(atPath: full),
-                  attrs[.type] as? FileAttributeType == .typeRegular,
-                  let size = attrs[.size] as? Int, size <= maxFileBytes else { continue }
+            if let hit = read(full) { out[hit.path] = hit }
+        }
+    }
+
+    /// The files a full scan found, read again without walking any folder
+    /// (9180): a timer round re-reads only these, each parsed again only
+    /// when it changed (`ParsedFileCache`). A file gone or emptied drops out;
+    /// a new file is found by the next full scan (launch, Refresh).
+    static func scan(files: [String]) -> [ScannedConfig] {
+        var out: [String: ScannedConfig] = [:]
+        for path in files where !isSymlink(path) {
+            if let hit = read(path) { out[hit.path] = hit }
+        }
+        return Array(out.values)
+    }
+
+    /// One candidate file, read the way the walk reads it.
+    private static func read(_ full: String) -> ScannedConfig? {
+        let name = (full as NSString).lastPathComponent
+        let ext = (name as NSString).pathExtension.lowercased()
+        guard candidateExtensions.contains(ext), !isExcludedFile(full) else { return nil }
+        // Regular files only: reading a named pipe (FIFO) or a socket that
+        // happens to end in .json would block the scan forever.
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: full),
+              attrs[.type] as? FileAttributeType == .typeRegular,
+              let size = attrs[.size] as? Int, size <= maxFileBytes else { return nil }
+        // Kept as a list of none or one, so "no servers in it" is cached too.
+        let parsed: [ScannedConfig]? = ParsedFileCache.value(path: full, kind: "scan") {
             guard let data = FileManager.default.contents(atPath: full),
                   mightHoldServers(data, fileName: name),
-                  let text = String(data: data, encoding: .utf8) else { continue }
-
+                  let text = String(data: data, encoding: .utf8) else { return [] }
             for shape in scanShapes(forFileNamed: name) {
                 if let entries = shape.parse(text), entries.contains(where: \.hasEndpoint) {
                     let canonical = canonicalPath(full)
-                    out[canonical] = ScannedConfig(path: canonical, label: deriveLabel(fromPath: full), entries: entries)
-                    break
+                    return [ScannedConfig(path: canonical, label: deriveLabel(fromPath: full), entries: entries)]
                 }
             }
+            return []
         }
+        return parsed?.first
     }
 
     /// The keys the shapes read outside an MCP-named file. A file with none of
