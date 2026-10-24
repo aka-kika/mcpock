@@ -50,21 +50,23 @@ echo "==> Signing and building $FOLDER/appcast.xml"
 "$GENERATE_APPCAST" --account "${SPARKLE_KEY_ACCOUNT:-mcpock}" \
   --download-url-prefix "$DOWNLOAD_PREFIX" "$FOLDER"
 
-# mcpock is Apple Silicon only. generate_appcast adds
-# <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements> to each
-# new item by reading the app's architecture slices. Check every item has it,
-# so an update is never offered to an Intel Mac that cannot open it.
+# mcpock is Apple Silicon only since 1.10.9. generate_appcast adds
+# <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements> to an
+# item by reading the app's architecture slices. Check the newest item has
+# it, so this update is never offered to an Intel Mac that cannot open it.
+# Older items were universal builds and rightly have no requirement.
 python3 - "$FOLDER/appcast.xml" <<'PY'
 import re, sys
 xml = open(sys.argv[1], encoding="utf-8").read()
 items = re.findall(r"<item>.*?</item>", xml, flags=re.S)
 if not items:
     sys.exit("error: no <item> found in the appcast")
-bad = [i for i in items
-       if not re.search(r"<sparkle:hardwareRequirements>\s*arm64\s*</sparkle:hardwareRequirements>", i)]
-if bad:
-    sys.exit(f"error: {len(bad)} of {len(items)} appcast items lack sparkle:hardwareRequirements arm64. "
-             "Remove the old universal DMGs from the folder, or fix the items, then run again.")
+def build(item):
+    m = re.search(r"<sparkle:version>\s*(\d+)\s*</sparkle:version>", item)
+    return int(m.group(1)) if m else -1
+newest = max(items, key=build)
+if not re.search(r"<sparkle:hardwareRequirements>\s*arm64\s*</sparkle:hardwareRequirements>", newest):
+    sys.exit(f"error: the newest appcast item (build {build(newest)}) lacks sparkle:hardwareRequirements arm64")
 PY
 
 echo "Done: $FOLDER/appcast.xml is ready."
