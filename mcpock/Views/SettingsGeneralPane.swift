@@ -21,6 +21,7 @@ struct SettingsGeneralPane: View {
     @AppStorage(AppPreferences.openPanelHotKeyKey, store: AppPreferences.store) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
+    @State private var launchNeedsApproval = LaunchAtLogin.needsApproval
     @State private var exportNote: String?
     /// The slider's live position while dragging (and while it snaps); nil
     /// at rest. The stored interval changes only when the knob is let go, so
@@ -113,9 +114,11 @@ struct SettingsGeneralPane: View {
                         do {
                             try LaunchAtLogin.setEnabled(newValue)
                             launchAtLogin = LaunchAtLogin.isEnabled
+                            launchNeedsApproval = LaunchAtLogin.needsApproval
                             launchError = nil
                         } catch {
                             launchAtLogin = LaunchAtLogin.isEnabled
+                            launchNeedsApproval = LaunchAtLogin.needsApproval
                             launchError = error.localizedDescription
                         }
                     }
@@ -127,6 +130,10 @@ struct SettingsGeneralPane: View {
                     Text(launchError)
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusBroken)
+                } else if launchNeedsApproval {
+                    Text(LaunchAtLogin.approvalText)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.statusDegraded)
                 } else if openPanelHotKey && GlobalHotKey.shared.isTaken {
                     Text(Self.hotKeyTakenText)
                         .font(Theme.caption)
@@ -206,7 +213,10 @@ struct SettingsGeneralPane: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .panelScrollIndicators()
-        .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
+        .onAppear {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            launchNeedsApproval = LaunchAtLogin.needsApproval
+        }
         .onChange(of: probeIntervalRaw) { _, _ in
             monitor?.probeIntervalChanged()
         }
