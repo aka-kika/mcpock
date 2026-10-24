@@ -25,8 +25,8 @@ enum SSEProbe {
         deadline: ContinuousClock.Instant = ContinuousClock.now + probeTimeout
     ) async -> ProbeResult? {
         var request = URLRequest(url: url, timeoutInterval: (try? HTTPProbe.timeoutInterval(until: deadline, cap: 10)) ?? 0.001)
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")   // last, as in HTTPProbe (r3 3c71)
 
         let bytes: URLSession.AsyncBytes
         let response: URLResponse
@@ -216,8 +216,8 @@ enum SSEProbe {
         var request = URLRequest(url: endpoint, timeoutInterval: try HTTPProbe.timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = try MCPJSONRPC.encode(message)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await ProbeSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ProbeError.protocolError("Invalid HTTP response")

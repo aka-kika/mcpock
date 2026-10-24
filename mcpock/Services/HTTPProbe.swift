@@ -168,11 +168,13 @@ enum HTTPProbe {
         var request = URLRequest(url: url, timeoutInterval: try timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
+        // Set last: a config's own Accept or Content-Type would make a streamable
+        // server answer 406 to the probe's body (r3 3c71).
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
 
         // Streamed, not `data(for:)`: a Streamable-HTTP server may answer on an
         // event stream it keeps open, and waiting for its end timed out every
