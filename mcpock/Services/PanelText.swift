@@ -10,7 +10,12 @@ enum PanelText {
     /// launch included) it reads "Checking…", next to the spinning refresh glyph.
     /// The full sentence lives in the tooltip (`footerTooltip`).
     static func compactSummary(_ groups: [ServerGroup], checking: Bool = false) -> String {
-        if checking { return "Checking\u{2026}" }
+        // While rows still wait for their first answer, count them (r3 2c74):
+        // "Checking…" alone hid the counts for the whole first pass.
+        if checking {
+            let done = groups.filter { $0.state != .unknown }.count
+            return done < groups.count ? "Checking \(done) of \(groups.count)" : "Checking\u{2026}"
+        }
         guard !groups.isEmpty else { return "No servers found" }
         let counts = Counts(groups)
         var parts: [String] = []

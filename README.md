@@ -106,7 +106,8 @@ Needs **macOS 26 or later** on Apple Silicon.
 **First launch, good to know:**
 
 - mcpock starts checking as soon as it launches, before you open the panel.
-  On a Mac with many agents the first list takes about 10 seconds.
+  On a Mac with many agents the first check takes a while (slow servers get
+  20 seconds); the footer counts it ("Checking 12 of 30").
 - If one of your servers lives in **Documents, Desktop or Downloads**, macOS
   asks whether mcpock may open that folder. Click **Allow**: mcpock has to start
   the server from there to check it. If you clicked Don't Allow, turn it on in

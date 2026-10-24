@@ -166,6 +166,8 @@ final class PanelTextTests: XCTestCase {
     func testCompactSummaryWhileChecking() {
         XCTAssertEqual(PanelText.compactSummary([group("a", .broken)], checking: true), "Checking\u{2026}")
         XCTAssertEqual(PanelText.compactSummary([], checking: true), "Checking\u{2026}")
+        XCTAssertEqual(PanelText.compactSummary([group("a", .unknown), group("b"), group("c", .unknown)], checking: true),
+                       "Checking 1 of 3", "r3 2c74: the first pass is counted")
     }
 
     func testFooterTooltipHasTheFullSentenceAndWhenItWasChecked() {
