@@ -195,7 +195,7 @@ starts a command from a file no agent it knows reads without your OK.
 
 | Agent | Config file | Format |
 |-------|-------------|--------|
-| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds (only the servers you approved in Claude Code) | JSON |
+| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds, but only inside `~/.config`, `~/Library/Application Support` or a hidden folder in your home folder, not in ordinary project folders (only the servers you approved in Claude Code) | JSON |
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | JSON |
 | Cursor | `~/.cursor/mcp.json` | JSON |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | JSON |
@@ -291,7 +291,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-709 unit tests at v1.10.9, and the build keeps zero warnings. They cover the
+709 unit tests at v1.10.9. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
@@ -362,8 +362,24 @@ xcrun notarytool store-credentials my-notary \
 MCPOCK_NOTARY_PROFILE=my-notary MCPOCK_SIGN_IDENTITY=<identity hash> ./scripts/release.sh
 ```
 
-Without those two variables the script uses the maintainer's own profile and
-identity.
+You can put the two variables in `scripts/release.env` (git-ignored, see
+`scripts/release.env.example`) instead. Without them the script stops with an
+error. It also stops if `docs/release-notes/<version>.md` is missing, if the
+tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
+
+## Uninstalling
+
+1. In each agent's MCP config, remove the `mcpock` entry you added in
+   **Connect your agents** (mcpock never edits your configs, so it did not add
+   one for you).
+2. In mcpock, open Settings > General and turn **Open at Login** off.
+3. Quit mcpock from its menu bar icon.
+4. Delete `mcpock.app` from Applications.
+5. Optional, to remove what it left behind (open Finder, press Shift+Cmd+G, and
+   paste each path):
+   - `~/Library/Application Support/mcpock` (the status and usage files)
+   - `~/Library/Preferences/com.mcpock.app.plist` (your settings)
+   - `~/Library/Group Containers/P5RB3W3D58.com.mcpock` (shared with the widgets)
 
 ## FAQ and troubleshooting
 
