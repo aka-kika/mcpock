@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.11.0](https://img.shields.io/badge/version-1.11.0-7a8fb0)](docs/release-notes/1.11.0.md)
+[![Version 1.12.0](https://img.shields.io/badge/version-1.12.0-7a8fb0)](docs/release-notes/1.12.0.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -67,17 +67,21 @@ them, checks every server, and shows you what needs attention and why, so you
   agent called it in the last 7 days, 30 days or all time (Settings >
   General > Usage, or Off). Read from the agent's own history on your Mac:
   Claude Code, Grok, Cursor and Hermes today. A dash means that agent keeps
-  no record mcpock can read yet.
+  no record mcpock can read yet. The panel says so once, with a Turn Off.
 - **Detail card.** Click a row: the full error (with **Ask an agent** and
   **Copy errors**), which agents use the server and where their config lives,
   its tools (name and short description; **+N more** lists them all), and
   **Check again**, **Pin** and **Hide**. While a server is re-checked, its
   row shows a small spinning mark.
+- **Lost in a session.** When a server drops inside a Claude Code session that
+  is still open (a short network blip), its row says "Lost in 1 open Claude
+  Code session: run /mcp there", even while mcpock's own check reaches it.
+  Read from Claude Code's own session and server logs on your Mac.
 - **Quiet menu bar icon.** Plain when all is fine, a small ring when something
   is slow or needs a look, a small diamond when something is broken. No
   numbers, no blinking, no notifications.
 - **Keyboard friendly.** Control-Option-M opens and closes the panel from any
-  app (turn it off in Settings > General). Arrow keys move (on the Agents tab,
+  app (pick your own keys, or turn it off, in Settings > General). Arrow keys move (on the Agents tab,
   Right and Left open and close an agent), Return opens the card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
   checks the selected row again (or every server), Cmd-C copies the selected
   row's error (or its details).
@@ -201,11 +205,13 @@ starts a command from a file no agent it knows reads without your OK.
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | JSON |
 | Cursor | `~/.cursor/mcp.json` | JSON |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | JSON |
+| Antigravity | `~/.gemini/config/mcp_config.json` | JSON |
 | Cline | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` | JSON |
 | Continue | `~/.continue/config.json` | JSON |
 | VS Code | `~/Library/Application Support/Code/User/mcp.json` (`servers`) | JSON |
 | Codex | `~/.codex/config.toml` | TOML |
 | Grok | `~/.grok/config.toml` | TOML |
+| Grok Bot | `~/.grokbot/settings.json` (`mcpBoxServers`, names only) | Settings |
 | Goose | `~/.config/goose/config.yaml` (`extensions:`) | YAML |
 | Hermes | `~/.hermes/config.yaml` (`mcp_servers:`) | YAML |
 | Kimi Code | `~/.kimi-code/mcp.json` | JSON |
@@ -226,7 +232,10 @@ because aka launches servers its own way, it never counts toward "set up
 differently". **Tinycast** keeps its servers in its own settings and their
 keys and sign-ins in its own Keychain items, which mcpock never reads: a
 Tinycast server that needs one shows as managed by its app, the others are
-checked like any other. Thirty agents have their real logo in the app; others show two
+checked like any other. **Grok Bot** keeps its servers in your xAI account
+and runs them in xAI's cloud; its settings file holds only their names, so
+mcpock lists them under Grok Bot and never starts them. A remote server
+written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty agents have their real logo in the app; others show two
 letters.
 
 ## Privacy and safety
@@ -261,6 +270,11 @@ letters.
   newest call it counted (so a rewritten file is never counted twice).
   Never a message, an argument or a result.
   Settings > General > Usage > Off stops the reading.
+- **Session logs, read only.** To spot a server lost in an open Claude Code
+  session, mcpock reads `~/.claude/sessions/*.json` (which sessions run, and
+  in which folder) and those sessions' lines in Claude Code's own MCP logs
+  (`~/Library/Caches/claude-cli-nodejs`), looking only at connect and failure
+  lines. Nothing is kept or sent.
 - **Where it looks.** Only known config paths and the usual config folders.
   The scan never looks inside Documents, Desktop or Downloads, and it skips
   symbolic links so it can't be led anywhere else.

@@ -1,6 +1,6 @@
 # mcpock — Architecture
 
-How the app is put together (v1.11), how one health check flows end to end, and
+How the app is put together (v1.12), how one health check flows end to end, and
 the rules that must not regress. For what the app does from a user's point of
 view, see the [README](../README.md); for build and test steps, see
 [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -78,6 +78,7 @@ card is open).
 | `Services/ClaudeProjectApproval.swift` | A scanned `.mcp.json` server (only files the scan reaches: inside `~/.config`, `~/Library/Application Support` or a home dot-folder; a `.mcp.json` in an ordinary project folder is not scanned) runs only when Claude Code approved it for that folder (`enabledMcpjsonServers`, `enableAllProjectMcpServers`; project settings only in a trusted folder; disabled wins) |
 | `Services/MCPServersTOML.swift`, `GooseConfig.swift`, `MCPServersYAML.swift`, `YAMLBlock.swift` | Small parsers for the TOML/YAML shapes agents write (no third-party TOML/YAML). `YAMLBlock` builds a node tree and reads YAML's multi-line scalars: wrapped plain text (Hermes wraps long paths), multi-line quoted text, `|` / `>` blocks, flow `[]` / `{}` |
 | `Services/AkaSource.swift` | aka keeps servers in a database, not a file: `GET http://127.0.0.1:6464/api/mcp/servers`, then launches each the way aka does (`bun x`, `python`, `bun run`). Asked only when `AkaListener` finds aka itself on the port (the user's process, inside an app validly signed as `ai.pipali`, or an aka source folder) |
+| `Services/ConfigShape.swift` (`GrokBotConfig`) | 1.12: Grok Bot's `~/.grokbot/settings.json` `mcpBoxServers` names become `builtin` rows with no command (they run in xAI's cloud); `AgentRegistry.cloudHosts` gives the row's "Runs in xAI's cloud" wording |
 
 ### Probing
 
@@ -96,6 +97,7 @@ card is open).
 | `Services/ShellEnvironment.swift` | The login shell's environment (`$SHELL -l -i -c env -0`, 5 s), read once per launch before the first check: the base for starting servers and filling `${VAR}` (1.11) |
 | `Services/ListeningPorts.swift` | Who listens on a local port: a quick connect first, then `lsof` with a 3 s kill; used by aka's check and `HostApps` (1.11) |
 | `Services/HostApps.swift` | The Mac app a server belongs to (the server's own program inside an `.app`, never Xcode's developer tools or an argument's file; a launcher naming one; a local port an app was seen on, via `lsof` off the main thread, re-checked once per session and forgotten when a plain server answers there). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
+| `Services/SessionDrops.swift` | 1.12: servers an open Claude Code session lost. Reads `~/.claude/sessions/*.json` (a session is open while its pid runs and is not newer than the session) and those sessions' connect/failure lines in `~/Library/Caches/claude-cli-nodejs/<folder>/mcp-logs-<server>/*.jsonl` (tail only). `HealthMonitor.refreshSessionDrops` after each full cycle and on panel open; `ServerGroup.droppedInSession` (healthy rows Claude Code declares) gives the quiet ring, Needs you, the row line and the card note |
 
 ### What the UI says (pure, unit-tested)
 
@@ -127,7 +129,7 @@ card is open).
 | `Services/WhatsNew.swift`, `Services/WhatsNewLauncher.swift` | What's new: `docs/release-notes/<version>.md` (bundled) in a small window, once after an update and from the right-click menu |
 | `Services/AppPreferences.swift` (`TestCallLeftovers`) | Removes, at every launch, what the 1.10.7 test builds' test calls left: four settings and `test-requests/` |
 | `Services/StatusItemRightClick.swift` | Right-click on the menu-bar icon: Settings, Quit |
-| `Services/GlobalHotKey.swift` | Control-Option-M from any app (1.10): a Carbon `RegisterEventHotKey` (no permission prompt), on/off in Settings > General; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
+| `Services/GlobalHotKey.swift` | The panel shortcut from any app (1.10; her own keys since 1.12, `PanelShortcut`, default Control-Option-M): a Carbon `RegisterEventHotKey` (no permission prompt), on/off and the recorder in Settings > General, let go while recording; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
 | `Theme/Theme.swift` | Colour tokens (Light semantic, Dark soft dark), fonts, `AppearanceApplier` |
 
 ### Usage counts (1.7)
