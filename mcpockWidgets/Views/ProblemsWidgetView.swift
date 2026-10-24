@@ -47,6 +47,12 @@ struct ProblemsWidgetView: View {
                                 .lineLimit(1)
                         }
                     }
+                    // The snapshot keeps only the worst few (r3 b5bc).
+                    if snapshot.problemCount > snapshot.problems.count {
+                        Text("+\(snapshot.problemCount - snapshot.problems.count) more")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer(minLength: 0)
             }
