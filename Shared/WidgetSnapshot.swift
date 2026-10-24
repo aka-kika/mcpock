@@ -26,6 +26,9 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
     /// is red only then, amber for the rest, like the menu bar icon. nil in a
     /// snapshot from 1.9.0 or earlier.
     var brokenCount: Int? = nil
+    /// The probe interval in seconds, 0 for Manual (r3 7183): the widget derives
+    /// from it how old is too old. nil in a snapshot from 1.10.9 or earlier.
+    var checkEverySeconds: Int? = nil
 
     struct Problem: Codable, Equatable, Sendable, Identifiable {
         var name: String
@@ -63,6 +66,20 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
     /// only slow, sign-in or set-up problems are left (like the menu bar
     /// icon's diamond and ring). An older snapshot keeps the red.
     var markIsRed: Bool { (brokenCount ?? problemCount) > 0 }
+
+    /// How long after `generated` the widgets stop trusting the snapshot (r3
+    /// 7183): three check intervals, at least 10 minutes, like
+    /// `StatusReport.freshnessNote`; 2 hours for Manual or an older snapshot.
+    var staleAfter: TimeInterval {
+        guard let seconds = checkEverySeconds, seconds > 0 else { return 2 * 3600 }
+        return max(Double(seconds) * 3, 600)
+    }
+
+    /// True when mcpock has not written for longer than `staleAfter`: it is
+    /// probably quit or asleep, so the widgets grey out instead of staying green.
+    func isStale(now: Date) -> Bool {
+        now.timeIntervalSince(generated) > staleAfter
+    }
 
     static func encoder() -> JSONEncoder {
         let encoder = JSONEncoder()
@@ -103,7 +120,8 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
             fineCount: status.counts.fine,
             problems: Array(problems),
             agents: Array(agents),
-            brokenCount: allProblems.filter { $0.status == "broken" }.count
+            brokenCount: allProblems.filter { $0.status == "broken" }.count,
+            checkEverySeconds: status.checkEverySeconds
         )
     }
 

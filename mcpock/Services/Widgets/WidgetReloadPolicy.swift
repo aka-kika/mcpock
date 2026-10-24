@@ -47,11 +47,13 @@ enum WidgetReloadPolicy {
     }
 
     /// True when `next` would draw differently from `previous` — everything
-    /// but `generated` and `schema`.
+    /// but `generated`, `schema`, `checking` and `checkEverySeconds`.
     static func displayDiffers(_ previous: MCPockWidgetSnapshot?, _ next: MCPockWidgetSnapshot) -> Bool {
         guard let previous else { return true }
-        return previous.checking != next.checking
-            || previous.firstCheckDone != next.firstCheckDone
+        // `checking` is left out on purpose (r3 7183): no widget draws it (only
+        // `firstCheckDone` shows "Checking..."), and every probe cycle flips it
+        // twice, which reloaded the widgets about once a minute for nothing.
+        return previous.firstCheckDone != next.firstCheckDone
             || previous.totalServers != next.totalServers
             || previous.problemCount != next.problemCount
             || previous.fineCount != next.fineCount

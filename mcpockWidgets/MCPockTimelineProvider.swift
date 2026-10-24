@@ -25,9 +25,16 @@ struct MCPockTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<MCPockWidgetEntry>) -> Void) {
-        let entry = MCPockWidgetEntry(date: .now, snapshot: currentSnapshot())
+        let snapshot = currentSnapshot()
+        var entries = [MCPockWidgetEntry(date: .now, snapshot: snapshot)]
+        // A second entry for the moment the snapshot turns stale (r3 7183), so a
+        // widget greys out on its own even if mcpock never writes again.
+        if let snapshot {
+            let staleAt = snapshot.generated.addingTimeInterval(snapshot.staleAfter + 1)
+            if staleAt > .now { entries.append(MCPockWidgetEntry(date: staleAt, snapshot: snapshot)) }
+        }
         let nextRefresh = Calendar.current.date(byAdding: .minute, value: 15, to: .now) ?? .now.addingTimeInterval(900)
-        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+        completion(Timeline(entries: entries, policy: .after(nextRefresh)))
     }
 
     private func currentSnapshot() -> MCPockWidgetSnapshot? {

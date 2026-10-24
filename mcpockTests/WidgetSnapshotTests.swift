@@ -164,4 +164,21 @@ final class WidgetSnapshotTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-widget-missing-\(UUID().uuidString)")
         XCTAssertNil(WidgetSnapshotStore.read(from: dir), "no snapshot yet: the widgets fall back to their empty state")
     }
+
+    /// r3 7183: the widgets grey out once mcpock has stopped writing.
+    func testStaleAfterThreeIntervalsWithATenMinuteFloor() {
+        var s = MCPockWidgetSnapshot(generated: Date(timeIntervalSince1970: 1_800_000_000), checking: false,
+                                     firstCheckDone: true, totalServers: 1, problemCount: 0, fineCount: 1,
+                                     problems: [], agents: [])
+        XCTAssertEqual(s.staleAfter, 7200, "no interval in the snapshot: 2 hours")
+        s.checkEverySeconds = 60
+        XCTAssertEqual(s.staleAfter, 600, "3 x 1 min is under the floor")
+        s.checkEverySeconds = 900
+        XCTAssertEqual(s.staleAfter, 2700)
+        s.checkEverySeconds = 0
+        XCTAssertEqual(s.staleAfter, 7200, "Manual: 2 hours")
+        s.checkEverySeconds = 900
+        XCTAssertFalse(s.isStale(now: s.generated.addingTimeInterval(2700)))
+        XCTAssertTrue(s.isStale(now: s.generated.addingTimeInterval(2701)))
+    }
 }

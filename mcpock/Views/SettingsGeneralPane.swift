@@ -36,6 +36,7 @@ struct SettingsGeneralPane: View {
     static let hotKeyTitle = "Open with \(GlobalHotKey.displayText)"
     static let hotKeyHelp = "\(GlobalHotKey.spokenText) opens and closes the panel from any app. "
         + "Then use the arrow keys, Return and Escape."
+    static let widgetsUnavailableText = "Widgets can't get data: mcpock can't open its App Group folder."
     static let hotKeyTakenText = "Another app already uses \(GlobalHotKey.displayText), so mcpock can't."
     static let sliderWidth: CGFloat = 190
 
@@ -186,6 +187,14 @@ struct SettingsGeneralPane: View {
                     Text(Self.statusFileErrorText(error))
                         .font(.system(size: 11.5))
                         .foregroundStyle(theme.statusBroken)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                // (r3 7183) An unsigned or ad-hoc build has no App Group: the
+                // widgets would show nothing, and nothing said why.
+                if AppGroup.containerURL == nil {
+                    Text(Self.widgetsUnavailableText)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(theme.statusDegraded)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } header: {

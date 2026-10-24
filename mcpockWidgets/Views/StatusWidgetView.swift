@@ -11,6 +11,7 @@ struct StatusWidgetView: View {
         Group {
             if let snapshot = entry.snapshot {
                 content(snapshot)
+                    .widgetStale(snapshot.isStale(now: entry.date))
             } else {
                 WidgetEmptyState()
             }
@@ -36,7 +37,7 @@ struct StatusWidgetView: View {
             Text("\(snapshot.totalServers) server\(snapshot.totalServers == 1 ? "" : "s")")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            WidgetCheckedAt(date: snapshot.generated)
+            WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
         }
