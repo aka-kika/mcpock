@@ -48,6 +48,15 @@ fi
 BUILD_DIR="build"
 DIST_DIR="dist"
 
+# The release notes for this version must exist before anything is built.
+VERSION="$(sed -n 's/^ *MARKETING_VERSION: *"*\([0-9][0-9.]*\)"* *$/\1/p' project.yml | head -n 1)"
+[[ -n "$VERSION" ]] || { echo "error: could not read MARKETING_VERSION from project.yml" >&2; exit 1; }
+[[ -f "docs/release-notes/$VERSION.md" ]] \
+  || { echo "error: docs/release-notes/$VERSION.md is missing" >&2; exit 1; }
+
+echo "==> Running the tests (scripts/ci.sh)"
+./scripts/ci.sh
+
 echo "==> Generating project + building Release"
 xcodegen generate
 # Apple Silicon only (Kika, 2026-10-20: "yes"): a Release build is universal
@@ -170,7 +179,7 @@ else
 fi
 
 echo "==> Verifying Gatekeeper acceptance"
-spctl --assess --type execute --verbose=4 "$APP" || true
+spctl --assess --type execute --verbose=4 "$APP"
 xcrun stapler validate "$DMG"
 codesign --verify "$DMG"
 
