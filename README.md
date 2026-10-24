@@ -103,8 +103,10 @@ Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/
   Right and Left open and close an agent), Return opens the card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
   checks the selected row again (or every server), Cmd-C copies the selected
   row's error (or its details).
-- **Desktop widgets.** Status (small), Problems and Agents (medium): right-click
-  the desktop, **Edit Widgets…**, search mcpock. They update after each check.
+- **Desktop widgets.** Status (small), Problems (up to four servers that need
+  you) and Agents (up to five agents, the ones that need you first), both
+  medium: right-click the desktop, **Edit Widgets…**, search mcpock. They
+  update after each check.
 - **Glass theme.** Apple's Liquid Glass for the panel, the card and Settings,
   following light/dark and your Clear/Tinted setting. On macOS 27 the panel is
   its own see-through window, so the glass shows your real desktop.
@@ -268,9 +270,10 @@ letters.
   for the tool list, then stops the process and all its child processes.
   Remote servers get the same few requests over HTTP. Paused servers are never
   started.
-- **No secrets leave the app.** The status file for agents holds env and header
-  **names**, never their values. API keys in command lines, URLs and error
-  texts are masked.
+- **Secrets are masked.** The status file for agents holds env and header
+  **names**, never their values. Anything that looks like an API key in
+  command lines, URLs, server replies and error texts is masked wherever
+  mcpock shows or stores it.
 - **Network stays narrow.** The only connections are to the remote MCP
   servers in your configs, to aka on your own Mac if you use it, and
   to mcpock.com to check for app updates (Settings > About). No
