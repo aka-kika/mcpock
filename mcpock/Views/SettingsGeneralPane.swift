@@ -136,15 +136,20 @@ struct SettingsGeneralPane: View {
                         }
                     }
                 ))
-                Toggle(Self.hotKeyTitle, isOn: $openPanelHotKey)
-                    .help(Self.hotKeyHelp(panelShortcut))
-                if openPanelHotKey {
-                    LabeledContent("Shortcut") {
+                // One row: the shortcut button, then the switch (the pane must
+                // open without scrolling, SettingsWindowSizingTests).
+                LabeledContent(Self.hotKeyTitle) {
+                    HStack(spacing: 10) {
                         ShortcutRecorder(shortcut: panelShortcut) { picked in
                             AppPreferences.savePanelShortcut(picked)
                         }
+                        .disabled(!openPanelHotKey)
+                        Toggle(Self.hotKeyTitle, isOn: $openPanelHotKey)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
                     }
                 }
+                .help(Self.hotKeyHelp(panelShortcut))
             } footer: {
                 if let launchError {
                     Text(launchError)
