@@ -44,9 +44,11 @@ enum HealthState: String, Sendable, Hashable {
         switch self {
         case .broken: return 0
         case .degraded: return 1
-        case .needsApp: return 2
-        case .unknown: return 3
-        case .healthy: return 4
+        case .unknown: return 2
+        case .healthy: return 3
+        // Below healthy (r3 b37a): a server that answers in Cursor but waits
+        // for a closed app elsewhere reads healthy, not "Needs app open".
+        case .needsApp: return 4
         case .selfManaged: return 5
         case .paused: return 6
         }
