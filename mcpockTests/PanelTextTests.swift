@@ -77,6 +77,18 @@ final class PanelTextTests: XCTestCase {
         XCTAssertEqual(AgentBadge.displayLabel("mcporter"), "mcporter", "lowercase brands stay as they are")
         let section = AgentSections.build(groups: [waiting])[0]
         XCTAssertEqual(section.servers[0].note, ShortReason.waitingNote)
+        XCTAssertEqual(AgentSections.problemText(section), "Waiting for your OK")
+        func cursorRow(_ name: String, _ state: HealthState, reason: String? = nil) -> ServerGroup {
+            let source = GroupSource(configID: name, label: "Cursor", agent: "Cursor", path: "", transport: .stdio,
+                                     target: "x", envKeys: [], headerKeys: [], state: state, failureReason: reason)
+            return ServerGroup(name: name, state: state, sourceLabels: ["Cursor"], tools: [],
+                               issues: reason.map { [ServerIssue(label: "Cursor", reason: $0, command: "x")] } ?? [],
+                               variantCount: 1, sources: [source])
+        }
+        let cursor = AgentSections.build(groups: [
+            cursorRow("n", .degraded, reason: "Uses ${GITHUB_TOKEN}, which mcpock cannot fill"), cursorRow("b", .healthy),
+        ])[0]
+        XCTAssertEqual(AgentSections.problemText(cursor), "1 not checked", "never All fine beside it")
     }
 
     /// r3 5f42: a 401 from a server with no headers is the agent's own

@@ -230,10 +230,18 @@ enum AgentSections {
             if section.checkingCount > 0 { return "Checking\u{2026}" }
             // Only waiting for its closed app (or a ${VAR}): say so calmly
             // instead of "All fine" (open loop from 2026-10-16).
-            if section.fineCount == 0 && section.waitingCount > 0 {
-                return section.servers.first { $0.state == .needsApp }?.note ?? "Not checked"
+            if section.fineCount == 0 && section.waitingCount > 0,
+               let note = section.servers.first(where: { $0.state == .needsApp })?.note {
+                return note
             }
-            return section.fineCount == 0 && section.pausedCount > 0 ? "Paused" : "All fine"
+            // Seen in the VM: Cursor read "All fine" beside a Not checked server.
+            let notChecked = section.servers.filter { $0.mark == .needsApp && $0.state != .needsApp }.count
+            if notChecked > 0 { return "\(notChecked) not checked" }
+            if section.fineCount == 0 && section.pausedCount > 0 {
+                let waiting = section.servers.allSatisfy { $0.state != .paused || $0.note == ShortReason.waitingNote }
+                return waiting ? "Waiting for your OK" : "Paused"
+            }
+            return "All fine"
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
     }
