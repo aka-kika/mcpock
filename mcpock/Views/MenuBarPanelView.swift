@@ -66,7 +66,10 @@ struct MenuBarPanelView: View {
             content
                 .frame(height: Self.listHeight(searchOpen: panel.isSearchOpen))
                 .overlay(alignment: .bottom) {
-                    if panel.showsWelcome { welcomeLine }
+                    VStack(spacing: 0) {
+                        if panel.showsUsageNote { usageNote }
+                        if panel.showsWelcome { welcomeLine }
+                    }
                 }
             rule
             footer
@@ -297,6 +300,29 @@ struct MenuBarPanelView: View {
             Button("OK") { panel.dismissWelcome() }
                 .buttonStyle(.link)
                 .font(Theme.caption)
+        }
+        .padding(10)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill)
+        }
+        .padding(10)
+    }
+
+    private var usageNote: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(PanelState.usageNoteText)
+                .font(Theme.caption)
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Spacer(minLength: 0)
+                Button("Turn Off") { panel.dismissUsageNote(turnOff: true) }
+                    .buttonStyle(.link)
+                    .font(Theme.caption)
+                Button("OK") { panel.dismissUsageNote(turnOff: false) }
+                    .buttonStyle(.link)
+                    .font(Theme.caption)
+            }
         }
         .padding(10)
         .background {

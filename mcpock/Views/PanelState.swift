@@ -177,6 +177,27 @@ final class PanelState {
         showsWelcome = false
     }
 
+    /// Usage counts read the agents' chat history (r3 3da1): said once, on
+    /// first launch or after the update, until she presses OK or Turn Off.
+    /// Never while Usage is already off.
+    var showsUsageNote = false
+    nonisolated static let usageNoteShownKey = "usageNoteShown"
+    nonisolated static let usageNoteText = "The call counts beside servers come from your agents' chat history "
+        + "on this Mac, read only here. To stop it, turn Usage off in Settings > General."
+
+    nonisolated static func shouldShowUsageNote(defaults: UserDefaults) -> Bool {
+        !defaults.bool(forKey: usageNoteShownKey) && AppPreferences.loadUsageWindow(from: defaults) != .off
+    }
+
+    /// OK keeps Usage as it is; Turn Off sets it to Off, as Settings does.
+    func dismissUsageNote(turnOff: Bool) {
+        showsUsageNote = false
+        defaults.set(true, forKey: Self.usageNoteShownKey)
+        guard turnOff else { return }
+        AppPreferences.saveUsageWindow(.off, to: defaults)
+        usageStore?.usageWindowChanged(knownServers: Set(monitor.groups.map { HealthMonitor.normalizedName($0.name) }))
+    }
+
     /// How long the footer offers "Undo" after a Hide.
     nonisolated static let undoSeconds: Double = 5
 

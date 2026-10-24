@@ -128,6 +128,10 @@ struct MCPockApp: App {
                 PanelToggle.toggle()
             }
         }
+        // Usage counts read chat history: said once, new install or update (r3 3da1).
+        if !isDemo && PanelState.shouldShowUsageNote(defaults: monitorDefaults) {
+            panel.showsUsageNote = true
+        }
         // Run from the disk image: say so once per launch (r3 102c).
         if !isDemo && ConnectSnippets.isTemporaryLocation(Bundle.main.bundlePath) {
             Task { @MainActor in
