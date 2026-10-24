@@ -99,10 +99,11 @@ final class ProcessRunner: @unchecked Sendable {
 
     init(
         command: String, args: [String], env: [String: String], workingDirectory: String? = nil,
-        capturesRawStdout: Bool = false
+        capturesRawStdout: Bool = false,
+        baseEnvironment: [String: String] = ShellEnvironment.current
     ) throws {
         self.capturesRawStdout = capturesRawStdout
-        var processEnv = PathResolver.processEnvironment(configEnv: env)
+        var processEnv = PathResolver.processEnvironment(configEnv: env, base: baseEnvironment)
         var resolved = PathResolver.resolveCommand(command, env: processEnv)
         // A relative path (`./.venv/bin/python`) is the project's, where the
         // agent starts it, not mcpock's own folder (review 2026-10-20, 542f).

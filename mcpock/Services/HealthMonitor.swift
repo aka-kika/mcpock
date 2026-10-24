@@ -454,12 +454,14 @@ final class HealthMonitor {
     }
 
     /// A hash of what each scan-only file starts: every server's name,
-    /// transport, command, args and url (not env or header values).
+    /// transport, command, args, url and headers helper (not env or header
+    /// values), so a changed helper asks again too (r3 1c25).
     nonisolated static func scanFileFingerprints(_ configs: [ServerConfig]) -> [String: String] {
         var lines: [String: [String]] = [:]
         for config in configs {
             guard let path = scanOnlyFile(config) else { continue }
-            let parts = [config.name, config.transport.rawValue, config.command ?? "", config.url ?? ""] + config.args
+            let parts = [config.name, config.transport.rawValue, config.command ?? "", config.url ?? "",
+                         config.headersHelper ?? ""] + config.args
             lines[path, default: []].append(parts.joined(separator: "\u{1F}"))
         }
         return lines.mapValues { UsageCursor.stableHash($0.sorted().joined(separator: "\n")) }

@@ -101,6 +101,7 @@
 		6C9E84A306B3F499A9885913 /* MCPJSONRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06F9CC8E18B1E01C5FCE633 /* MCPJSONRPCTests.swift */; };
 		6CDC5C6F960ED5F15113F7B5 /* GrokUsageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A006FD20F608A964ED7B3AAF /* GrokUsageReader.swift */; };
 		6F80975E8D85A363659607E9 /* WidgetSnapshotWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE81A977F2D31489789062D2 /* WidgetSnapshotWriterTests.swift */; };
+		701B745C8AF8227EF39E67CC /* StdinLineReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E67C4483038AAD40084F27 /* StdinLineReader.swift */; };
 		70E8E118DE6EE66389B39849 /* MCPockStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E52D088F73F7C15B2E72066 /* MCPockStatus.swift */; };
 		71108A0633FE6009AE74C16E /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04599C262BE66B556946BCBD /* WidgetSnapshot.swift */; };
 		7297DB34330EA308F92EDB1C /* SlowStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B178025863CBB699AAA3660 /* SlowStartTests.swift */; };
@@ -156,6 +157,7 @@
 		BD5312C84A2BAC5D502E7C7D /* StdioProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8247380AA5646FC7ABE26A8 /* StdioProbe.swift */; };
 		BD58D6F0BCBB0BDF74A58917 /* YAMLBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A105700D24E8D55E4E55C1 /* YAMLBlock.swift */; };
 		BD737C9225540E63EDF314C2 /* StatusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F5DF508E3BDB980FEB3287 /* StatusSnapshot.swift */; };
+		BDB861C7DB2C3D1B42A0250E /* StdinLineReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E67C4483038AAD40084F27 /* StdinLineReader.swift */; };
 		BF68D11F1E109E7CB72F1046 /* DetailCardPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B04D3BCFD3D2CB755E056C /* DetailCardPresenter.swift */; };
 		C3AF830D78C964D43E4783E4 /* HostApps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91147D947184A6B40EC6F325 /* HostApps.swift */; };
 		C53AE77F8DE7861C587B8252 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 981D0A65C6D25412CF19A2A7 /* Assets.xcassets */; };
@@ -412,6 +414,7 @@
 		D9F671AA474D522512E93E33 /* PinnedServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedServerTests.swift; sourceTree = "<group>"; };
 		DFCA439EC63464024DCA8C51 /* SettingsTabStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTabStrip.swift; sourceTree = "<group>"; };
 		E0F08106FA5A1EBCB77D5A51 /* SecretMaskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretMaskTests.swift; sourceTree = "<group>"; };
+		E1E67C4483038AAD40084F27 /* StdinLineReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdinLineReader.swift; sourceTree = "<group>"; };
 		E38CD64F6A6D9832D00F8D5B /* StatusIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusIconView.swift; sourceTree = "<group>"; };
 		E407298A6EEAB2B72A412E24 /* HeadersHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadersHelper.swift; sourceTree = "<group>"; };
 		E5C3C8AD2835FA47F0DAFC6A /* AkaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AkaSource.swift; sourceTree = "<group>"; };
@@ -476,6 +479,7 @@
 				9E52D088F73F7C15B2E72066 /* MCPockStatus.swift */,
 				6016F282B85807123025DA19 /* MCPStatusServer.swift */,
 				3E48BCAA4C53E9F11C659DC1 /* StatusReport.swift */,
+				E1E67C4483038AAD40084F27 /* StdinLineReader.swift */,
 				04599C262BE66B556946BCBD /* WidgetSnapshot.swift */,
 				D9E3E403CD0E1393D314118B /* WidgetSnapshotStore.swift */,
 			);
@@ -996,6 +1000,7 @@
 				974E06098802F46A1F51B469 /* StatusItemRightClick.swift in Sources */,
 				0A396BB2A942C2C0E3A1E377 /* StatusReport.swift in Sources */,
 				BD737C9225540E63EDF314C2 /* StatusSnapshot.swift in Sources */,
+				BDB861C7DB2C3D1B42A0250E /* StdinLineReader.swift in Sources */,
 				BD5312C84A2BAC5D502E7C7D /* StdioProbe.swift in Sources */,
 				667AC602C4A0F0D46A664024 /* Theme.swift in Sources */,
 				D63A6D7D84C1CF1D62351E59 /* UpdateController.swift in Sources */,
@@ -1122,6 +1127,7 @@
 				67AAB90CD3C51FA712686EFE /* Models.swift in Sources */,
 				11D557A7AA8A7494ECEABAA8 /* SecretMask.swift in Sources */,
 				9E102B64DB44A2E77B8776B9 /* StatusReport.swift in Sources */,
+				701B745C8AF8227EF39E67CC /* StdinLineReader.swift in Sources */,
 				28563F5A9A25550897E9050F /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

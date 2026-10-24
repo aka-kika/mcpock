@@ -37,6 +37,17 @@ final class HeadersHelperTests: XCTestCase {
 
     // MARK: Parsing
 
+    /// r3 1c25: the helper gets PATH, HOME and the like, the server's own
+    /// env, and none of the other keys in mcpock's environment.
+    func testHelperGetsOnlyABasicEnvironment() async {
+        let base = HeadersHelper.helperBase(["PATH": "/usr/bin:/bin", "HOME": "/u", "OPENAI_API_KEY": "k", "LC_ALL": "C"])
+        XCTAssertEqual(Set(base.keys), ["PATH", "HOME", "LC_ALL"])
+        let result = await HeadersHelper.run(
+            helper: #"printf '{"a":"%s","b":"%s"}' "${OPENAI_API_KEY:-none}" "$OWN""#,
+            serverName: "s", serverURL: "https://x.test/mcp", env: ["OWN": "mine"])
+        XCTAssertEqual(try? result.get(), ["a": "none", "b": "mine"])
+    }
+
     func testParsesHeadersHelperOnHTTPEntry() {
         let entry = DiscoveredEntry(name: "postiz", entry: [
             "type": "http", "url": "https://postiz.example.com/api/mcp",

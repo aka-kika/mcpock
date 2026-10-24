@@ -27,7 +27,8 @@ enum HeadersHelper {
                 command: "/bin/sh", args: ["-c", helper],
                 env: env.merging(["CLAUDE_CODE_MCP_SERVER_NAME": serverName, "CLAUDE_CODE_MCP_SERVER_URL": serverURL]) { _, own in own },
                 workingDirectory: workingDirectory,
-                capturesRawStdout: true
+                capturesRawStdout: true,
+                baseEnvironment: helperBase(ShellEnvironment.current)
             )
         } catch {
             return .failure(.headerHelper("failed: could not start"))
@@ -63,6 +64,16 @@ enum HeadersHelper {
             return .failure(.headerHelper("did not return JSON"))
         }
         return .success(headers)
+    }
+
+    /// The variables a helper gets from mcpock itself: only what a shell
+    /// needs to find its tools and the user's files. Every other key in
+    /// mcpock's environment (the login shell's API keys) stays out (r3 1c25);
+    /// the server's own `env` is still added on top.
+    static let inheritedNames: Set<String> = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "TZ"]
+
+    static func helperBase(_ environment: [String: String]) -> [String: String] {
+        environment.filter { inheritedNames.contains($0.key) || $0.key.hasPrefix("LC_") }
     }
 
     /// A JSON object whose values are all strings, or nil.
