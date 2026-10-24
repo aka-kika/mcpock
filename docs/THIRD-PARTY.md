@@ -177,6 +177,13 @@ POSSIBILITY OF SUCH DAMAGE.
   `"license": "MIT"` but carries no LICENSE file, so the text below comes from
   the project's repository (`LICENSE` on GitHub, fetched 2026-09-24).
 
+## Agent logo: Grok Bot
+
+- **What:** `agent-grokbot`, a one-color mark drawn for mcpock (1.12.2) after
+  Grok Bot's own app icon (the face in its rounded square), so Grok Bot's rows
+  look like the app. Grok Bot and its icon belong to xAI; mcpock is not
+  affiliated with xAI and uses the mark only to name the app.
+
 ## Agent logos: Simple Icons (CC0 1.0)
 
 - **What:** JetBrains, Raycast, Warp, Zed (marks LobeHub does not carry).

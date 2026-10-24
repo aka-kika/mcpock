@@ -126,6 +126,9 @@ struct AgentBadge: Hashable, Sendable {
         "Cursor": "agent-cursor",
         "Goose": "agent-goose",
         "Grok": "agent-grok",
+        // 1.12.2: drawn for mcpock after Grok Bot's own app icon (the face in
+        // its rounded square), mono like the rest; see `docs/THIRD-PARTY.md`.
+        "Grok Bot": "agent-grokbot",
         "Hermes": "agent-hermesagent",
         "Kimi": "agent-kimi", "Kimi Code": "agent-kimi",
         "MiniMax": "agent-minimax",
@@ -165,6 +168,7 @@ struct AgentBadge: Hashable, Sendable {
         "claudecode": "agent-claudecode", "claude-code": "agent-claudecode",
         "claude": "agent-claude", "claude desktop": "agent-claude", "claude-desktop": "agent-claude",
         "codeium": "agent-windsurf",
+        "grokbot": "agent-grokbot", "grok-bot": "agent-grokbot",
         "kimi-code": "agent-kimi", "kimicode": "agent-kimi",
         "hermes agent": "agent-hermesagent", "hermes-agent": "agent-hermesagent",
         "opencode": "agent-opencode", "open code": "agent-opencode",

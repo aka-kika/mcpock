@@ -53,6 +53,9 @@ final class CloudAgentTests: XCTestCase {
         XCTAssertEqual(CardText.cloudNote(agents: ["Grok Bot"], cloud: "xAI's cloud"),
                        "Runs in xAI's cloud for Grok Bot, not on this Mac, so mcpock lists it and doesn't check it.")
         XCTAssertEqual(AgentBadge.forLabel("Grok Bot").monogram, "GB")
+        // 1.12.2 (Kika: "need icon for grok bot"): its own mark, not Grok's.
+        XCTAssertEqual(AgentBadge.forLabel("Grok Bot").logoName, "agent-grokbot")
+        XCTAssertEqual(AgentBadge.forLabel("Grok").logoName, "agent-grok")
     }
 
     /// Seen in the VM: Grok Bot read "All fine" and "All 2 servers answer

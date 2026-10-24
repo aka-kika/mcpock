@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.12.1](https://img.shields.io/badge/version-1.12.1-7a8fb0)](docs/release-notes/1.12.1.md)
+[![Version 1.12.2](https://img.shields.io/badge/version-1.12.2-7a8fb0)](docs/release-notes/1.12.2.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -33,7 +33,7 @@ them, checks every server, and shows you what needs attention and why, so you
 - **Grok Bot:** listed under its own name as soon as it is installed, on the
   Agents tab and in Settings > Agents, even with no servers yet. Its servers
   live in your xAI account and run in xAI's cloud, so mcpock lists them and
-  never starts them.
+  never starts them. Since 1.12.2 its rows show a mark drawn after its own app icon.
 - **Antigravity:** its servers are read from `~/.gemini/config/mcp_config.json`.
 - **Lost in a session:** a server that dropped inside a Claude Code session that
   is still open says so ("Lost in 1 open Claude Code session: run /mcp there").
@@ -44,7 +44,7 @@ them, checks every server, and shows you what needs attention and why, so you
   chat history on this Mac, with Turn Off right there. In 1.12.1 it sits under
   the list instead of covering it.
 
-Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/1.12.1.md).
+Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/1.12.1.md), [1.12.2](docs/release-notes/1.12.2.md).
 
 ## What it does
 
@@ -255,7 +255,7 @@ and runs them in xAI's cloud; its settings file holds only their names, so
 mcpock lists them under Grok Bot and never starts them. Grok Bot is listed
 once installed (its app or `~/.grokbot`), with "No servers yet" while its list
 is empty. A remote server
-written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty agents have their real logo in the app; others show two
+written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty-one agents have their real logo in the app (Grok Bot since 1.12.2); others show two
 letters.
 
 ## Privacy and safety
