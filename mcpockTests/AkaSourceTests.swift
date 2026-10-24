@@ -165,8 +165,13 @@ final class AkaSourceTests: XCTestCase {
         XCTAssertFalse(trusted([]), "nothing listening")
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/tmp/Fake.app/Contents/MacOS/bun", workingDirectory: "/")]),
                        "an unsigned app that only claims aka's bundle id")
-        XCTAssertEqual(AkaListener.validSigningIdentifier("/System/Applications/Calculator.app"), "com.apple.calculator")
-        XCTAssertNil(AkaListener.validSigningIdentifier("/tmp/no-such.app"))
+        // Off the main thread, as in the app: the Security call warns there.
+        let (calculator, missing) = DispatchQueue.global().sync {
+            (AkaListener.validSigningIdentifier("/System/Applications/Calculator.app"),
+             AkaListener.validSigningIdentifier("/tmp/no-such.app"))
+        }
+        XCTAssertEqual(calculator, "com.apple.calculator")
+        XCTAssertNil(missing)
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/usr/bin/python3", workingDirectory: "/tmp")]))
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/Applications/Other.app/Contents/MacOS/x", workingDirectory: "/")]))
         XCTAssertFalse(trusted([.init(uid: 501, executable: "/x/bun", workingDirectory: "/src/other")]))
