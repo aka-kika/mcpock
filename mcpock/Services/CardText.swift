@@ -86,7 +86,7 @@ enum CardText {
     /// Title of the "why" box: broken, slow, or waiting for a sign-in.
     static func whyTitle(for group: ServerGroup) -> String {
         if group.needsSignIn { return "Why it needs sign-in" }
-        if group.needsVariable { return "Why it is not checked" }
+        if group.notCheckedHere { return "Why it is not checked" }
         return group.state == .broken ? "Why it is broken" : "Why it is slow"
     }
 

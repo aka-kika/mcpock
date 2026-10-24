@@ -169,7 +169,8 @@ enum AgentSections {
             let reason = sources.first { $0.state == state && $0.failureReason != nil }?.failureReason
             note = reason.map { ShortReason.from($0, state: state) } ?? (state == .broken ? "Broken" : "Slow")
             // Not checked (a ${VAR} to fill) is calm, as on the Servers tab (r3 b964).
-            let notChecked = state == .degraded && reason?.hasPrefix(ConfigVariables.reasonPrefix) == true
+            let notChecked = state == .degraded && (reason?.hasPrefix(ConfigVariables.reasonPrefix) == true
+                || reason?.hasPrefix(HealthMonitor.agentSignInPrefix) == true)
             rank = notChecked ? nil : state == .broken ? 0 : 1
             if notChecked { mark = .needsApp }
         case .healthy:

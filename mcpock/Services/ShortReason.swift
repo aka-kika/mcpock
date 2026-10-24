@@ -49,6 +49,9 @@ enum ShortReason {
         if trimmed.hasPrefix("Needs authentication") {
             return "Needs sign-in"
         }
+        if trimmed.hasPrefix(HealthMonitor.agentSignInPrefix) {
+            return HealthMonitor.agentSignInPrefix
+        }
         if trimmed.hasPrefix(ConfigVariables.reasonPrefix),
            let close = trimmed.firstIndex(of: "}") {
             return clip("Not checked: uses \(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 5)...close])")

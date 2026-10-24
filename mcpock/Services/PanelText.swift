@@ -101,7 +101,7 @@ enum PanelText {
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
             signIn = groups.filter(\.needsSignIn).count
-            notChecked = groups.filter(\.needsVariable).count
+            notChecked = groups.filter(\.notCheckedHere).count
             slow = groups.filter { $0.state == .degraded }.count - signIn - notChecked
             needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
@@ -127,6 +127,16 @@ extension ServerGroup {
     var needsVariable: Bool {
         state == .degraded && !needsSignIn && issues.contains { $0.reason.hasPrefix(ConfigVariables.reasonPrefix) }
     }
+
+    /// Degraded because the server wants a sign-in its agent holds (OAuth):
+    /// the config has no headers, so nothing here is wrong (r3 5f42).
+    var signedInByAgent: Bool {
+        state == .degraded && issues.contains { $0.reason.hasPrefix(HealthMonitor.agentSignInPrefix) }
+    }
+
+    /// Not checked by mcpock for a reason that is nobody's fault here: a
+    /// `${VAR}` it can't fill, or a sign-in its agent holds. Calm everywhere.
+    var notCheckedHere: Bool { needsVariable || signedInByAgent }
 
     /// The agents behind the row, one per agent (a server declared in two Claude
     /// Code projects is still one Claude Code), in discovery order. Drives the

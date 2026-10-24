@@ -398,9 +398,15 @@ a remote one). Copy the error, fix it in the agent's config, then
 Check again.
 
 **It says "Needs sign-in".**
-The server answered with HTTP 401 or 403. Sign in through your agent, or add
-the token header to the config. mcpock never signs in for you, so this state
-doesn't turn red.
+The server answered with HTTP 401 or 403 although its config sends a token
+header: the token is likely wrong or expired. Fix the header in the config.
+mcpock never signs in for you, so this state doesn't turn red.
+
+**It says "Signed in by the agent".**
+The server answered with HTTP 401 or 403 and its config has no token header:
+you signed in inside the agent (OAuth), and the agent keeps that sign-in to
+itself. Nothing is wrong, mcpock just can't check this server. It shows a
+calm dash and stays out of Needs you.
 
 **What does "set up differently" mean?**
 The same server name launches a different command, script or address in one

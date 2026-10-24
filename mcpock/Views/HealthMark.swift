@@ -97,12 +97,13 @@ struct HealthMark: View {
     /// calm dash of a row waiting on something outside, not the amber ring
     /// (r3 b964).
     static func markState(for group: ServerGroup) -> HealthState {
-        group.needsVariable ? .needsApp : group.state
+        group.notCheckedHere ? .needsApp : group.state
     }
 
     /// The word for a whole row: an auth failure reads "Needs sign-in" rather than
     /// "Slow", and a healthy row that differs reads "Set up differently".
     static func word(for group: ServerGroup) -> String {
+        if group.signedInByAgent { return "Signed in by the agent" }
         if group.needsVariable { return "Not checked" }
         if group.waitsForFileOK { return "Waiting for your OK" }
         if group.state == .degraded,

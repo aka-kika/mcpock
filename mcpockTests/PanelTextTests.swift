@@ -79,6 +79,30 @@ final class PanelTextTests: XCTestCase {
         XCTAssertEqual(section.servers[0].note, ShortReason.waitingNote)
     }
 
+    /// r3 5f42: a 401 from a server with no headers is the agent's own
+    /// sign-in: calm, never "Needs sign-in" forever. With headers it stays amber.
+    func testAgentHeldSignInIsCalm() {
+        let bare = ServerConfig(id: "x", name: "x", source: ServerSource(label: "Code"), projectPath: nil,
+                                transport: .http, command: nil, args: [], env: [:], url: "https://x.test/mcp", headers: [:])
+        let failed = ProbeResult(state: .broken, failureReason: "Needs authentication (HTTP 401)", tools: nil,
+                                 needsAttention: true)
+        let calm = HealthMonitor.agentSignIn(failed, config: bare)
+        XCTAssertTrue(calm.failureReason!.hasPrefix(HealthMonitor.agentSignInPrefix))
+        XCTAssertTrue(calm.failureReason!.hasSuffix("(HTTP 401)"))
+        let withHeaders = ServerConfig(id: "x", name: "x", source: ServerSource(label: "Code"), projectPath: nil,
+                                   transport: .http, command: nil, args: [], env: [:], url: "https://x.test/mcp",
+                                   headers: ["Authorization": "Bearer abc"])
+        XCTAssertEqual(HealthMonitor.agentSignIn(failed, config: withHeaders).failureReason, failed.failureReason)
+
+        let row = group("o", .degraded, reason: calm.failureReason)
+        XCTAssertTrue(row.signedInByAgent)
+        XCTAssertFalse(row.needsSignIn)
+        XCTAssertFalse(PanelSections.needsYou(row))
+        XCTAssertEqual(HealthMark.word(for: row), "Signed in by the agent")
+        XCTAssertEqual(ShortReason.line(for: row), "Signed in by the agent")
+        XCTAssertEqual(PanelText.summary([row]), "1 server \u{00B7} 1 not checked")
+    }
+
     func testUnknownReadsAsChecking() {
         XCTAssertEqual(PanelText.summary([group("a", .unknown), group("b")]),
                        "2 servers \u{00B7} 1 checking")

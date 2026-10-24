@@ -314,7 +314,7 @@ final class HealthMonitor {
 
     /// A Not checked row (a `${VAR}` to fill) is calm, never the ring (r3 b964).
     nonisolated static func iconInput(_ group: ServerGroup) -> HealthState {
-        group.needsVariable ? .healthy : group.state
+        group.notCheckedHere ? .healthy : group.state
     }
 
     /// Menu-bar icon verdict across all servers. Pure — safe to unit-test.
@@ -1046,7 +1046,26 @@ final class HealthMonitor {
         case .stdio:
             return await StdioProbe.probe(config: config, fetchTools: fetchTools)
         case .http, .sse:
-            return await HTTPProbe.probe(config: config, fetchTools: fetchTools)
+            return agentSignIn(await HTTPProbe.probe(config: config, fetchTools: fetchTools), config: config)
         }
+    }
+
+    /// Starts every reason for a server whose sign-in lives in its agent.
+    nonisolated static let agentSignInPrefix = "Signed in by the agent"
+
+    /// A 401 or 403 from a server whose config carries no headers and no
+    /// helper: the agent signed in with OAuth and holds the token, so mcpock
+    /// can't, and "Needs sign-in" was wrong forever (r3 5f42). Amber stays
+    /// for a server with headers: then the token itself is wrong.
+    nonisolated static func agentSignIn(_ result: ProbeResult, config: ServerConfig) -> ProbeResult {
+        guard config.headers.isEmpty, config.headersHelper == nil,
+              let reason = result.failureReason, reason.hasPrefix("Needs authentication") else { return result }
+        let code = reason.replacingOccurrences(of: "Needs authentication (", with: "")
+        var calm = ProbeResult(
+            state: result.state,
+            failureReason: agentSignInPrefix + ": the agent holds this server's sign-in, so mcpock can't check it (" + code,
+            tools: result.tools, transientFailure: result.transientFailure, needsAttention: result.needsAttention)
+        calm.slowStartSeconds = result.slowStartSeconds
+        return calm
     }
 }
