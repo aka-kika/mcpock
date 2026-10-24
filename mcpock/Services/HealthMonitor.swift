@@ -1033,6 +1033,9 @@ final class HealthMonitor {
         if config.builtin {
             return ProbeResult(state: .selfManaged, failureReason: nil, tools: nil)
         }
+        if config.transport == .stdio && (config.command ?? "").isEmpty {
+            return ProbeResult(state: .broken, failureReason: noEndpointReason, tools: nil, needsAttention: true)
+        }
         // `${VAR}` and friends filled in as the agent would; one that can't be
         // is not started with the literal text (review 2026-10-20, 0d87). Amber
         // "not checked", never red, backs off like a sign-in.
@@ -1049,6 +1052,9 @@ final class HealthMonitor {
             return agentSignIn(await HTTPProbe.probe(config: config, fetchTools: fetchTools), config: config)
         }
     }
+
+    /// A config entry with neither a command nor a url (r3 e412).
+    nonisolated static let noEndpointReason = "Not checked: no command or url in the config"
 
     /// Starts every reason for a server whose sign-in lives in its agent.
     nonisolated static let agentSignInPrefix = "Signed in by the agent"

@@ -183,6 +183,22 @@ final class ConfigShapeTests: XCTestCase {
         XCTAssertTrue(user.allows("u"), "the user's own settings count in a trusted folder")
     }
 
+    /// r3 e412: a command given as a list runs; an entry with no command or
+    /// url stays as a row that says so instead of vanishing.
+    func testListCommandAndEntryWithoutCommandKeepTheirRows() async {
+        let entries = [DiscoveredEntry(name: "a", entry: ["command": ["npx", "pkg"], "args": ["--x"]]),
+                       DiscoveredEntry(name: "b", entry: ["env": ["K": "v"]])]
+        let configs = ConfigDiscovery.configs(from: entries, source: ServerSource(label: "Cursor"), idPrefix: "reg:Cursor")
+            .sorted { $0.name < $1.name }
+        XCTAssertEqual(configs.map(\.name), ["a", "b"])
+        XCTAssertEqual(configs[0].command, "npx")
+        XCTAssertEqual(configs[0].args, ["pkg", "--x"])
+        XCTAssertNil(configs[1].command)
+        let result = await HealthMonitor.probeServer(config: configs[1], fetchTools: false)
+        XCTAssertEqual(result.failureReason, HealthMonitor.noEndpointReason)
+        XCTAssertTrue(result.needsAttention, "amber, not red")
+    }
+
     /// r3 22cd: a user-wide enableAllProjectMcpServers never starts a stray
     /// .mcp.json in a folder Claude Code was never told to trust.
     func testUserWideApprovalNeedsATrustedFolder() {
