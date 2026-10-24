@@ -135,14 +135,21 @@ enum SSEProbe {
     private struct ForeignEndpoint: Error {}
 
     /// Same scheme (http or https), host and port as the configured URL.
+    /// localhost, 127.0.0.1 and ::1 count as one host: a local server often
+    /// announces its endpoint under another name than the config uses (r3 d0d1).
     static func isSameOrigin(_ endpoint: URL, as base: URL) -> Bool {
         guard let scheme = endpoint.scheme?.lowercased(), ["http", "https"].contains(scheme),
               scheme == base.scheme?.lowercased(),
               let host = endpoint.host, let baseHost = base.host,
-              host.caseInsensitiveCompare(baseHost) == .orderedSame
+              canonicalHost(host) == canonicalHost(baseHost)
         else { return false }
         let defaultPort = scheme == "https" ? 443 : 80
         return (endpoint.port ?? defaultPort) == (base.port ?? defaultPort)
+    }
+
+    private static func canonicalHost(_ host: String) -> String {
+        let lower = host.lowercased()
+        return ["localhost", "127.0.0.1", "::1"].contains(lower) ? "localhost" : lower
     }
 
     /// One parsed SSE event: `event:` name (default `message`) and its `data:` line.

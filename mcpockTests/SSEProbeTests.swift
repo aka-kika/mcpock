@@ -123,6 +123,30 @@ final class SSEProbeTests: XCTestCase {
         XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "file:///etc/passwd")!, as: base))
     }
 
+    /// r3 d0d1: localhost, 127.0.0.1 and ::1 are one origin; the port and scheme still count.
+    func testLoopbackNamesAreOneOrigin() {
+        let base = URL(string: "http://localhost:8080/sse")!
+        XCTAssertTrue(SSEProbe.isSameOrigin(URL(string: "http://127.0.0.1:8080/messages")!, as: base))
+        XCTAssertTrue(SSEProbe.isSameOrigin(URL(string: "http://[::1]:8080/messages")!, as: base))
+        XCTAssertTrue(SSEProbe.isSameOrigin(URL(string: "http://LOCALHOST:8080/m")!, as: URL(string: "http://127.0.0.1:8080/sse")!))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "http://127.0.0.1:9090/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "https://127.0.0.1:8080/m")!, as: base))
+        XCTAssertFalse(SSEProbe.isSameOrigin(URL(string: "http://127.0.0.2:8080/m")!, as: base))
+    }
+
+    /// r3 d0d1: a server reached as localhost that announces http://127.0.0.1:<port> still probes healthy.
+    func testEndpointOnLoopbackAliasIsUsed() async throws {
+        // The mock announces a relative path; announce the absolute 127.0.0.1 form instead.
+        let alias = mock.replacingOccurrences(
+            of: "b'event: endpoint\\ndata: /messages?session=s1\\n\\n'",
+            with: "b'event: endpoint\\ndata: http://127.0.0.1:%d/messages?session=s1\\n\\n' % httpd.server_address[1]")
+        XCTAssertNotEqual(alias, mock)
+        let (aliasServer, aliasPort) = try startMock(alias)
+        defer { aliasServer.terminate(); aliasServer.waitUntilExit() }
+        let result = await SSEProbe.probe(url: URL(string: "http://localhost:\(aliasPort)/sse")!, headers: [:], fetchTools: false)
+        XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
+    }
+
     /// A URL labelled `sse` that does not serve an event stream falls through to
     /// the streamable-HTTP probe rather than failing on the GET.
     func testNonStreamURLLabelledSSEFallsBackToStreamableProbe() async throws {
