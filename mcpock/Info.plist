@@ -37,6 +37,9 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<!-- Servers on the local network (r3 b5bc). -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>mcpock checks MCP servers on your local network that your agents use.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
