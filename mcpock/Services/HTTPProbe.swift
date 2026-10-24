@@ -71,15 +71,15 @@ enum HTTPProbe {
 
         let result: ProbeResult
         do {
-            let initBody = try MCPJSONRPC.encode(MCPJSONRPC.initializeRequest(id: 1))
-            let (initResponse, sessionId) = try await postJSON(url: url, body: initBody, headers: config.headers, deadline: deadline)
+            let (initResponse, sessionId, version) = try await initialize(
+                url: url, headers: config.headers, deadline: deadline)
             try MCPJSONRPC.validateInitializeResponse(initResponse)
 
             // Streamable-HTTP servers assign an Mcp-Session-Id on initialize and reject
             // follow-up requests that omit it. Replay it plus the negotiated protocol version.
             var headers = config.headers
             if headers["MCP-Protocol-Version"] == nil {
-                headers["MCP-Protocol-Version"] = MCPJSONRPC.protocolVersion
+                headers["MCP-Protocol-Version"] = version
             }
             if let sessionId {
                 headers["Mcp-Session-Id"] = sessionId
@@ -119,6 +119,35 @@ enum HTTPProbe {
             await closeSession(url: url, headers: sessionHeaders)
         }
         return result
+    }
+
+    /// `initialize`, asked once more with the version a refusing server names
+    /// (r3 a1f3). The refusal may come as a JSON-RPC error in a 200 or in the
+    /// body of a 4xx. Returns the answer, the session id and the version the
+    /// probe settled on.
+    private static func initialize(
+        url: URL, headers: [String: String], deadline: ContinuousClock.Instant
+    ) async throws -> (json: [String: Any], sessionId: String?, version: String) {
+        func attempt(_ version: String) async throws -> (json: [String: Any], sessionId: String?) {
+            let body = try MCPJSONRPC.encode(
+                MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID, protocolVersion: version))
+            return try await postJSON(url: url, body: body, headers: headers, deadline: deadline)
+        }
+        let first: (json: [String: Any], sessionId: String?)
+        do {
+            first = try await attempt(MCPJSONRPC.protocolVersion)
+        } catch ProbeError.httpError(let status, let body) {
+            guard let json = try? MCPJSONRPC.parseJSONObject(Data(body.utf8)),
+                  let retry = MCPJSONRPC.retryVersion(after: json, sent: MCPJSONRPC.protocolVersion)
+            else { throw ProbeError.httpError(status, body) }
+            let second = try await attempt(retry)
+            return (second.json, second.sessionId, MCPJSONRPC.negotiatedVersion(second.json, sent: retry))
+        }
+        if let retry = MCPJSONRPC.retryVersion(after: first.json, sent: MCPJSONRPC.protocolVersion) {
+            let second = try await attempt(retry)
+            return (second.json, second.sessionId, MCPJSONRPC.negotiatedVersion(second.json, sent: retry))
+        }
+        return (first.json, first.sessionId, MCPJSONRPC.negotiatedVersion(first.json, sent: MCPJSONRPC.protocolVersion))
     }
 
     /// A request's timeout: what is left of the probe's budget, at most `cap`.

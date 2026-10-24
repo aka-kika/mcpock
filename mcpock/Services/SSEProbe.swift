@@ -116,8 +116,17 @@ enum SSEProbe {
         // 2026-10-20, 7676).
         guard isSameOrigin(endpoint, as: base) else { throw ForeignEndpoint() }
 
-        try await post(MCPJSONRPC.initializeRequest(id: 1), to: endpoint, headers: headers, deadline: deadline)
-        try MCPJSONRPC.validateInitializeResponse(try await nextResponse(&lines, id: 1))
+        try await post(MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID), to: endpoint, headers: headers, deadline: deadline)
+        var initResponse = try await nextResponse(&lines, id: MCPJSONRPC.initializeID)
+        // A server that refuses our protocol version names the one it speaks:
+        // ask once more with it (r3 a1f3).
+        if let retry = MCPJSONRPC.retryVersion(after: initResponse, sent: MCPJSONRPC.protocolVersion) {
+            try await post(
+                MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID, protocolVersion: retry),
+                to: endpoint, headers: headers, deadline: deadline)
+            initResponse = try await nextResponse(&lines, id: MCPJSONRPC.initializeID)
+        }
+        try MCPJSONRPC.validateInitializeResponse(initResponse)
         try await post(
             MCPJSONRPC.initializedNotification(), to: endpoint, headers: headers, deadline: deadline,
             timeout: HTTPProbe.notificationTimeout

@@ -157,4 +157,74 @@ final class ProbeR3Tests: XCTestCase {
         let result = await HTTPProbe.probe(config: config, fetchTools: false)
         XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
     }
+
+    // MARK: a1f3
+
+    /// A server that only speaks 2025-06-18 refuses 2024-11-05 with an error
+    /// naming its version, in a 200 (or a 400), and answers a retry with it.
+    func testHTTPRetriesWithTheServersVersion() async throws {
+        for status in [200, 400] {
+            let (server, port) = try startServer("""
+            import sys, json, http.server, socketserver
+            class H(http.server.BaseHTTPRequestHandler):
+                protocol_version = 'HTTP/1.1'
+                def log_message(self, *a): pass
+                def reply(self, code, obj, session=None):
+                    out = json.dumps(obj).encode()
+                    self.send_response(code); self.send_header('Content-Type','application/json')
+                    if session: self.send_header('Mcp-Session-Id', session)
+                    self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+                def do_POST(self):
+                    n = int(self.headers.get('Content-Length', 0)); msg = json.loads(self.rfile.read(n) or b'{}')
+                    if msg.get('method') == 'initialize':
+                        if msg['params']['protocolVersion'] != '2025-06-18':
+                            return self.reply(\(status), {'jsonrpc':'2.0','id':msg['id'],'error':{'code':-32602,'message':'Unsupported protocol version','data':{'supported':['2025-06-18']}}})
+                        return self.reply(200, {'jsonrpc':'2.0','id':msg['id'],'result':{'protocolVersion':'2025-06-18','capabilities':{},'serverInfo':{'name':'m','version':'0'}}}, 's1')
+                    if msg.get('id') is None:
+                        self.send_response(202); self.send_header('Content-Length', '0'); self.end_headers(); return
+                    if self.headers.get('MCP-Protocol-Version') != '2025-06-18':
+                        return self.reply(400, {'jsonrpc':'2.0','id':msg['id'],'error':{'code':-1,'message':'wrong header'}})
+                    self.reply(200, {'jsonrpc':'2.0','id':msg['id'],'result':{'tools':[{'name':'echo','description':'Echo'}]}})
+                def do_DELETE(self):
+                    self.send_response(405); self.send_header('Content-Length', '0'); self.end_headers()
+            class S(socketserver.ThreadingMixIn, http.server.HTTPServer): daemon_threads = True
+            with S(('127.0.0.1', 0), H) as httpd:
+                sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
+                httpd.serve_forever()
+            """)
+            defer { server.terminate(); server.waitUntilExit() }
+            let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: true)
+            XCTAssertEqual(result.state, .healthy, "status \(status): \(result.failureReason ?? "")")
+            XCTAssertEqual(result.tools?.map(\.name), ["echo"])
+        }
+    }
+
+    /// The same refusal on a stdio server: one more initialize with its version.
+    func testStdioRetriesWithTheServersVersion() async throws {
+        let script = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mcpock-r3-stdio-\(UUID().uuidString).py")
+        try """
+        import sys, json
+        for line in sys.stdin:
+            msg = json.loads(line)
+            mid = msg.get('id')
+            if msg.get('method') == 'initialize':
+                if msg['params']['protocolVersion'] != '2025-06-18':
+                    out = {'jsonrpc':'2.0','id':mid,'error':{'code':-32602,'message':'Unsupported protocol version','data':{'supported':['2025-06-18']}}}
+                else:
+                    out = {'jsonrpc':'2.0','id':mid,'result':{'protocolVersion':'2025-06-18','capabilities':{},'serverInfo':{'name':'m','version':'0'}}}
+            elif msg.get('method') == 'tools/list':
+                out = {'jsonrpc':'2.0','id':mid,'result':{'tools':[{'name':'echo','description':'Echo'}]}}
+            else:
+                continue
+            sys.stdout.write(json.dumps(out) + '\\n'); sys.stdout.flush()
+        """.write(to: script, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: script) }
+        let config = ServerConfig(
+            id: "t:r3stdio", name: "r3stdio", source: .code, projectPath: nil, transport: .stdio,
+            command: "/usr/bin/python3", args: [script.path], env: [:], url: nil, headers: [:])
+        let result = await StdioProbe.probe(config: config, fetchTools: true)
+        XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
+        XCTAssertEqual(result.tools?.map(\.name), ["echo"])
+    }
 }

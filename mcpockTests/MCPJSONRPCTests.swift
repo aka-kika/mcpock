@@ -54,4 +54,31 @@ final class MCPJSONRPCTests: XCTestCase {
         let request: [String: Any] = ["jsonrpc": "2.0", "id": 1, "method": "roots/list"]
         XCTAssertFalse(MCPJSONRPC.isResponse(request, to: 1))
     }
+
+    /// r3 a1f3: a refusal that names another supported version is retried with it.
+    func testRetryVersionFromARefusal() {
+        let sent = MCPJSONRPC.protocolVersion
+        let listed: [String: Any] = ["jsonrpc": "2.0", "id": 1, "error": [
+            "code": -32602, "message": "Unsupported protocol version",
+            "data": ["supported": ["2025-03-26", "2025-06-18"], "requested": sent]]]
+        XCTAssertEqual(MCPJSONRPC.retryVersion(after: listed, sent: sent), "2025-06-18")
+        let inMessage: [String: Any] = ["jsonrpc": "2.0", "id": NSNull(), "error": [
+            "code": -32602, "message": "Unsupported version \(sent), use 2025-03-26"]]
+        XCTAssertEqual(MCPJSONRPC.retryVersion(after: inMessage, sent: sent), "2025-03-26")
+        let named: [String: Any] = ["jsonrpc": "2.0", "id": 1, "error": [
+            "code": -1, "message": "bad", "data": ["protocolVersion": "2025-11-25"]]]
+        XCTAssertEqual(MCPJSONRPC.retryVersion(after: named, sent: sent), "2025-11-25")
+    }
+
+    func testNoRetryWhenThereIsNothingNewToTry() {
+        let sent = MCPJSONRPC.protocolVersion
+        let echoed: [String: Any] = ["jsonrpc": "2.0", "id": 1, "error": ["code": -1, "message": "Unsupported \(sent)"]]
+        XCTAssertNil(MCPJSONRPC.retryVersion(after: echoed, sent: sent))
+        let plain: [String: Any] = ["jsonrpc": "2.0", "id": 1, "error": ["code": -1, "message": "boom"]]
+        XCTAssertNil(MCPJSONRPC.retryVersion(after: plain, sent: sent))
+        let result: [String: Any] = ["jsonrpc": "2.0", "id": 1, "result": ["protocolVersion": "2025-06-18"]]
+        XCTAssertNil(MCPJSONRPC.retryVersion(after: result, sent: sent), "a result is an answer, not a refusal")
+        XCTAssertEqual(MCPJSONRPC.negotiatedVersion(result, sent: sent), "2025-06-18")
+        XCTAssertEqual(MCPJSONRPC.negotiatedVersion(plain, sent: sent), sent)
+    }
 }
