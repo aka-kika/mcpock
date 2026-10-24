@@ -135,6 +135,11 @@ struct MCPStatusServer {
         line(["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
     }
 
+    /// The answer to a message over the size cap: JSON-RPC "Invalid Request", id unknown (r3 b1c9).
+    func tooLongReply() -> String {
+        encode(error: -32600, message: "Message too long (over 1 MB)", id: NSNull())
+    }
+
     private func line(_ object: [String: Any]) -> String {
         // `encodeLine` adds the newline the transport needs; the caller writes it.
         guard let data = try? MCPJSONRPC.encodeLine(object),

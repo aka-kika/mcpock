@@ -250,6 +250,39 @@ final class MCPStatusServerTests: XCTestCase {
                        MCPStatusServer.supportedVersions[0])
     }
 
+    // MARK: - Stdin reading with a size cap (r3 b1c9)
+
+    func testReaderSplitsLinesAcrossPieces() {
+        var reader = StdinLineReader()
+        XCTAssertEqual(reader.feed(Data("ab".utf8)), [])
+        XCTAssertEqual(reader.feed(Data("c\nde\nf".utf8)), [.line("abc"), .line("de")])
+        XCTAssertEqual(reader.finish(), .line("f"))
+        XCTAssertNil(reader.finish())
+    }
+
+    func testReaderAnswersATooLongMessageOnceAndKeepsServing() {
+        var reader = StdinLineReader(maxBytes: 8)
+        // Over the cap across several pieces, then a good line.
+        var events = reader.feed(Data("123456".utf8))
+        events += reader.feed(Data("789012".utf8))
+        events += reader.feed(Data("3456\nok\n".utf8))
+        XCTAssertEqual(events, [.tooLong, .line("ok")])
+        // Over the cap inside one piece that also holds a newline.
+        XCTAssertEqual(reader.feed(Data("0123456789\nnext\n".utf8)), [.tooLong, .line("next")])
+        // Exactly at the cap is fine.
+        XCTAssertEqual(reader.feed(Data("12345678\n".utf8)), [.line("12345678")])
+        // A too-long tail with no newline at the end of input says nothing more.
+        _ = reader.feed(Data("123456789".utf8))
+        XCTAssertNil(reader.finish())
+    }
+
+    func testTooLongReplyIsInvalidRequest() throws {
+        let s = server(at: try fixtureFile())
+        let object = try MCPJSONRPC.parseJSONObject(Data(s.tooLongReply().utf8))
+        XCTAssertEqual((object["error"] as? [String: Any])?["code"] as? Int, -32600)
+        XCTAssertTrue(object["id"] is NSNull)
+    }
+
     // MARK: - The real helper, end to end
 
     /// Runs the helper bundled in the test host (the app) over stdio against the
