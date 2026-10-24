@@ -266,9 +266,11 @@ private struct AgentRowView: View {
                     .padding(.top, 4)
                     .padding(.bottom, 2)
             }
-            Rectangle().fill(theme.divider).frame(height: 1)
-                .padding(.top, 6)
-                .padding(.horizontal, 6)
+            if !section.paths.isEmpty {
+                Rectangle().fill(theme.divider).frame(height: 1)
+                    .padding(.top, 6)
+                    .padding(.horizontal, 6)
+            }
             // The config file(s), path only (round 8: no "Open config" button;
             // right-click has the shared menu, opening is its last item).
             ForEach(section.paths, id: \.self) { path in

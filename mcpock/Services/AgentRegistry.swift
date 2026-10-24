@@ -41,12 +41,15 @@ enum AgentRegistry {
     }
 
     /// Agents listed even with no servers, once they are on this Mac (1.12.1):
-    /// label -> the line that stands in for the servers. Grok Bot keeps its
-    /// list in the xAI account, so an empty or missing settings file is the
+    /// label -> the line that says where its servers would be. Grok Bot keeps
+    /// its list in the xAI account, so an empty or missing settings file is the
     /// usual case, not an agent that isn't there.
     static let listedWhenEmpty: [String: String] = [
-        grokBotLabel: "No servers yet. Grok Bot's servers live in your xAI account and run in xAI's cloud.",
+        grokBotLabel: "Grok Bot's servers live in your xAI account and run in xAI's cloud.",
     ]
+
+    /// What such an agent says beside its name while it has none.
+    static let noServersYet = "No servers yet"
 
     /// What shows each of those is installed: its app or its own folder.
     static var installMarkers: [String: [String]] {

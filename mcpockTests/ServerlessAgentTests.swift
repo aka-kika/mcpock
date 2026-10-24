@@ -35,8 +35,7 @@ final class ServerlessAgentTests: XCTestCase {
         XCTAssertNotNil(grokBot)
         XCTAssertEqual(grokBot?.servers.count, 0)
         XCTAssertEqual(grokBot.map(AgentSections.problemText), "No servers yet")
-        XCTAssertEqual(grokBot?.emptyLine,
-                       "No servers yet. Grok Bot's servers live in your xAI account and run in xAI's cloud.")
+        XCTAssertEqual(grokBot?.emptyLine, "Grok Bot's servers live in your xAI account and run in xAI's cloud.")
         XCTAssertEqual(AgentSections.compactSummary(sections), "2 agents, all fine")
     }
 
