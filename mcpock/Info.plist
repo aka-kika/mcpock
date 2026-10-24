@@ -51,6 +51,9 @@
 	     leaves the Keychain and is never in this repo. Sparkle refuses to
 	     install an update whose appcast signature doesn't verify against
 	     this key. -->
+	<!-- Check the signature before Sparkle unpacks an update (r3 60a3). -->
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>SUPublicEDKey</key>
 	<string>cWnn72MEaG+PlI5iOPdSCW4lZI+KNrybquhJPkJ9wuc=</string>
 </dict>
