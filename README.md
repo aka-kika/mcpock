@@ -367,6 +367,20 @@ You can put the two variables in `scripts/release.env` (git-ignored, see
 error. It also stops if `docs/release-notes/<version>.md` is missing, if the
 tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
 
+## Uninstalling
+
+1. In each agent's MCP config, remove the `mcpock` entry you added in
+   **Connect your agents** (mcpock never edits your configs, so it did not add
+   one for you).
+2. In mcpock, open Settings > General and turn **Open at Login** off.
+3. Quit mcpock from its menu bar icon.
+4. Delete `mcpock.app` from Applications.
+5. Optional, to remove what it left behind (open Finder, press Shift+Cmd+G, and
+   paste each path):
+   - `~/Library/Application Support/mcpock` (the status and usage files)
+   - `~/Library/Preferences/com.mcpock.app.plist` (your settings)
+   - `~/Library/Group Containers/P5RB3W3D58.com.mcpock` (shared with the widgets)
+
 ## FAQ and troubleshooting
 
 **macOS asks for permission to open a folder.**
