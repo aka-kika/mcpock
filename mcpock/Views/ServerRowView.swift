@@ -61,6 +61,22 @@ struct ServerRowView: View {
 
                     Spacer(minLength: 6)
 
+                    // A row that needs you shows Check again under the pointer:
+                    // before, it lived only on the card, the right-click menu
+                    // and Cmd-R (open loop 2026-10-10, r3 50f1).
+                    if isHovered && PanelSections.needsYou(group) {
+                        Button(action: actions.checkAgain) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(theme.textSecondary)
+                                .frame(width: 18, height: 18)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(CardAction.checkAgain.title)
+                        .accessibilityLabel(CardAction.checkAgain.title)
+                    }
+
                     badges
 
                     Text(group.tools.isEmpty ? "" : "\(group.tools.count)")
@@ -92,6 +108,7 @@ struct ServerRowView: View {
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAction(named: CardAction.checkAgain.title, actions.checkAgain)
         .contextMenu { ServerContextMenu(group: group, isPinned: isPinned, actions: actions) }
     }
 
@@ -101,6 +118,8 @@ struct ServerRowView: View {
     }
 
     private var noteColor: Color {
+        // Not checked here is calm, like its dash (r3 b964, 5f42).
+        if group.notCheckedHere { return theme.textSecondary }
         switch group.state {
         case .broken: return theme.statusBroken
         case .degraded: return theme.statusDegraded

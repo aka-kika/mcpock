@@ -175,6 +175,15 @@ struct DetailCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // A quiet way to the config, without the right-click and the
+            // warning (r3 50f1): Finder only, mcpock never opens it for editing.
+            if let path = CardText.failingConfigPath(for: group) {
+                Button("Show \(CardText.shortPath(path)) in Finder") { ConfigFileActions.showInFinder(path) }
+                    .buttonStyle(.link)
+                    .font(Theme.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
             // Layout B (1.5.3): one row of two equal-width buttons.
             HStack(spacing: Self.buttonGap) {
                 askAgentButton
@@ -360,7 +369,8 @@ struct DetailCardView: View {
                         iconButton(.resume) { state.togglePause(group.name) }
                     }
                 } else {
-                    iconButton(.checkAgain, spinning: state.isChecking(group.name)) {
+                    // Labeled: the key fix action was an unlabeled arrow (r3 50f1).
+                    iconButton(.checkAgain, spinning: state.isChecking(group.name), labeled: true) {
                         state.checkAgain(group.name)
                     }
                     .disabled(state.isChecking(group.name))
@@ -377,13 +387,14 @@ struct DetailCardView: View {
     private func iconButton(
         _ action: CardAction,
         spinning: Bool = false,
+        labeled: Bool = false,
         perform: @escaping () -> Void
     ) -> some View {
         CardButton(
             title: action.title,
             systemImage: action.systemImage,
             spinning: spinning,
-            iconOnly: true,
+            iconOnly: !labeled,
             theme: theme,
             action: perform
         )

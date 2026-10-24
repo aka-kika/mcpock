@@ -186,6 +186,12 @@ enum CardText {
             + "Allow this file (right-click the row) checks it from now on."
     }
 
+    /// The config file of the first failing source, for the Why box's
+    /// Show in Finder link; nil when none is known.
+    static func failingConfigPath(for group: ServerGroup) -> String? {
+        group.sources.first { ($0.state == .broken || $0.state == .degraded) && !$0.path.isEmpty }?.path
+    }
+
     static func shortPath(_ path: String, home: String = NSHomeDirectory()) -> String {
         guard !home.isEmpty, path == home || path.hasPrefix(home + "/") else { return path }
         return "~" + path.dropFirst(home.count)
