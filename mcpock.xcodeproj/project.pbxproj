@@ -177,6 +177,7 @@
 		D00603FC1C3B0EC5D9278FA4 /* HermesUsageReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9211F9554340D9C17DC4A74F /* HermesUsageReaderTests.swift */; };
 		D1A50ECFC7C9BCFC66087F83 /* GooseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBF1461A92D93E004FC288D /* GooseConfig.swift */; };
 		D2FF1484B51C2981F46EE70E /* StatusSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B20D40BD2AB847657206F56 /* StatusSnapshotTests.swift */; };
+		D43ED231FA904E12332F862C /* ServerlessAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D8B9DE782298994A3C6294 /* ServerlessAgentTests.swift */; };
 		D5D3CC68B9FFE866CCC8ADA4 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = BA8B15BA67861AFEA1A9C0E3 /* libsqlite3.tbd */; };
 		D5FAC77B4E0F57B1F90D70BC /* ErrorExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7876E4D27E20FAAD47B81527 /* ErrorExport.swift */; };
 		D62BA5BF8362F08EC591621A /* DifferentOnPurposeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A72664DD7C4DA9F68F0B7D /* DifferentOnPurposeTests.swift */; };
@@ -348,6 +349,7 @@
 		6D7BC3923254B9825C3DAA45 /* release-notes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "release-notes"; path = "docs/release-notes"; sourceTree = SOURCE_ROOT; };
 		6E6F98A45B5815F04DA9D005 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		6FA3F23B5FC1490EAA2F24D4 /* SpinnableIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpinnableIcon.swift; sourceTree = "<group>"; };
+		70D8B9DE782298994A3C6294 /* ServerlessAgentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerlessAgentTests.swift; sourceTree = "<group>"; };
 		72EEB5C009333D0DA35F9B7F /* ConfigScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigScanner.swift; sourceTree = "<group>"; };
 		733E2668702D555A2080B7EE /* ClaudeProjectApproval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProjectApproval.swift; sourceTree = "<group>"; };
 		7874494E7CE378CA4E6E7226 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -565,6 +567,7 @@
 				E0F08106FA5A1EBCB77D5A51 /* SecretMaskTests.swift */,
 				4A480112C717EFA056D8E125 /* SelfManagedTests.swift */,
 				11DB586624AD507321224BAC /* ServerGroupingTests.swift */,
+				70D8B9DE782298994A3C6294 /* ServerlessAgentTests.swift */,
 				6BDA247B9C3B4895795AD580 /* ServerReportTests.swift */,
 				FD7BA145CE13C04C4CFAF217 /* SessionDropsTests.swift */,
 				0D43856E058F8AB4450CFBB1 /* SettingsPanesTests.swift */,
@@ -1119,6 +1122,7 @@
 				DFD6321F7638FFEA7BB56D2D /* SelfManagedTests.swift in Sources */,
 				8D6736CF94761CB72B50EBFC /* ServerGroupingTests.swift in Sources */,
 				13DF8BBF8AFF5FF5DFFB9877 /* ServerReportTests.swift in Sources */,
+				D43ED231FA904E12332F862C /* ServerlessAgentTests.swift in Sources */,
 				4C26F9EA099B8EED88A3E2FD /* SessionDropsTests.swift in Sources */,
 				A570CFEF84925B7D1AE1CD05 /* SettingsPanesTests.swift in Sources */,
 				FE05711914612616057415C7 /* SettingsWindowSizingTests.swift in Sources */,

@@ -135,13 +135,16 @@ private struct AgentRowView: View {
                             .foregroundStyle(theme.textTertiary)
                             .rotationEffect(.degrees(isOpen ? 90 : 0))
                     }
-                    HealthBar(
-                        section: section,
-                        theme: theme,
-                        isRefreshing: panel.monitor.isRefreshing,
-                        firstViewWindowOpen: panel.firstAgentsViewWindowOpen
-                    )
-                        .padding(.leading, Self.contentIndent)
+                    // No bar for an agent with no servers (1.12.1, Grok Bot).
+                    if !section.servers.isEmpty {
+                        HealthBar(
+                            section: section,
+                            theme: theme,
+                            isRefreshing: panel.monitor.isRefreshing,
+                            firstViewWindowOpen: panel.firstAgentsViewWindowOpen
+                        )
+                            .padding(.leading, Self.contentIndent)
+                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 9)
@@ -211,6 +214,14 @@ private struct AgentRowView: View {
         let isFoldExpanded = panel.expandedFoldAgents.contains(section.agent)
         let fold = AgentSections.ServerFold.shown(section.listed, expanded: isFoldExpanded)
         VStack(alignment: .leading, spacing: 1) {
+            if let line = section.emptyLine {
+                Text(line)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 6)
+                    .padding(.vertical, 2)
+            }
             ForEach(fold.rows) { server in
                 AgentServerRow(
                     server: server,

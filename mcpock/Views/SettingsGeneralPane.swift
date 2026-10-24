@@ -272,7 +272,7 @@ struct SettingsGeneralPane: View {
     }
 
     private var agentsText: String {
-        let entries = SettingsAgentsPane.entries(from: monitor?.groups ?? [])
+        let entries = SettingsAgentsPane.entries(from: monitor?.groups ?? [], emptyAgents: monitor?.serverlessAgents ?? [])
         return SettingsAgentsPane.countText(entries)
     }
 

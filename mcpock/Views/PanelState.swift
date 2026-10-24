@@ -222,13 +222,14 @@ final class PanelState {
     /// The Agents tab, built from the same visible rows, search text and
     /// attention toggle.
     var agentSections: [AgentSection] {
-        AgentSections.build(groups: monitor.visibleGroups, query: query, filter: filter)
+        AgentSections.build(groups: monitor.visibleGroups, query: query, filter: filter,
+                            emptyAgents: monitor.serverlessAgents)
     }
 
     /// Every agent, whatever the toggle and the search say: the footer's summary
     /// and the toggle's count describe the whole setup.
     var allAgentSections: [AgentSection] {
-        AgentSections.build(groups: monitor.visibleGroups)
+        AgentSections.build(groups: monitor.visibleGroups, emptyAgents: monitor.serverlessAgents)
     }
 
     /// The open agent: the one she opened, while it is in the list. nil until

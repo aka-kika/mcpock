@@ -54,6 +54,11 @@ struct AgentSection: Identifiable, Hashable, Sendable {
     /// "answers normally" either.
     var waitingCount: Int { servers.filter { $0.state == .needsApp || ($0.mark == .needsApp && !$0.needsYou) }.count }
     var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount - waitingCount }
+    /// An installed agent with no servers (1.12.1, Grok Bot): the line that
+    /// stands in for them. nil while it has any.
+    var emptyLine: String? {
+        servers.isEmpty ? AgentRegistry.listedWhenEmpty[AgentBadge.agentName(fromLabel: agent)] : nil
+    }
 }
 
 /// Builds the Agents tab (v1.5 spec, Phase 4) from the same `ServerGroup`s as the
@@ -70,7 +75,10 @@ enum AgentSections {
     /// keeps agents with nothing wrong too, sorted after them, so the tab is
     /// never left looking half empty (2026-09-25). `isDimmed` tells the
     /// view which sections those are.
-    static func build(groups: [ServerGroup], query: String = "", filter: PanelFilter = .all) -> [AgentSection] {
+    /// `emptyAgents`: installed agents listed even with no servers (1.12.1,
+    /// `HealthMonitor.installedEmptyAgents`); one that has servers is listed as usual.
+    static func build(groups: [ServerGroup], query: String = "", filter: PanelFilter = .all,
+                      emptyAgents: [String] = []) -> [AgentSection] {
         var order: [String] = []
         var paths: [String: [String]] = [:]
         var servers: [String: [AgentServer]] = [:]
@@ -94,6 +102,12 @@ enum AgentSections {
             for (agent, own) in byAgent {
                 servers[agent, default: []].append(server(group, agent: agent, sources: own))
             }
+        }
+        let named = Set(order.map(AgentBadge.agentName(fromLabel:)))
+        for agent in emptyAgents where !named.contains(agent) {
+            order.append(agent)
+            paths[agent] = []
+            servers[agent] = []
         }
 
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -233,6 +247,7 @@ enum AgentSections {
     static func problemText(_ section: AgentSection) -> String {
         let count = section.problems.count
         if count == 0 {
+            if section.emptyLine != nil { return "No servers yet" }
             if section.checkingCount > 0 { return "Checking\u{2026}" }
             // Only waiting for its closed app (or a ${VAR}): say so calmly
             // instead of "All fine" (open loop from 2026-10-16).

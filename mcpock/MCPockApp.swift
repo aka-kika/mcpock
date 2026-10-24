@@ -74,6 +74,12 @@ struct MCPockApp: App {
                 await Task.detached(priority: .utility) { SessionDrops.read() }.value
             }
         }
+        // Grok Bot is listed once installed, even with no servers (1.12.1).
+        if !isHostingTests && !isDemo {
+            monitor.findInstalledEmptyAgents = {
+                await Task.detached(priority: .utility) { AgentRegistry.installedEmptyAgents() }.value
+            }
+        }
         // Servers start with the login shell's PATH and keys, like an agent
         // started from a terminal (r3 3c03). Read once, before the first check.
         if !isHostingTests && !isDemo { monitor.prepareEnvironment = { await ShellEnvironment.loadOnce() } }

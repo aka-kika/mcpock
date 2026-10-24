@@ -110,6 +110,21 @@ final class HealthMonitor {
         guard let readSessionDrops else { return }
         sessionDrops = await readSessionDrops()
     }
+    /// Agents on this Mac that are listed with no servers (1.12.1, Grok Bot):
+    /// `AgentRegistry.listedWhenEmpty`. Read with every config read.
+    private(set) var installedEmptyAgents: [String] = []
+
+    /// Those of them with no server at all, hidden ones included: the agents
+    /// the Agents tab and Settings list with their "No servers yet" line.
+    var serverlessAgents: [String] {
+        guard !installedEmptyAgents.isEmpty else { return [] }
+        let named = Set(groups.flatMap { $0.sources.map { AgentBadge.agentName(fromLabel: $0.agent) } })
+        return installedEmptyAgents.filter { !named.contains($0) }
+    }
+
+    /// Finds those agents. Nil (tests, demo mode) finds none.
+    @ObservationIgnored var findInstalledEmptyAgents: (@Sendable () async -> [String])?
+
     // MARK: - Servers that belong to a Mac app (2026-10-16)
 
     /// Local port -> the `.app` seen listening on it, kept across launches
@@ -479,6 +494,10 @@ final class HealthMonitor {
             recorded = true
         }
         if recorded { AppPreferences.saveAllowedScanFingerprints(allowedScanFingerprints, to: defaults) }
+        if let findInstalledEmptyAgents {
+            let installed = await findInstalledEmptyAgents()
+            if installed != installedEmptyAgents { installedEmptyAgents = installed }
+        }
         servers = Self.merged(configs, into: servers, pausedNames: pausedNames,
                               allowedScanFiles: Self.stillAllowed(allowedScanFiles, prints: allowedScanFingerprints,
                                                                   now: scanFingerprints))

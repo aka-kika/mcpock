@@ -31,9 +31,12 @@ struct SettingsAgentsPane: View {
     /// by their label's agent part, so "Hermes" and "Hermes · scribe" are one
     /// row with two paths, and a server declared in three of Cursor's projects
     /// counts once. Pure, so `SettingsPanesTests` covers it without a monitor.
-    nonisolated static func entries(from groups: [ServerGroup]) -> [SettingsAgentEntry] {
+    /// `emptyAgents`: installed agents with no servers, listed too (1.12.1,
+    /// Grok Bot; `HealthMonitor.serverlessAgents`).
+    nonisolated static func entries(from groups: [ServerGroup], emptyAgents: [String] = []) -> [SettingsAgentEntry] {
         var paths: [String: Set<String>] = [:]
         var servers: [String: Set<String>] = [:]
+        for agent in emptyAgents { servers[agent] = [] }
         for group in groups {
             for source in group.sources {
                 let agent = AgentBadge.agentName(fromLabel: source.agent)
@@ -67,7 +70,7 @@ struct SettingsAgentsPane: View {
     }
 
     private var entries: [SettingsAgentEntry] {
-        Self.entries(from: monitor?.groups ?? [])
+        Self.entries(from: monitor?.groups ?? [], emptyAgents: monitor?.serverlessAgents ?? [])
     }
 
     var body: some View {
@@ -108,7 +111,12 @@ struct SettingsAgentsPane: View {
                         .font(Theme.caption)
                         .foregroundStyle(theme.textTertiary)
                 }
-                if entry.paths.isEmpty {
+                if entry.serverCount == 0, let line = AgentRegistry.listedWhenEmpty[entry.agent] {
+                    Text(line)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if entry.paths.isEmpty {
                     Text("Config path unknown")
                         .font(Theme.mono)
                         .foregroundStyle(theme.textTertiary)
