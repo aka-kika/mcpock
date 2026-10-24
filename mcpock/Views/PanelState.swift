@@ -311,6 +311,8 @@ final class PanelState {
     func panelOpened() {
         installKeyMonitor()
         isPanelOpen = true
+        // A server an open session lost shows without waiting for the timer (1.12).
+        Task { await monitor.refreshSessionDrops() }
         userPickedFilter = false
         didJumpToNeedsYou = false
         // Start from her own saved choice: an earlier automatic jump to Needs

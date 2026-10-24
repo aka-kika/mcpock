@@ -174,8 +174,11 @@ enum AgentSections {
             rank = notChecked ? nil : state == .broken ? 0 : 1
             if notChecked { mark = .needsApp }
         case .healthy:
-            rank = differs ? 2 : nil
-            note = differs ? CardText.differsLine(for: group, agent: agent) : nil
+            // Only Claude Code's own row: its sessions are the ones that lost it (1.12).
+            let lost = group.droppedInSession && AgentBadge.agentName(fromLabel: agent) == AgentRegistry.claudeCodeLabel
+            rank = differs || lost ? 2 : nil
+            note = lost ? ShortReason.sessionDropLine(group.sessionDrops)
+                : differs ? CardText.differsLine(for: group, agent: agent) : nil
         // Not checked yet is not a problem (same rule as the Servers tab's Needs
         // you): right after launch every agent would otherwise read "19 need you".
         case .paused:

@@ -229,6 +229,17 @@ struct GroupSource: Sendable, Hashable, Identifiable {
     var awaitingFileOK = false
 }
 
+/// A server an open Claude Code session lost (inbox 2026-10-17): mcpock's own
+/// check starts a fresh connection, so a server that dropped inside a running
+/// session (a short network blip) still read fine while that session kept it
+/// disconnected until /mcp.
+struct SessionDrop: Hashable, Sendable {
+    /// The session's folder (its `cwd`).
+    let folder: String
+    /// When the session last failed to reach it.
+    let at: Date
+}
+
 /// A display row: all instances that share a server **name**, collapsed into one.
 /// Its `state` is the worst across instances, so it shows broken if any instance is.
 struct ServerGroup: Identifiable, Sendable, Hashable {
@@ -257,8 +268,18 @@ struct ServerGroup: Identifiable, Sendable, Hashable {
     var slowStartSeconds: Double? = nil
     /// "Wake": the closed app it waits for, while `state == .needsApp`.
     var needsAppName: String? = nil
+    /// Open Claude Code sessions that lost this server (1.12), newest first.
+    var sessionDrops: [SessionDrop] = []
 
     var id: String { name }
+
+    /// mcpock's own check works, but an open Claude Code session lost it:
+    /// that session needs /mcp (1.12). Only for a row Claude Code declares.
+    var droppedInSession: Bool { state == .healthy && !sessionDrops.isEmpty }
+
+    /// A healthy row that still wants a look: set up differently, or lost in
+    /// an open session. The quiet ring, never the broken diamond.
+    var attentionWhileHealthy: Bool { differsNeedsAttention || droppedInSession }
 
     /// True when the row's agents disagree about what to launch.
     var isDiffering: Bool { !differs.isEmpty }

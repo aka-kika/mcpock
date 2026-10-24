@@ -76,7 +76,9 @@ enum StatusSnapshot {
         switch group.state {
         case .broken: return "broken"
         case .degraded: return group.needsSignIn ? "needs sign-in" : group.notCheckedHere ? "not checked" : "slow"
-        case .healthy: return group.differsNeedsAttention ? "set up differently" : "fine"
+        case .healthy:
+            if group.droppedInSession { return "lost in an open Claude Code session" }
+            return group.differsNeedsAttention ? "set up differently" : "fine"
         case .unknown: return "checking"
         case .paused: return "paused"
         case .selfManaged: return "managed by its app"

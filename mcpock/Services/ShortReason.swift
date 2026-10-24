@@ -18,6 +18,12 @@ enum ShortReason {
     /// The short line for a whole row, or nil when the row doesn't need one.
     /// Uses the first failing source's reason; a row that only differs names the
     /// odd one out.
+    /// "Lost in 1 open Claude Code session: run /mcp there" (1.12).
+    static func sessionDropLine(_ drops: [SessionDrop]) -> String {
+        let n = drops.count
+        return "Lost in \(n) open Claude Code session\(n == 1 ? "" : "s"): run /mcp there"
+    }
+
     static func line(for group: ServerGroup) -> String? {
         switch group.state {
         case .broken, .degraded:
@@ -26,6 +32,7 @@ enum ShortReason {
             }
             return group.state == .broken ? "Broken" : "Slow"
         case .healthy:
+            if group.droppedInSession { return sessionDropLine(group.sessionDrops) }
             return group.differsNeedsAttention ? differs(group.differs) : nil
         // Unknown rows sit in their normal section with the unknown ring (they
         // never need you), so they get no second line.

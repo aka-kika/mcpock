@@ -113,6 +113,7 @@ struct HealthMark: View {
         if group.state == .needsApp, let app = group.needsAppName {
             return "Needs \(app) open"
         }
+        if group.droppedInSession { return "Lost in a session" }
         if group.state == .healthy && group.differsNeedsAttention {
             return "Set up differently"
         }

@@ -63,6 +63,7 @@
 		4ACE71E43B22552EE7A8C0E1 /* AkaSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACA6CCFA36910A94C0334218 /* AkaSourceTests.swift */; };
 		4B08ED36FAADADF1A9BC91A2 /* mcpockWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E9FB8EF2FB0F7E7612FC9E61 /* mcpockWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4B5FF0C7572D6B2602BF127B /* ShellEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4237EB10361F73C5ADD4CE5C /* ShellEnvironmentTests.swift */; };
+		4C26F9EA099B8EED88A3E2FD /* SessionDropsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD7BA145CE13C04C4CFAF217 /* SessionDropsTests.swift */; };
 		4F04BD4B667CC7E477E568C6 /* GlassPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CECA6A856BE0688490D9B54 /* GlassPanelTests.swift */; };
 		4FA030B07EDCBED58DA7727E /* ServerReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AB1301367B07B1C9A2B721 /* ServerReport.swift */; };
 		51B6E57E3986CA85100F662D /* StderrReasonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78931860EE005FF56726AA8A /* StderrReasonTests.swift */; };
@@ -111,6 +112,7 @@
 		77F36E33D5AF1B3782C2C8B3 /* AgentBadgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66025BFE9342F7F8A33E399E /* AgentBadgeTests.swift */; };
 		790BDCD236DBA10DE6AD16B5 /* AppBundleProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 811003DF5DEB18550B9F1F65 /* AppBundleProbeTests.swift */; };
 		7CBFA9E849726A9C7E13B929 /* WhatsNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052AF522F55D8592F1E9EE44 /* WhatsNew.swift */; };
+		7FB28F9DEDD92EA4751A00CE /* SessionDrops.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A5C181D131381982788F05 /* SessionDrops.swift */; };
 		7FE7D576203CF03ED01A63DB /* StatusIconTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7C9B9263BE42408318ACB9 /* StatusIconTests.swift */; };
 		8269FCED013B1233C62DF35F /* AgentsWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60ADC0EB555C307D95FF402A /* AgentsWidgetView.swift */; };
 		828D9F998AA85612F10C2D77 /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF39C888A03B5448DA4E443 /* ProcessRunner.swift */; };
@@ -421,6 +423,7 @@
 		E0F08106FA5A1EBCB77D5A51 /* SecretMaskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretMaskTests.swift; sourceTree = "<group>"; };
 		E1E67C4483038AAD40084F27 /* StdinLineReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdinLineReader.swift; sourceTree = "<group>"; };
 		E38CD64F6A6D9832D00F8D5B /* StatusIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusIconView.swift; sourceTree = "<group>"; };
+		E3A5C181D131381982788F05 /* SessionDrops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDrops.swift; sourceTree = "<group>"; };
 		E407298A6EEAB2B72A412E24 /* HeadersHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadersHelper.swift; sourceTree = "<group>"; };
 		E5C3C8AD2835FA47F0DAFC6A /* AkaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AkaSource.swift; sourceTree = "<group>"; };
 		E601A8F74EB72825DEE95A5B /* RedirectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedirectTests.swift; sourceTree = "<group>"; };
@@ -438,6 +441,7 @@
 		F8FE37D1861BBF6370C0519F /* SSEProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEProbe.swift; sourceTree = "<group>"; };
 		F9D89F96A074E838EED87470 /* WhatsNewLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewLauncher.swift; sourceTree = "<group>"; };
 		FB4248253AF4A25404D99670 /* MCPJSONRPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPJSONRPC.swift; sourceTree = "<group>"; };
+		FD7BA145CE13C04C4CFAF217 /* SessionDropsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDropsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -557,6 +561,7 @@
 				4A480112C717EFA056D8E125 /* SelfManagedTests.swift */,
 				11DB586624AD507321224BAC /* ServerGroupingTests.swift */,
 				6BDA247B9C3B4895795AD580 /* ServerReportTests.swift */,
+				FD7BA145CE13C04C4CFAF217 /* SessionDropsTests.swift */,
 				0D43856E058F8AB4450CFBB1 /* SettingsPanesTests.swift */,
 				F8FBD6D68E36379FD7BFB717 /* SettingsWindowSizingTests.swift */,
 				4237EB10361F73C5ADD4CE5C /* ShellEnvironmentTests.swift */,
@@ -638,6 +643,7 @@
 				4F1AD044E3456D407A552D7F /* SecretMask.swift */,
 				05AB1301367B07B1C9A2B721 /* ServerReport.swift */,
 				9D9845E457F80223D9B47DE9 /* ServerVisibility.swift */,
+				E3A5C181D131381982788F05 /* SessionDrops.swift */,
 				40C66CF8F6F69F4C1BE60286 /* SettingsLauncher.swift */,
 				1F23CF9DDB92A0D16DA16631 /* ShellEnvironment.swift */,
 				6666A0C03AB65C936C6492BA /* ShortReason.swift */,
@@ -994,6 +1000,7 @@
 				4FA030B07EDCBED58DA7727E /* ServerReport.swift in Sources */,
 				65C8CD45FB7FC6818ABFA70A /* ServerRowView.swift in Sources */,
 				E3B8A5D21C3BDAB4B8DA7B4E /* ServerVisibility.swift in Sources */,
+				7FB28F9DEDD92EA4751A00CE /* SessionDrops.swift in Sources */,
 				0A41870049B13CEB66950A47 /* SettingsAboutPane.swift in Sources */,
 				5486A7CB5BE930114ED37E81 /* SettingsAgentsPane.swift in Sources */,
 				C93AD96DFB1F7A00D7E6CD84 /* SettingsConnectPane.swift in Sources */,
@@ -1104,6 +1111,7 @@
 				DFD6321F7638FFEA7BB56D2D /* SelfManagedTests.swift in Sources */,
 				8D6736CF94761CB72B50EBFC /* ServerGroupingTests.swift in Sources */,
 				13DF8BBF8AFF5FF5DFFB9877 /* ServerReportTests.swift in Sources */,
+				4C26F9EA099B8EED88A3E2FD /* SessionDropsTests.swift in Sources */,
 				A570CFEF84925B7D1AE1CD05 /* SettingsPanesTests.swift in Sources */,
 				FE05711914612616057415C7 /* SettingsWindowSizingTests.swift in Sources */,
 				4B5FF0C7572D6B2602BF127B /* ShellEnvironmentTests.swift in Sources */,

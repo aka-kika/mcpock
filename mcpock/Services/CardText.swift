@@ -26,6 +26,16 @@ enum CardText {
         return parts.joined(separator: " \u{00B7} ")
     }
 
+    /// "Claude Code lost it in the open session in Recall 4 min ago. mcpock's
+    /// own check reaches it, so run /mcp in that session to reconnect." (1.12)
+    static func sessionDropNote(_ drops: [SessionDrop], now: Date) -> String? {
+        guard let newest = drops.first else { return nil }
+        let folders = list(drops.map { ($0.folder as NSString).lastPathComponent })
+        let sessions = drops.count == 1 ? "the open session in \(folders)" : "open sessions in \(folders)"
+        return "Claude Code lost it in \(sessions) \(PanelText.ago(newest.at, now: now)). "
+            + "mcpock's own check reaches it, so run /mcp in that session to reconnect."
+    }
+
     /// A row whose agents run their servers in the cloud (Grok Bot, 1.12).
     static func cloudNote(agents: [String], cloud: String) -> String {
         let host = list(agents.map(AgentBadge.displayLabel))

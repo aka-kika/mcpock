@@ -68,6 +68,12 @@ struct MCPockApp: App {
                 return configs + (await aka)
             }
         }
+        // Servers open Claude Code sessions lost, from their own logs (1.12).
+        if !isHostingTests && !isDemo {
+            monitor.readSessionDrops = {
+                await Task.detached(priority: .utility) { SessionDrops.read() }.value
+            }
+        }
         // Servers start with the login shell's PATH and keys, like an agent
         // started from a terminal (r3 3c03). Read once, before the first check.
         if !isHostingTests && !isDemo { monitor.prepareEnvironment = { await ShellEnvironment.loadOnce() } }

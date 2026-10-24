@@ -128,7 +128,7 @@ struct DetailCardView: View {
         switch group.state {
         case .broken: return theme.statusBroken
         case .degraded: return theme.statusDegraded
-        case .healthy: return group.differsNeedsAttention ? theme.statusDegraded : theme.statusHealthy
+        case .healthy: return group.attentionWhileHealthy ? theme.statusDegraded : theme.statusHealthy
         case .unknown, .selfManaged, .paused, .needsApp: return theme.textSecondary
         }
     }
@@ -173,7 +173,8 @@ struct DetailCardView: View {
                 + "mcpock checks it again once \(app) is running."
         case .healthy, .degraded, .broken:
             // Another source is checked, but one waits for its file's OK: say so.
-            return CardText.awaitingFileNote(for: group)
+            return CardText.sessionDropNote(group.droppedInSession ? group.sessionDrops : [], now: Date())
+                ?? CardText.awaitingFileNote(for: group)
         }
     }
 

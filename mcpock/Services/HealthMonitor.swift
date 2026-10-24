@@ -91,6 +91,25 @@ final class HealthMonitor {
     private(set) var differsAcknowledged: [String: [String]] {
         didSet { groupsCache = nil }
     }
+
+    /// Servers open Claude Code sessions lost (1.12), by normalized name.
+    private(set) var sessionDrops: [String: [SessionDrop]] = [:] {
+        didSet {
+            guard sessionDrops != oldValue else { return }
+            groupsCache = nil
+            statusDidChange()
+        }
+    }
+
+    /// Reads which servers open sessions lost. Nil (tests, demo mode) reads nothing.
+    @ObservationIgnored var readSessionDrops: (@Sendable () async -> [String: [SessionDrop]])?
+
+    /// Read the open sessions' logs again: after each full check and when the
+    /// panel opens, so a drop shows without waiting for the timer.
+    func refreshSessionDrops() async {
+        guard let readSessionDrops else { return }
+        sessionDrops = await readSessionDrops()
+    }
     // MARK: - Servers that belong to a Mac app (2026-10-16)
 
     /// Local port -> the `.app` seen listening on it, kept across launches
@@ -184,8 +203,9 @@ final class HealthMonitor {
     var groups: [ServerGroup] {
         let servers = self.servers
         let acknowledged = differsAcknowledged
+        let drops = sessionDrops
         if let groupsCache { return groupsCache }
-        let built = Self.groupByName(servers, acknowledged: acknowledged)
+        let built = Self.groupByName(servers, acknowledged: acknowledged, sessionDrops: drops)
         groupsCache = built
         return built
     }
@@ -313,7 +333,7 @@ final class HealthMonitor {
     var aggregate: AggregateState {
         let shown = visibleGroups
         if shown.isEmpty && !groups.isEmpty { return .allHealthy }
-        return Self.iconState(shown.map(Self.iconInput), anyDiffers: shown.contains(where: \.differsNeedsAttention))
+        return Self.iconState(shown.map(Self.iconInput), anyDiffers: shown.contains(where: \.attentionWhileHealthy))
     }
 
     /// A Not checked row (a `${VAR}` to fill) is calm, never the ring (r3 b964).
@@ -794,7 +814,8 @@ final class HealthMonitor {
     /// stays in `differs`.
     nonisolated static func groupByName(
         _ snapshots: [ServerSnapshot],
-        acknowledged: [String: [String]] = [:]
+        acknowledged: [String: [String]] = [:],
+        sessionDrops: [String: [SessionDrop]] = [:]
     ) -> [ServerGroup] {
         let grouped = Dictionary(grouping: snapshots, by: { Self.normalizedName($0.config.name) })
         let groups = grouped.map { key, variants -> ServerGroup in
@@ -857,7 +878,9 @@ final class HealthMonitor {
                 slowStartSeconds: state == .healthy
                     ? variants.filter { $0.state == .healthy }.compactMap(\.slowStartSeconds).max()
                     : nil,
-                needsAppName: state == .needsApp ? variants.compactMap(\.hostApp).first?.name : nil
+                needsAppName: state == .needsApp ? variants.compactMap(\.hostApp).first?.name : nil,
+                sessionDrops: variants.contains { $0.config.source.label == AgentRegistry.claudeCodeLabel }
+                    ? sessionDrops[key] ?? [] : []
             )
         }
         // Broken first, then by name — the only sort the display needs.
@@ -1016,6 +1039,7 @@ final class HealthMonitor {
             }
         }
         if !Task.isCancelled { hasCompletedFirstPass = true }
+        await refreshSessionDrops()
     }
 
     /// Identity of a probe target: two configs with the same spec launch the exact

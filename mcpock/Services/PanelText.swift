@@ -63,6 +63,7 @@ enum PanelText {
         if c.notChecked > 0 { parts.append("\(c.notChecked) not checked") }
         if c.waiting > 0 { parts.append("\(c.waiting) waiting for your OK") }
         if c.differs > 0 { parts.append("\(c.differs) set up differently") }
+        if c.lost > 0 { parts.append("\(c.lost) lost in a session") }
         if c.needsApp > 0 { parts.append("\(c.needsApp) \(c.needsApp == 1 ? "needs its app" : "need their app")") }
         if firstPass {
             parts.insert("Checking\u{2026}", at: 0)
@@ -102,6 +103,7 @@ enum PanelText {
         let needsApp: Int
         let checking: Int
         let waiting: Int
+        let lost: Int
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
@@ -112,6 +114,7 @@ enum PanelText {
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count
             waiting = groups.filter(\.waitsForFileOK).count
+            lost = groups.filter(\.droppedInSession).count
         }
     }
 
