@@ -1,5 +1,23 @@
 import SwiftUI
 
+/// What Settings says with nothing to list. After the first pass it says
+/// where mcpock looked, instead of "Still looking" forever (r3 ba40).
+@MainActor
+enum SettingsEmptyText {
+    static let whereItLooked = "mcpock read the config files of the agents it knows and the hidden folders, "
+        + "~/.config and Application Support in your home folder."
+
+    static func servers(monitor: HealthMonitor?) -> String {
+        guard let monitor else { return "No servers yet." }
+        return monitor.hasCompletedFirstPass ? "No servers found. " + whereItLooked : "Still looking for servers\u{2026}"
+    }
+
+    static func agents(monitor: HealthMonitor?) -> String {
+        guard let monitor else { return "No agents yet." }
+        return monitor.hasCompletedFirstPass ? "No agents found. " + whereItLooked : "Still looking for agents\u{2026}"
+    }
+}
+
 /// The Servers pane (v1.5 spec, Phase 5; a grouped form since round 8): one
 /// row per server with its health mark, tool count and a three-way "Show as"
 /// control. Round 8: the control is three icons (pin, eye, eye.slash for
@@ -32,7 +50,7 @@ struct SettingsServersPane: View {
         Form {
             Section {
                 if rows.isEmpty {
-                    Text(monitor == nil ? "No servers yet." : "Still looking for servers\u{2026}")
+                    Text(SettingsEmptyText.servers(monitor: monitor))
                         .foregroundStyle(theme.textTertiary)
                 } else {
                     ForEach(rows) { group in

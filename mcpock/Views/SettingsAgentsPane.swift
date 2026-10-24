@@ -75,7 +75,7 @@ struct SettingsAgentsPane: View {
         Form {
             Section {
                 if entries.isEmpty {
-                    Text(monitor == nil ? "No agents yet." : "Still looking for agents\u{2026}")
+                    Text(SettingsEmptyText.agents(monitor: monitor))
                         .foregroundStyle(theme.textTertiary)
                 } else {
                     ForEach(entries) { entry in
