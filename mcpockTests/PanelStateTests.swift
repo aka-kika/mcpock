@@ -241,6 +241,17 @@ final class PanelStateTests: XCTestCase {
         XCTAssertFalse(state.firstAgentsViewWindowOpen, "a later view never reopens it")
     }
 
+    /// r3 40f5: Undo after hiding a pinned server pins it again.
+    func testUndoHideKeepsThePin() {
+        let state = makeState()
+        state.monitor.setPinned(true, name: "wake")
+        state.hide("wake")
+        XCTAssertFalse(state.monitor.isPinned("wake"), "hiding unpins")
+        state.undoHide()
+        XCTAssertTrue(state.monitor.isPinned("wake"))
+        XCTAssertFalse(state.monitor.isHidden("wake"))
+    }
+
     /// Round 5: the Agents tab opens the card itself, so switching tabs drops
     /// the other tab's selection and card instead of carrying them over.
     func testSwitchingTabsClearsTheSelection() {

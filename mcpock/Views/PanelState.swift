@@ -144,6 +144,7 @@ final class PanelState {
     /// nil under MenuBarExtra, which closes itself on an unhandled Escape.
     @ObservationIgnored var requestClose: (() -> Void)?
     @ObservationIgnored private var undoTask: Task<Void, Never>?
+    @ObservationIgnored private var undoHideWasPinned = false
     @ObservationIgnored private var keyMonitor: Any?
     /// The detail card's window (Phase 3).
     @ObservationIgnored private let card = DetailCardPresenter()
@@ -540,6 +541,8 @@ final class PanelState {
 
     /// Hide a row and offer Undo in the footer for `undoSeconds`.
     func hide(_ name: String) {
+        // Hiding unpins; Undo pins it again (r3 40f5).
+        undoHideWasPinned = monitor.isPinned(name)
         monitor.setHidden(true, name: name)
         if selectedName == name {
             closeCard()
@@ -559,6 +562,7 @@ final class PanelState {
         undoTask?.cancel()
         undoHideName = nil
         monitor.setHidden(false, name: name)
+        if undoHideWasPinned { monitor.setPinned(true, name: name) }
     }
 
     func togglePin(_ name: String) {
