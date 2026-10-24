@@ -28,6 +28,16 @@ final class MCPJSONRPCTests: XCTestCase {
         XCTAssertFalse(MCPJSONRPC.isResponse(["jsonrpc": "2.0", "id": 7, "error": ["code": 1]], to: 1))
     }
 
+    /// r3 f730: after initialize, a null-id error (a server rejecting the
+    /// initialized notice) is not the answer to tools/list.
+    func testNullIdErrorOnlyAnswersInitialize() {
+        let rejected: [String: Any] = ["jsonrpc": "2.0", "id": NSNull(), "error": ["code": -32600, "message": "no"]]
+        XCTAssertTrue(MCPJSONRPC.isResponse(rejected, to: MCPJSONRPC.initializeID))
+        XCTAssertFalse(MCPJSONRPC.isResponse(rejected, to: 2))
+        let noID: [String: Any] = ["jsonrpc": "2.0", "error": ["code": -32600, "message": "no"]]
+        XCTAssertFalse(MCPJSONRPC.isResponse(noID, to: 2))
+    }
+
     func testNotificationIsNotAResponse() {
         // A server-initiated log notification mid-handshake must be skipped, not
         // mistaken for the initialize/tools response (it has no id and no result).

@@ -2,6 +2,8 @@ import Foundation
 
 enum MCPJSONRPC {
     static let protocolVersion = "2024-11-05"
+    /// Every probe sends `initialize` with this id.
+    static let initializeID = 1
     static let clientName = "mcpock"
     /// Reported to servers in `clientInfo`; tracks the app version so it can't drift.
     static let clientVersion =
@@ -60,8 +62,11 @@ enum MCPJSONRPC {
         if let string = message["id"] as? String { return string == String(id) }
         // An error with a null id is the server's answer to a request it could
         // not read (a parse or version error): the reply, with its real
-        // message, not a wait until the timeout (review 2026-10-20, 7243).
-        return message["error"] != nil && (message["id"] == nil || message["id"] is NSNull)
+        // message, not a wait until the timeout (review 2026-10-20, 7243). Only
+        // while waiting for initialize: later, a null-id error is a server
+        // refusing something else (the initialized notice) and must not stand
+        // in for the answer to tools/list (r3 f730).
+        return id == initializeID && message["error"] != nil && (message["id"] == nil || message["id"] is NSNull)
     }
 
     static func parseJSONObject(_ data: Data) throws -> [String: Any] {
