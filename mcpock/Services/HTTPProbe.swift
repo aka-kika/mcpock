@@ -2,6 +2,10 @@ import Foundation
 
 enum HTTPProbe {
     static let probeTimeout: TimeInterval = 10
+    /// The initialized notice and the closing DELETE are best-effort: a server
+    /// that sits on them must not add a full probe timeout each (Argon 2026-10-16 #14).
+    static let notificationTimeout: TimeInterval = 3
+    static let closeTimeout: TimeInterval = 2
 
     /// Probe an HTTP/SSE MCP server via JSON-RPC POST.
     static func probe(config: ServerConfig, fetchTools: Bool) async -> ProbeResult {
@@ -45,6 +49,11 @@ enum HTTPProbe {
             )
         }
 
+        // One budget for the whole probe: the SSE attempt, a fall-through to the
+        // streamable path, each request in it. Before, every step had its own 10 s
+        // and a slow server took 25 to 50 s (Argon 2026-10-16 #14).
+        let deadline = ContinuousClock.now + .seconds(probeTimeout)
+
         // Legacy SSE transport: a GET opens the event stream and announces a POST
         // endpoint; responses arrive on the stream. Posting JSON-RPC straight to the
         // stream URL (what the streamable path does) answers 405 or hangs, so every
@@ -52,7 +61,7 @@ enum HTTPProbe {
         // servers as `sse`, so a URL that doesn't serve an event stream falls
         // through to the streamable probe below.
         if config.transport == .sse,
-           let sse = await SSEProbe.probe(url: url, headers: config.headers, fetchTools: fetchTools) {
+           let sse = await SSEProbe.probe(url: url, headers: config.headers, fetchTools: fetchTools, deadline: deadline) {
             return sse
         }
 
@@ -63,7 +72,7 @@ enum HTTPProbe {
         let result: ProbeResult
         do {
             let initBody = try MCPJSONRPC.encode(MCPJSONRPC.initializeRequest(id: 1))
-            let (initResponse, sessionId) = try await postJSON(url: url, body: initBody, headers: config.headers)
+            let (initResponse, sessionId) = try await postJSON(url: url, body: initBody, headers: config.headers, deadline: deadline)
             try MCPJSONRPC.validateInitializeResponse(initResponse)
 
             // Streamable-HTTP servers assign an Mcp-Session-Id on initialize and reject
@@ -79,13 +88,16 @@ enum HTTPProbe {
 
             // Best-effort initialized notification (some servers require it)
             if let notifyBody = try? MCPJSONRPC.encode(MCPJSONRPC.initializedNotification()) {
-                _ = try? await postJSON(url: url, body: notifyBody, headers: headers, expectResponse: false)
+                _ = try? await postJSON(
+                    url: url, body: notifyBody, headers: headers, deadline: deadline, expectResponse: false,
+                    timeout: notificationTimeout
+                )
             }
 
             var tools: [MCPToolInfo]?
             if fetchTools {
                 let toolsBody = try MCPJSONRPC.encode(MCPJSONRPC.toolsListRequest(id: 2))
-                let (toolsResponse, _) = try await postJSON(url: url, body: toolsBody, headers: headers)
+                let (toolsResponse, _) = try await postJSON(url: url, body: toolsBody, headers: headers, deadline: deadline)
                 tools = try MCPJSONRPC.parseTools(from: toolsResponse)
             }
 
@@ -109,9 +121,18 @@ enum HTTPProbe {
         return result
     }
 
+    /// A request's timeout: what is left of the probe's budget, at most `cap`.
+    /// Nothing left is a timeout already.
+    static func timeoutInterval(until deadline: ContinuousClock.Instant, cap: TimeInterval) throws -> TimeInterval {
+        let left = deadline - ContinuousClock.now
+        guard left > .zero else { throw URLError(.timedOut) }
+        let seconds = Double(left.components.seconds) + Double(left.components.attoseconds) / 1e18
+        return min(cap, seconds)
+    }
+
     /// Best-effort session teardown; errors are irrelevant to the probe verdict.
     private static func closeSession(url: URL, headers: [String: String]) async {
-        var request = URLRequest(url: url, timeoutInterval: 5)
+        var request = URLRequest(url: url, timeoutInterval: closeTimeout)
         request.httpMethod = "DELETE"
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
@@ -139,9 +160,11 @@ enum HTTPProbe {
         url: URL,
         body: Data,
         headers: [String: String],
-        expectResponse: Bool = true
+        deadline: ContinuousClock.Instant,
+        expectResponse: Bool = true,
+        timeout: TimeInterval = probeTimeout
     ) async throws -> (json: [String: Any], sessionId: String?) {
-        var request = URLRequest(url: url, timeoutInterval: probeTimeout)
+        var request = URLRequest(url: url, timeoutInterval: try timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -159,9 +182,7 @@ enum HTTPProbe {
             throw ProbeError.protocolError("Invalid HTTP response")
         }
         // The request's timeout only covers silence; a stream that keeps
-        // talking without ever answering stops here.
-        let deadline = ContinuousClock.now + .seconds(probeTimeout)
-
+        // talking without ever answering stops at the shared deadline.
         let sessionId = http.value(forHTTPHeaderField: "Mcp-Session-Id")
 
         if !(200...299).contains(http.statusCode) {

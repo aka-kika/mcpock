@@ -20,8 +20,11 @@ enum SSEProbe {
     /// answer to the GET, or a stream that never announces an endpoint) — the
     /// caller then tries the streamable-HTTP probe instead, because configs
     /// routinely label streamable servers `sse`.
-    static func probe(url: URL, headers: [String: String], fetchTools: Bool) async -> ProbeResult? {
-        var request = URLRequest(url: url, timeoutInterval: 10)
+    static func probe(
+        url: URL, headers: [String: String], fetchTools: Bool,
+        deadline: ContinuousClock.Instant = ContinuousClock.now + probeTimeout
+    ) async -> ProbeResult? {
+        var request = URLRequest(url: url, timeoutInterval: (try? HTTPProbe.timeoutInterval(until: deadline, cap: 10)) ?? 0.001)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
 
@@ -52,12 +55,15 @@ enum SSEProbe {
         do {
             let result = try await withThrowingTaskGroup(of: ProbeResult.self) { group in
                 group.addTask {
-                    try await handshake(stream: bytes, base: url, headers: headers, fetchTools: fetchTools, endpoint: endpoint)
+                    try await handshake(
+                        stream: bytes, base: url, headers: headers, fetchTools: fetchTools, endpoint: endpoint,
+                        deadline: deadline
+                    )
                 }
                 group.addTask {
-                    try await Task.sleep(for: endpointTimeout)
+                    try await Task.sleep(for: min(endpointTimeout, deadline - ContinuousClock.now))
                     if !endpoint.seen { throw ProbeError.protocolError("SSE stream sent no endpoint event") }
-                    try await Task.sleep(for: probeTimeout - endpointTimeout)
+                    try await Task.sleep(until: deadline, clock: .continuous)
                     throw ProbeError.timeout(probeTimeout)
                 }
                 let first = try await group.next()!
@@ -94,7 +100,8 @@ enum SSEProbe {
     }
 
     private static func handshake(
-        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool, endpoint seen: EndpointSeen
+        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool, endpoint seen: EndpointSeen,
+        deadline: ContinuousClock.Instant
     ) async throws -> ProbeResult {
         var lines = stream.lines.makeAsyncIterator()
 
@@ -109,13 +116,16 @@ enum SSEProbe {
         // 2026-10-20, 7676).
         guard isSameOrigin(endpoint, as: base) else { throw ForeignEndpoint() }
 
-        try await post(MCPJSONRPC.initializeRequest(id: 1), to: endpoint, headers: headers)
+        try await post(MCPJSONRPC.initializeRequest(id: 1), to: endpoint, headers: headers, deadline: deadline)
         try MCPJSONRPC.validateInitializeResponse(try await nextResponse(&lines, id: 1))
-        try await post(MCPJSONRPC.initializedNotification(), to: endpoint, headers: headers)
+        try await post(
+            MCPJSONRPC.initializedNotification(), to: endpoint, headers: headers, deadline: deadline,
+            timeout: HTTPProbe.notificationTimeout
+        )
 
         var tools: [MCPToolInfo]?
         if fetchTools {
-            try await post(MCPJSONRPC.toolsListRequest(id: 2), to: endpoint, headers: headers)
+            try await post(MCPJSONRPC.toolsListRequest(id: 2), to: endpoint, headers: headers, deadline: deadline)
             tools = try MCPJSONRPC.parseTools(from: try await nextResponse(&lines, id: 2))
         }
         return ProbeResult(state: .healthy, failureReason: nil, tools: tools)
@@ -192,8 +202,11 @@ enum SSEProbe {
 
     /// POST one JSON-RPC message to the announced endpoint; the answer (if any)
     /// comes back on the stream, so only the status code matters here.
-    private static func post(_ message: [String: Any], to endpoint: URL, headers: [String: String]) async throws {
-        var request = URLRequest(url: endpoint, timeoutInterval: 10)
+    private static func post(
+        _ message: [String: Any], to endpoint: URL, headers: [String: String],
+        deadline: ContinuousClock.Instant, timeout: TimeInterval = 10
+    ) async throws {
+        var request = URLRequest(url: endpoint, timeoutInterval: try HTTPProbe.timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = try MCPJSONRPC.encode(message)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

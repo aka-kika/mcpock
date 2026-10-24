@@ -68,4 +68,47 @@ final class ProbeR3Tests: XCTestCase {
         }
         XCTAssertLessThan(ContinuousClock.now - started, .seconds(5))
     }
+
+    // MARK: Deadline (Argon 2026-10-16 #14)
+
+    func testRequestTimeoutIsWhatIsLeftOfTheBudget() throws {
+        let now = ContinuousClock.now
+        XCTAssertEqual(try HTTPProbe.timeoutInterval(until: now + .seconds(60), cap: 3), 3)
+        let left = try HTTPProbe.timeoutInterval(until: now + .seconds(2), cap: 10)
+        XCTAssertLessThanOrEqual(left, 2)
+        XCTAssertGreaterThan(left, 1)
+        XCTAssertThrowsError(try HTTPProbe.timeoutInterval(until: now - .seconds(1), cap: 10)) { error in
+            XCTAssertEqual((error as? URLError)?.code, .timedOut)
+        }
+    }
+
+    /// A server that answers initialize at once but sits on the initialized
+    /// notice and the closing DELETE costs about 3 s plus 2 s, not 10 plus 5.
+    func testSlowNoticeAndDeleteStayShort() async throws {
+        let (server, port) = try startServer("""
+        import sys, json, time, http.server, socketserver
+        class H(http.server.BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+            def log_message(self, *a): pass
+            def do_POST(self):
+                n = int(self.headers.get('Content-Length', 0)); msg = json.loads(self.rfile.read(n) or b'{}')
+                if msg.get('id') is None:
+                    time.sleep(30)
+                out = json.dumps({'jsonrpc':'2.0','id':msg.get('id'),'result':{'protocolVersion':'2024-11-05','capabilities':{},'serverInfo':{'name':'m','version':'0'}}}).encode()
+                self.send_response(200); self.send_header('Content-Type','application/json')
+                self.send_header('Mcp-Session-Id', 's1')
+                self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+            def do_DELETE(self):
+                time.sleep(30)
+        class S(socketserver.ThreadingMixIn, http.server.HTTPServer): daemon_threads = True
+        with S(('127.0.0.1', 0), H) as httpd:
+            sys.stdout.write(str(httpd.server_address[1]) + "\\n"); sys.stdout.flush()
+            httpd.serve_forever()
+        """)
+        defer { server.terminate(); server.waitUntilExit() }
+        let started = ContinuousClock.now
+        let result = await HTTPProbe.probe(config: httpConfig("http://127.0.0.1:\(port)/mcp"), fetchTools: false)
+        XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
+        XCTAssertLessThan(ContinuousClock.now - started, .seconds(8))
+    }
 }
