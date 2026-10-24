@@ -98,7 +98,7 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
             generated: status.generated,
             checking: status.checking,
             firstCheckDone: status.firstCheckDone,
-            totalServers: status.counts.total - status.counts.hidden,
+            totalServers: status.counts.total,   // already the shown rows (r3 09ec)
             problemCount: allProblems.count,
             fineCount: status.counts.fine,
             problems: Array(problems),
