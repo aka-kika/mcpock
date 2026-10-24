@@ -100,6 +100,18 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(text.contains("3 need attention: call mcpock_problems"))
     }
 
+    /// r3 be34: a server with hundreds of tools does not flood the answer.
+    func testToolNamesAreCapped() {
+        let few = (1...3).map { "t\($0)" }
+        XCTAssertEqual(StatusReport.toolNames(few), "t1, t2, t3")
+        let exact = (1...40).map { "t\($0)" }
+        XCTAssertFalse(StatusReport.toolNames(exact).contains("more"))
+        let many = (1...100).map { "t\($0)" }
+        let text = StatusReport.toolNames(many)
+        XCTAssertTrue(text.hasSuffix("t40, and 60 more"), text)
+        XCTAssertFalse(text.contains("t41"))
+    }
+
     func testServerDetailsMatchLooselyAndListEverything() throws {
         let text = try XCTUnwrap(server(at: fixtureFile()).callTool("mcpock_server", arguments: ["name": "Fire Crawl"]))
         XCTAssertTrue(text.hasPrefix("firecrawl — broken"), text)
