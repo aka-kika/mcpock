@@ -209,7 +209,7 @@ enum HTTPProbe {
 
     /// The whole body, at most `limit` bytes: past it, the cut text (an error
     /// page) or an error (an answer too large to be real).
-    private static func collect(
+    static func collect(
         _ bytes: URLSession.AsyncBytes, limit: Int, deadline: ContinuousClock.Instant, throwsOverLimit: Bool = true
     ) async throws -> Data {
         var data = Data()
@@ -219,7 +219,9 @@ enum HTTPProbe {
                 if throwsOverLimit { throw ProbeError.protocolError("Message too large") }
                 break
             }
-            if data.count % 4096 == 0, ContinuousClock.now > deadline { throw URLError(.timedOut) }
+            // Every byte, not every 4096th: a server dripping one byte at a
+            // time kept this loop alive for about an hour (r3 3e24).
+            if ContinuousClock.now > deadline { throw URLError(.timedOut) }
         }
         return data
     }
