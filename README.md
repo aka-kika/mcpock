@@ -195,7 +195,7 @@ starts a command from a file no agent it knows reads without your OK.
 
 | Agent | Config file | Format |
 |-------|-------------|--------|
-| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds (only the servers you approved in Claude Code) | JSON |
+| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds, but only inside `~/.config`, `~/Library/Application Support` or a hidden folder in your home folder, not in ordinary project folders (only the servers you approved in Claude Code) | JSON |
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | JSON |
 | Cursor | `~/.cursor/mcp.json` | JSON |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | JSON |
