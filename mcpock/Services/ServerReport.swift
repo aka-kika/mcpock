@@ -83,7 +83,8 @@ enum ServerReport {
         var lines: [String] = []
         for source in server.sources {
             guard let failure = source.failure, !failure.isEmpty else { continue }
-            lines.append("- \(source.agent): \(failure)")
+            lines.append("- \(source.agent):")
+            lines.append(contentsOf: StatusReport.untrustedBlock(failure, indent: "  "))
             if !source.target.isEmpty { lines.append("  runs: \(source.target)") }
         }
         return lines
@@ -98,8 +99,10 @@ enum ServerReport {
     }
 
     /// The problem in one clause, after "mcpock reports that <name> ".
-    static func problemClause(_ server: MCPockStatus.Server) -> String {
-        let reason = server.reason.flatMap { $0.isEmpty ? nil : $0 }
+    /// `includeReason: false` leaves the reason out: the prompt fences it as
+    /// untrusted server output instead of inlining it (r3 42bd).
+    static func problemClause(_ server: MCPockStatus.Server, includeReason: Bool = true) -> String {
+        let reason = includeReason ? server.reason.flatMap { $0.isEmpty ? nil : $0 } : nil
         switch server.status {
         case "broken": return "is broken" + (reason.map { " (\($0))" } ?? "")
         case "slow": return "is slow to answer" + (reason.map { " (\($0))" } ?? "")
@@ -116,7 +119,7 @@ enum ServerReport {
     /// have mcpock's own MCP server set up; with any, the prompt mentions
     /// `mcpock_server` for fresh details.
     static func askAgentPrompt(_ server: MCPockStatus.Server, mcpockAgents: [String], now: Date) -> String {
-        var clause = problemClause(server)
+        var clause = problemClause(server, includeReason: false)
         if !clause.hasSuffix(".") { clause += "." }
         var lines = [
             "Please help me understand a problem with one of my MCP servers. Investigate and advise only: "
@@ -135,6 +138,11 @@ enum ServerReport {
                 + "command by hand to see its output. Secrets below are masked as \(SecretMask.dots); "
                 + "don't print real keys or tokens back to me.",
         ]
+        if let reason = server.reason, !reason.isEmpty {
+            lines.append("")
+            lines.append("Reason")
+            lines.append(contentsOf: StatusReport.untrustedBlock(reason))
+        }
         if !mcpockAgents.isEmpty {
             lines.append("")
             lines.append("mcpock has its own read-only MCP server, \"\(ConnectSnippets.serverName)\" (set up in "
