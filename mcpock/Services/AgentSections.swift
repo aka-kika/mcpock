@@ -11,6 +11,9 @@ struct AgentServer: Identifiable, Hashable, Sendable {
     /// Rank inside the agent's problems (broken, slow, differs), as in
     /// the panel's Needs you. nil when the server doesn't need you.
     let rank: Int?
+    /// The mark when it differs from `state`: the calm dash for a server mcpock
+    /// could not check (a `${VAR}` to fill, r3 b964).
+    var mark: HealthState? = nil
 
     var id: String { name }
     var needsYou: Bool { rank != nil }
@@ -47,7 +50,10 @@ struct AgentSection: Identifiable, Hashable, Sendable {
     /// Paused, by her or waiting for a scan-only file's OK: not checked, so
     /// never "answers normally" (review 2026-10-20, 5ae6).
     var pausedCount: Int { servers.filter { $0.state == .paused }.count }
-    var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount }
+    /// Waiting for a closed app, or not checked for a `${VAR}`: calm, but not
+    /// "answers normally" either.
+    var waitingCount: Int { servers.filter { $0.state == .needsApp || ($0.mark == .needsApp && !$0.needsYou) }.count }
+    var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount - waitingCount }
 }
 
 /// Builds the Agents tab (v1.5 spec, Phase 4) from the same `ServerGroup`s as the
@@ -157,24 +163,33 @@ enum AgentSections {
             && isOddOneOut(group, sources: sources)
         let rank: Int?
         let note: String?
+        var mark: HealthState?
         switch state {
         case .broken, .degraded:
-            rank = state == .broken ? 0 : 1
             let reason = sources.first { $0.state == state && $0.failureReason != nil }?.failureReason
             note = reason.map { ShortReason.from($0, state: state) } ?? (state == .broken ? "Broken" : "Slow")
+            // Not checked (a ${VAR} to fill) is calm, as on the Servers tab (r3 b964).
+            let notChecked = state == .degraded && reason?.hasPrefix(ConfigVariables.reasonPrefix) == true
+            rank = notChecked ? nil : state == .broken ? 0 : 1
+            if notChecked { mark = .needsApp }
         case .healthy:
             rank = differs ? 2 : nil
             note = differs ? CardText.differsLine(for: group, agent: agent) : nil
         // Not checked yet is not a problem (same rule as the Servers tab's Needs
         // you): right after launch every agent would otherwise read "19 need you".
-        case .unknown, .selfManaged, .paused:
+        case .paused:
+            rank = nil
+            let waits = sources.contains(where: \.awaitingFileOK)
+                && !sources.contains { $0.state == .paused && !$0.awaitingFileOK }
+            note = waits ? ShortReason.waitingNote : nil
+        case .unknown, .selfManaged:
             rank = nil
             note = nil
         case .needsApp:
             rank = nil
             note = group.needsAppName.map { "Needs \($0) open" }
         }
-        return AgentServer(name: group.name, state: state, note: note, rank: rank)
+        return AgentServer(name: group.name, state: state, note: note, rank: rank, mark: mark)
     }
 
     private static func sortServers(_ servers: [AgentServer]) -> [AgentServer] {
@@ -212,6 +227,11 @@ enum AgentSections {
         let count = section.problems.count
         if count == 0 {
             if section.checkingCount > 0 { return "Checking\u{2026}" }
+            // Only waiting for its closed app (or a ${VAR}): say so calmly
+            // instead of "All fine" (open loop from 2026-10-16).
+            if section.fineCount == 0 && section.waitingCount > 0 {
+                return section.servers.first { $0.state == .needsApp }?.note ?? "Not checked"
+            }
             return section.fineCount == 0 && section.pausedCount > 0 ? "Paused" : "All fine"
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
@@ -263,19 +283,26 @@ enum AgentSections {
         let rest = section.fineCount
         let checking = section.checkingCount
         let paused = section.pausedCount
-        let pausedPart = paused > 0 ? ", \(paused) paused" : ""
+        let waiting = section.waitingCount
+        let pausedPart = (paused > 0 ? ", \(paused) paused" : "") + (waiting > 0 ? ", \(waiting) waiting" : "")
         if checking > 0 {
-            let more = section.problems.isEmpty ? "" : "\(rest + checking + paused) more, "
+            let more = section.problems.isEmpty ? "" : "\(rest + checking + paused + waiting) more, "
             return more + "\(checking) not checked yet" + pausedPart
         }
         if section.problems.isEmpty {
+            if rest == 0, paused == 0, waiting > 0 {
+                return waiting == 1 ? "Its only server is waiting" : "All \(waiting) servers are waiting"
+            }
             if rest == 0, paused > 0 {
                 return paused == 1 ? "Its only server is paused" : "All \(paused) servers are paused"
             }
-            if paused > 0 { return "\(rest) \(rest == 1 ? "answers" : "answer") normally, \(paused) paused" }
+            if paused + waiting > 0 { return "\(rest) \(rest == 1 ? "answers" : "answer") normally" + pausedPart }
             return rest == 1 ? "Its only server answers normally" : "All \(rest) servers answer normally"
         }
-        if rest == 0 { return paused > 0 ? "\(paused) more, paused" : "Nothing else here" }
+        if rest == 0 {
+            if waiting > 0 { return "\(paused + waiting) more" + pausedPart }
+            return paused > 0 ? "\(paused) more, paused" : "Nothing else here"
+        }
         return "\(rest) more, all fine" + pausedPart
     }
 }

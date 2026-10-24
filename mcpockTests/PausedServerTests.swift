@@ -19,8 +19,9 @@ final class PausedServerTests: XCTestCase {
     }
 
     func testIconStateMatchesPreviousAggregateSemantics() {
-        XCTAssertEqual(HealthMonitor.iconState([]), .degradedOrUnknown, "still discovering")
-        XCTAssertEqual(HealthMonitor.iconState([.healthy, .unknown]), .degradedOrUnknown)
+        XCTAssertEqual(HealthMonitor.iconState([]), .allHealthy, "no servers: the plain glyph (r3 8aa6)")
+        XCTAssertEqual(HealthMonitor.iconState([.healthy, .unknown]), .allHealthy, "only checking: plain too")
+        XCTAssertEqual(HealthMonitor.iconState([.unknown, .degraded]), .degradedOrUnknown)
         XCTAssertEqual(HealthMonitor.iconState([.healthy, .selfManaged]), .allHealthy)
         XCTAssertEqual(HealthMonitor.iconState([.healthy, .degraded]), .degradedOrUnknown)
     }

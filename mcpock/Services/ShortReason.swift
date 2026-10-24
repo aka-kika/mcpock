@@ -8,6 +8,10 @@ import Foundation
 /// tail) to plain words, and falls back to the first 60 characters for anything
 /// it doesn't recognise, so a new failure never shows up blank. Pure.
 enum ShortReason {
+    /// Under a row whose scan-found file waits for her OK (r3 3301): before,
+    /// such rows showed a grey dash with no reason anywhere but the card.
+    static let waitingNote = "Found by the scan: Allow this file to check it"
+
     /// Longest fallback line before it is cut with an ellipsis.
     static let fallbackLength = 60
 
@@ -25,7 +29,9 @@ enum ShortReason {
             return group.differsNeedsAttention ? differs(group.differs) : nil
         // Unknown rows sit in their normal section with the unknown ring (they
         // never need you), so they get no second line.
-        case .unknown, .selfManaged, .paused:
+        case .paused:
+            return group.waitsForFileOK ? waitingNote : nil
+        case .unknown, .selfManaged:
             return nil
         case .needsApp:
             return group.needsAppName.map { "Needs \($0) open" } ?? "Needs its app open"

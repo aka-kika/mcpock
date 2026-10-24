@@ -272,6 +272,20 @@ struct ServerGroup: Identifiable, Sendable, Hashable {
     }
     var sourceSummary: String { sourceLabels.joined(separator: " · ") }
 
+    /// True when a declaration behind the row comes from a scan-only file she
+    /// has not allowed yet: only "Allow this file" gives that OK (r3 f9f2).
+    var awaitsFileOK: Bool { sources.contains(where: \.awaitingFileOK) }
+
+    /// True when she paused the row herself, as opposed to it only waiting for
+    /// a file's OK: Resume is offered only then.
+    var isPausedByUser: Bool {
+        sources.contains { $0.state == .paused && !$0.awaitingFileOK }
+    }
+
+    /// Paused only because its scan-found file waits for her OK: counted as
+    /// waiting, with a note on the row (r3 3301).
+    var waitsForFileOK: Bool { state == .paused && awaitsFileOK && !isPausedByUser }
+
     /// Framing so a pasted report is self-explanatory to an LLM (provenance + the ask).
     /// Single source for both the one-server "Copy errors" text and the multi-server
     /// export report, so the two explanations can't drift apart.
@@ -348,7 +362,8 @@ enum ProbeError: Error, LocalizedError, Sendable {
                 : String(format: "%.1f", seconds)
             return "Timed out after \(text)s"
         case .handshakeRejected(let detail):
-            return "Handshake rejected: \(detail)"
+            // The server's own words: capped and masked before they are kept (r3 d791).
+            return "Handshake rejected: \(SecretMask.scrub(String(detail.prefix(240))))"
         case .nonZeroExit(let code):
             return "Non-zero exit (\(code))"
         case .invalidURL(let url):
@@ -357,7 +372,7 @@ enum ProbeError: Error, LocalizedError, Sendable {
             if Self.isAuthCode(code) {
                 return "Needs authentication (HTTP \(code))"
             }
-            let snippet = body.prefix(120)
+            let snippet = SecretMask.scrub(String(body.prefix(120)))
             return "HTTP \(code)\(snippet.isEmpty ? "" : ": \(snippet)")"
         case .protocolError(let detail):
             return "Protocol error: \(detail)"

@@ -245,9 +245,8 @@ final class HealthMonitor {
     /// Pause or resume probing for a display row by name; persists immediately.
     /// Pausing takes effect at once (state flips to `.paused`, no more launches);
     /// resuming re-probes the row right away so the user sees a fresh verdict.
+    /// Never gives a scan-only file its OK: that is `allowScanFiles` only (r3 f9f2).
     func setPaused(_ paused: Bool, name: String) {
-        // Resume on a row waiting for its file's OK gives that OK.
-        if !paused { allowScanFiles(forGroup: name) }
         let key = Self.normalizedName(name)
         if paused { pausedNames.insert(key) } else { pausedNames.remove(key) }
         AppPreferences.savePausedServers(pausedNames, to: defaults)
@@ -310,7 +309,12 @@ final class HealthMonitor {
     var aggregate: AggregateState {
         let shown = visibleGroups
         if shown.isEmpty && !groups.isEmpty { return .allHealthy }
-        return Self.iconState(shown.map(\.state), anyDiffers: shown.contains(where: \.differsNeedsAttention))
+        return Self.iconState(shown.map(Self.iconInput), anyDiffers: shown.contains(where: \.differsNeedsAttention))
+    }
+
+    /// A Not checked row (a `${VAR}` to fill) is calm, never the ring (r3 b964).
+    nonisolated static func iconInput(_ group: ServerGroup) -> HealthState {
+        group.needsVariable ? .healthy : group.state
     }
 
     /// Menu-bar icon verdict across all servers. Pure — safe to unit-test.
@@ -318,9 +322,11 @@ final class HealthMonitor {
     /// lifts an otherwise all-healthy verdict to `.attention`: a mismatch earns the
     /// quiet ring, never the broken diamond, and never masks a real failure.
     nonisolated static func iconState(_ states: [HealthState], anyDiffers: Bool = false) -> AggregateState {
-        guard !states.isEmpty else { return .degradedOrUnknown }
+        // No servers, or rows only waiting for their first check: the plain
+        // glyph (r3 8aa6). The ring is for a real slow, sign-in or differs.
+        guard !states.isEmpty else { return .allHealthy }
         // A server waiting for its closed app never colors the icon (2026-10-16).
-        switch aggregateState(states.map { $0 == .needsApp ? .healthy : $0 }) {
+        switch aggregateState(states.map { $0 == .needsApp || $0 == .unknown ? .healthy : $0 }) {
         case .broken: return .broken
         case .degraded, .unknown: return .degradedOrUnknown
         // Self-managed servers are their host app's business, and paused servers
@@ -383,11 +389,16 @@ final class HealthMonitor {
     /// servers" was set to **Manually** (the 2026-08-03 report).
     private var hasStarted = false
 
+    /// Runs once before the first check: the app reads the login shell's
+    /// environment here (`ShellEnvironment`); tests and demo mode do nothing.
+    @ObservationIgnored var prepareEnvironment: () async -> Void = {}
+
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
         restartTimer()
         Task {
+            await prepareEnvironment()
             await awaitInFlightCycle()
             await reloadThenProbe(force: false)
         }
@@ -441,8 +452,8 @@ final class HealthMonitor {
         return servers.contains { Self.normalizedName($0.config.name) == key && $0.awaitingFileOK }
     }
 
-    /// Allow the scan-only files behind a row and check it at once (Resume,
-    /// right-click). Returns true when there was one to allow.
+    /// Allow the scan-only files behind a row ("Allow this file" on the card
+    /// and the right-click menu). Returns true when there was one to allow.
     @discardableResult
     func allowScanFiles(forGroup name: String) -> Bool {
         let key = Self.normalizedName(name)
@@ -718,7 +729,7 @@ final class HealthMonitor {
                 // Cmd-C, the card, Copy All, Export) is safe to paste into a chat: a
                 // command line can carry a bearer token (mcp-remote --header ...).
                 .map { snapshot -> ServerIssue in
-                    let known = SecretMask.knownSecrets(env: snapshot.config.env, headers: snapshot.config.headers)
+                    let known = SecretMask.knownSecrets(of: snapshot.config)
                     let command = snapshot.config.transport == .stdio
                         ? SecretMask.commandLine(command: snapshot.config.command, args: snapshot.config.args, known: known)
                         : SecretMask.url(snapshot.config.url ?? "", known: known)
@@ -727,7 +738,7 @@ final class HealthMonitor {
                                        command: command)
                 }
             let sources = variants.map { v -> GroupSource in
-                let known = SecretMask.knownSecrets(env: v.config.env, headers: v.config.headers)
+                let known = SecretMask.knownSecrets(of: v.config)
                 let target = v.config.transport == .stdio
                     ? SecretMask.commandLine(command: v.config.command, args: v.config.args, known: known)
                     : SecretMask.url(v.config.url ?? "", known: known)

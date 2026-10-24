@@ -7,6 +7,8 @@ struct ServerRowActions {
     let checkAgain: () -> Void
     let hide: () -> Void
     let togglePause: () -> Void
+    /// "Allow this file" for a row waiting on a scan-only file's OK (r3 f9f2).
+    let allowFile: () -> Void
     let togglePin: () -> Void
     /// "Mark as Intended" (true) / "Unmark as Intended" (false) (1.5.2).
     let setIntended: (Bool) -> Void
@@ -41,7 +43,8 @@ struct ServerRowView: View {
         Button(action: actions.select) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 10) {
-                    HealthMark(state: group.state, theme: theme, checking: isChecking)
+                    HealthMark(state: HealthMark.markState(for: group), theme: theme, checking: isChecking,
+                               word: HealthMark.word(for: group))
 
                     Text(group.name)
                         .font(Theme.body)
@@ -140,8 +143,15 @@ struct ServerContextMenu: View {
     let actions: ServerRowActions
 
     var body: some View {
+        if group.awaitsFileOK {
+            Button(action: actions.allowFile) {
+                Label(CardAction.allowFile.title, systemImage: CardAction.allowFile.systemImage)
+            }
+        }
         if group.state == .paused {
-            Button(action: actions.togglePause) { Label("Resume probing", systemImage: "play.circle") }
+            if group.isPausedByUser {
+                Button(action: actions.togglePause) { Label("Resume probing", systemImage: "play.circle") }
+            }
         } else {
             Button(action: actions.checkAgain) { Label("Check again", systemImage: "arrow.clockwise") }
             Button(action: actions.togglePause) { Label("Pause probing", systemImage: "pause.circle") }

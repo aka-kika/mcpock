@@ -41,6 +41,37 @@ final class ProcessRunner: @unchecked Sendable {
     /// 2026-10-20, c46c). Before, two threads per check stayed blocked forever.
     private let readersAbandoned = OSAllocatedUnfairLock(initialState: false)
 
+    /// Every runner whose process may still be running, so quitting or
+    /// updating mid-check can stop them all (r3 4cd2): before, npx and node
+    /// trees outlived mcpock. Weak, so a finished runner just drops out.
+    private static let liveLock = NSLock()
+    nonisolated(unsafe) private static let live = NSHashTable<ProcessRunner>.weakObjects()
+
+    /// Stops every live server process tree at once (mcpock is quitting).
+    static func stopAll() {
+        liveLock.lock()
+        let runners = live.allObjects
+        live.removeAllObjects()
+        liveLock.unlock()
+        runners.forEach { $0.forceKill() }
+    }
+
+    /// How many runners are still live (tests).
+    static var liveCount: Int {
+        liveLock.lock(); defer { liveLock.unlock() }
+        return live.allObjects.count
+    }
+
+    static func isLive(_ runner: ProcessRunner) -> Bool {
+        liveLock.lock(); defer { liveLock.unlock() }
+        return live.contains(runner)
+    }
+
+    private func setLive(_ isLive: Bool) {
+        Self.liveLock.lock(); defer { Self.liveLock.unlock() }
+        if isLive { Self.live.add(self) } else { Self.live.remove(self) }
+    }
+
     /// True once both reader threads have ended.
     var readersDidFinish: Bool { stdoutDidFinish && stderrFinished.withLock { $0 } }
     /// Only a one-shot command (the headers helper) keeps its raw stdout; a
@@ -163,6 +194,7 @@ final class ProcessRunner: @unchecked Sendable {
             throw ProbeError.spawnFailed(error.localizedDescription)
         }
         rootStarted = Self.startTime(of: process.processIdentifier) ?? spawnTime
+        setLive(true)
     }
 
     /// Read loop on its own thread; `sink` runs there, in order, and `onEOF`
@@ -240,6 +272,7 @@ final class ProcessRunner: @unchecked Sendable {
             return false
         }
         if alreadyDone { return }
+        setLive(false)
 
         // List the tree BEFORE closing stdin (1.9.0): a server that exits on
         // stdin EOF gets reparented children that `pgrep -P` can no longer find
@@ -329,6 +362,7 @@ final class ProcessRunner: @unchecked Sendable {
             return false
         }
         if alreadyDone { return }
+        setLive(false)
 
         try? stdinPipe.fileHandleForWriting.close()
         let rootPID = process.processIdentifier

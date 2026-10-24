@@ -178,8 +178,29 @@ final class ConfigShapeTests: XCTestCase {
                                                        userSettings: nil, readFile: { files[$0] })
         XCTAssertTrue(approval.allows("x"))
         XCTAssertFalse(approval.allows("bad"))
-        let user = ClaudeProjectApproval.forFolder("/q", projects: [:], userSettings: ["enabledMcpjsonServers": ["u"]],
-                                                   readFile: { _ in nil })
-        XCTAssertTrue(user.allows("u"), "the user's own settings count everywhere")
+        let user = ClaudeProjectApproval.forFolder("/q", projects: [ConfigScanner.canonicalPath("/q"): trusted],
+                                                   userSettings: ["enabledMcpjsonServers": ["u"]], readFile: { _ in nil })
+        XCTAssertTrue(user.allows("u"), "the user's own settings count in a trusted folder")
+    }
+
+    /// r3 22cd: a user-wide enableAllProjectMcpServers never starts a stray
+    /// .mcp.json in a folder Claude Code was never told to trust.
+    func testUserWideApprovalNeedsATrustedFolder() {
+        let userSettings: [String: Any] = ["enableAllProjectMcpServers": true,
+                                           "enabledMcpjsonServers": ["u"],
+                                           "disabledMcpjsonServers": ["off"]]
+        let stray = ClaudeProjectApproval.forFolder("/stray", projects: [:], userSettings: userSettings,
+                                                    readFile: { _ in nil })
+        XCTAssertFalse(stray.allows("anything"))
+        XCTAssertFalse(stray.allows("u"))
+        let seenNotTrusted = ClaudeProjectApproval.projects(claudeJSON: #"{"projects":{"/seen":{}}}"#)
+        XCTAssertFalse(ClaudeProjectApproval.forFolder("/seen", projects: seenNotTrusted, userSettings: userSettings,
+                                                       readFile: { _ in nil }).allows("anything"))
+        var trusted = ClaudeProjectApproval(); trusted.trusted = true
+        let mine = ClaudeProjectApproval.forFolder("/mine", projects: [ConfigScanner.canonicalPath("/mine"): trusted],
+                                                   userSettings: userSettings, readFile: { _ in nil })
+        XCTAssertTrue(mine.allows("anything"))
+        XCTAssertFalse(mine.allows("off"), "her disabled list still wins")
+        XCTAssertTrue(stray.disabled.contains("off"), "and counts everywhere")
     }
 }

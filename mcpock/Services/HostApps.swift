@@ -145,16 +145,7 @@ enum HostApps {
     /// The `.app` listening on a local port right now, or nil (a command-line
     /// server, or nothing listening).
     nonisolated static func listeningApp(port: Int) -> HostApp? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        task.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
-        let out = Pipe()
-        task.standardOutput = out
-        task.standardError = Pipe()
-        guard (try? task.run()) != nil else { return nil }
-        task.waitUntilExit()
-        let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        for pid in text.split(whereSeparator: \.isNewline).compactMap({ Int32($0) }) {
+        for pid in ListeningPorts.pids(port: port) {
             guard let path = NSRunningApplication(processIdentifier: pid)?.bundleURL?.path,
                   path.hasSuffix(".app"), let app = hostApp(atBundlePath: path) else { continue }
             return app

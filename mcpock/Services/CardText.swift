@@ -181,7 +181,7 @@ enum CardText {
         guard !files.isEmpty else { return nil }
         let list = list(files.map { shortPath($0, home: home) })
         return "Found in \(list), a file no agent mcpock knows reads. mcpock won't start it until you say so: "
-            + "Resume (right-click the row) checks it from now on."
+            + "Allow this file (right-click the row) checks it from now on."
     }
 
     static func shortPath(_ path: String, home: String = NSHomeDirectory()) -> String {
@@ -284,12 +284,13 @@ enum CardText {
 /// tooltip and accessibility label. The right-click menu keeps its own texts
 /// (`MenuText`).
 enum CardAction: CaseIterable, Sendable {
-    case checkAgain, resume, pin, unpin, hide
+    case checkAgain, resume, allowFile, pin, unpin, hide
 
     var title: String {
         switch self {
         case .checkAgain: return "Check again"
         case .resume: return "Resume"
+        case .allowFile: return "Allow this file"
         case .pin: return "Pin"
         case .unpin: return "Unpin"
         case .hide: return "Hide"
@@ -300,6 +301,7 @@ enum CardAction: CaseIterable, Sendable {
         switch self {
         case .checkAgain: return "arrow.clockwise"
         case .resume: return "play"
+        case .allowFile: return "checkmark.shield"
         case .pin: return "pin"
         case .unpin: return "pin.slash"
         case .hide: return "eye.slash"

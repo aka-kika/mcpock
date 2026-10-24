@@ -11,8 +11,8 @@ import Foundation
 ///
 /// Applied to the command, args, env values, URL and header values, for the
 /// probe only: the config itself is never changed and the panel, Compare and
-/// Copy keep the text as written. Values come from mcpock's own environment,
-/// like an agent's come from its own. A variable that can't be filled
+/// Copy keep the text as written. Values come from the login shell's
+/// environment (`ShellEnvironment`), like a terminal agent's. A variable that can't be filled
 /// (`${input:…}` asks the user, a workspace folder with no project open, a
 /// variable mcpock's environment does not have) in the command, args, URL or
 /// headers leaves the server unchecked with that reason instead of starting
@@ -26,7 +26,7 @@ enum ConfigVariables {
 
     static func expand(
         _ config: ServerConfig,
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ShellEnvironment.current
     ) -> Expanded {
         var missing: [String] = []
         func fill(_ text: String) -> String {

@@ -17,6 +17,10 @@ enum PanelText {
         if counts.broken > 0 { parts.append("\(counts.broken) broken") }
         if counts.slow > 0 { parts.append("\(counts.slow) slow") }
         if counts.signIn > 0 { parts.append("\(counts.signIn) sign-in") }
+        // r3 6eef: Not checked and waiting rows were left out, so the footer
+        // read "all fine" beside them.
+        if counts.notChecked > 0 { parts.append("\(counts.notChecked) not checked") }
+        if counts.waiting > 0 { parts.append("\(counts.waiting) waiting") }
         if counts.differs > 0 { parts.append("\(counts.differs) \(counts.differs == 1 ? "differs" : "differ")") }
         if counts.checking > 0 { parts.append("\(counts.checking) checking") }
         guard !parts.isEmpty else { return count(groups.count, "server", "servers") + ", all fine" }
@@ -52,6 +56,7 @@ enum PanelText {
         if c.slow > 0 { parts.append("\(c.slow) slow") }
         if c.signIn > 0 { parts.append("\(c.signIn) \(c.signIn == 1 ? "needs" : "need") sign-in") }
         if c.notChecked > 0 { parts.append("\(c.notChecked) not checked") }
+        if c.waiting > 0 { parts.append("\(c.waiting) waiting for your OK") }
         if c.differs > 0 { parts.append("\(c.differs) set up differently") }
         if c.needsApp > 0 { parts.append("\(c.needsApp) \(c.needsApp == 1 ? "needs its app" : "need their app")") }
         if firstPass {
@@ -91,6 +96,7 @@ enum PanelText {
         let differs: Int
         let needsApp: Int
         let checking: Int
+        let waiting: Int
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
@@ -100,6 +106,7 @@ enum PanelText {
             needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count
+            waiting = groups.filter(\.waitsForFileOK).count
         }
     }
 

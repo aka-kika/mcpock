@@ -35,6 +35,26 @@ enum ConfigScanner {
     }
     private static let maxFileBytes = 1_000_000
 
+    /// Application Support folders macOS guards with a privacy prompt (Contacts,
+    /// call history) or that hold its own data: listing them could raise a
+    /// prompt on first launch, and no agent keeps a config there (r3 17e7).
+    /// Any `com.apple.*` folder is skipped too.
+    static let protectedTopDirs: Set<String> = [
+        "addressbook", "callhistorydb", "callhistorytransactions", "knowledge", "mobilesync",
+        "facetime", "clouddocs", "fileprovider", "dock", "accounts",
+    ]
+
+    /// Home dot folders that are package caches or tool state, walked every
+    /// minute for nothing (r3 17e7).
+    static let skippedHomeDotDirs: Set<String> = [
+        ".cache", ".npm", ".vscode", ".docker", ".rustup", ".pnpm-store", ".gradle", ".m2", ".nvm", ".bun",
+    ]
+
+    static func isProtectedTopDir(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        return protectedTopDirs.contains(lower) || lower.hasPrefix("com.apple.")
+    }
+
     /// Files that look like an agent config but that no agent loads. Matched as a
     /// path suffix, so it holds under any home folder.
     /// - `~/.minimax/mcp/mcp.json`: MiniMax loads only `~/.minimax/mcp.json` (its
@@ -62,6 +82,7 @@ enum ConfigScanner {
         guard let items = try? fm.contentsOfDirectory(atPath: home) else { return [] }
         return items
             .filter { $0.hasPrefix(".") && $0 != "." && $0 != ".." && $0 != ".Trash" }
+            .filter { !skippedHomeDotDirs.contains($0.lowercased()) }
             .map { (home as NSString).appendingPathComponent($0) }
             // Skip symlinked roots: a dotdir symlinked into iCloud/Documents must not be followed.
             .filter { !isSymlink($0) }
@@ -95,6 +116,7 @@ enum ConfigScanner {
 
             if childIsDir.boolValue {
                 if isExcludedDir(name) || name.hasPrefix(".") && depth > 0 { continue }
+                if depth == 0 && isProtectedTopDir(name) { continue }
                 if depth < maxDepth {
                     walk(full, depth: depth + 1, maxDepth: maxDepth, into: &out)
                 }

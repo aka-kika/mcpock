@@ -96,7 +96,7 @@ enum StatusSnapshot {
         let oddLabels = Set(group.differs.map(\.label))
         let sources = group.sources.map { source -> MCPockStatus.Source in
             let config = byID[source.configID]?.config
-            let known = config.map { SecretMask.knownSecrets(env: $0.env, headers: $0.headers) } ?? []
+            let known = config.map(SecretMask.knownSecrets(of:)) ?? []
             let target: String
             if let config {
                 target = config.transport == .stdio
@@ -123,7 +123,7 @@ enum StatusSnapshot {
             paths.append(source.path)
         }
         let allKnown = group.sources.compactMap { byID[$0.configID]?.config }
-            .flatMap { SecretMask.knownSecrets(env: $0.env, headers: $0.headers) }
+            .flatMap(SecretMask.knownSecrets(of:))
         return MCPockStatus.Server(
             name: group.name,
             state: group.state.rawValue,

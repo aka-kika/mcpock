@@ -25,18 +25,20 @@ enum WhatsNewLauncher {
         guard WhatsNew.shouldShow(defaults: defaults) else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            open(defaults: defaults)
+            // Shown without taking the keyboard: after an update at login it
+            // used to jump in front of whatever she was typing (r3 8987).
+            open(defaults: defaults, activate: false)
         }
     }
 
     /// Whether this version has notes to show (the menu item's state).
     static var hasNotes: Bool { WhatsNew.notes(for: WhatsNew.currentVersion) != nil }
 
-    static func open(defaults: UserDefaults = AppPreferences.store) {
+    static func open(defaults: UserDefaults = AppPreferences.store, activate: Bool = true) {
         guard let lines = WhatsNew.notes(for: WhatsNew.currentVersion) else { return }
-        NSApp.activate(ignoringOtherApps: true)
+        if activate { NSApp.activate(ignoringOtherApps: true) }
         if let window {
-            window.makeKeyAndOrderFront(nil)
+            if activate { window.makeKeyAndOrderFront(nil) } else { window.orderFrontRegardless() }
             return
         }
         let root = WhatsNewSheet(appName: "mcpock", lines: lines) { close(defaults: defaults) }
@@ -48,14 +50,14 @@ enum WhatsNewLauncher {
         window.contentView = hosting
         window.title = "What's New in mcpock"
         window.isReleasedWhenClosed = false
-        window.level = .floating
+        window.level = .normal   // not above every other app (r3 e78a)
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         window.delegate = WhatsNewCloser.shared
         let themeRaw = AppPreferences.store.string(forKey: AppPreferences.themeKey)
         window.appearance = (themeRaw.flatMap(AppTheme.init(rawValue:)) ?? AppPreferences.defaultTheme).nsAppearance
         window.center()
         self.window = window
-        window.makeKeyAndOrderFront(nil)
+        if activate { window.makeKeyAndOrderFront(nil) } else { window.orderFrontRegardless() }
     }
 
     /// Continue, or the close button: seen, and gone.

@@ -61,7 +61,7 @@ enum Differs {
     /// that pass their own API key (`--api-key`, `?apiKey=`) launch the same
     /// server, and Compare shows both as the same masked line.
     static func launchTarget(_ config: ServerConfig) -> LaunchTarget {
-        let known = SecretMask.knownSecrets(env: config.env, headers: config.headers)
+        let known = SecretMask.knownSecrets(of: config)
         switch config.transport {
         case .stdio:
             let command = comparedCommand(config.command ?? "")

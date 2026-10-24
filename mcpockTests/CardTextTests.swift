@@ -193,7 +193,7 @@ final class CardTextTests: XCTestCase {
         XCTAssertEqual(CardAction.pin.systemImage, "pin")
         XCTAssertEqual(CardAction.unpin.systemImage, "pin.slash")
         XCTAssertEqual(CardAction.hide.systemImage, "eye.slash")
-        XCTAssertEqual(CardAction.allCases.map(\.title), ["Check again", "Resume", "Pin", "Unpin", "Hide"])
+        XCTAssertEqual(CardAction.allCases.map(\.title), ["Check again", "Resume", "Allow this file", "Pin", "Unpin", "Hide"])
         for action in CardAction.allCases {
             XCTAssertNotNil(NSImage(systemSymbolName: action.systemImage, accessibilityDescription: nil), action.title)
         }

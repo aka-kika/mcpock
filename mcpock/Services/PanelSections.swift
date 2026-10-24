@@ -59,7 +59,8 @@ enum PanelSections {
     static func needsYouRank(_ group: ServerGroup) -> Int? {
         switch group.state {
         case .broken: return 0
-        case .degraded: return 1
+        // A ${VAR} mcpock can't fill is nothing for her to fix here (r3 b964).
+        case .degraded: return group.needsVariable ? nil : 1
         case .healthy: return group.differsNeedsAttention ? 2 : nil
         // Waiting for a closed app is calm: not a problem to fix (2026-10-16).
         case .unknown, .selfManaged, .paused, .needsApp: return nil

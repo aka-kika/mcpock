@@ -159,8 +159,13 @@ final class ConfigDiscoveryTests: XCTestCase {
         try FileManager.default.removeItem(at: home.appendingPathComponent(".claude.json"))
         XCTAssertTrue(ConfigDiscovery.discover(registry: registry, scanRoots: [home.path]).isEmpty)
 
-        // Approved in the user's own settings.
+        // The user's own settings approve all, but Claude Code never trusted
+        // the folder: still nothing runs (r3 22cd).
         try write(".claude/settings.json", #"{"enableAllProjectMcpServers": true}"#)
+        XCTAssertTrue(ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".tools").path]).isEmpty)
+
+        // Once the folder is trusted, the user's settings count.
+        try write(".claude.json", #"{"projects": {"\#(project.path)": {"hasTrustDialogAccepted": true}}}"#)
         XCTAssertEqual(ConfigDiscovery.discover(registry: registry, scanRoots: [home.appendingPathComponent(".tools").path]).count, 3)
     }
 
@@ -228,6 +233,30 @@ final class ScanOnlyFileTests: XCTestCase {
         XCTAssertEqual(allowed.map(\.state), [.unknown], "an allowed file starts over and is checked")
     }
 
+    /// r3 f9f2: a row that reads healthy (one source checked) with a second
+    /// source waiting for its file's OK. Pause used to read the row as paused,
+    /// so it approved and started the file and the healthy server kept running.
+    @MainActor
+    func testPauseOnAHealthyRowNeverApprovesAWaitingFile() async {
+        let scanned = config("scan:/u/.tool/mcp.json:global:a", name: "tool", path: "/u/.tool/mcp.json")
+        let registry = config("reg:Cursor:global:a", name: "tool", path: "/u/.cursor/mcp.json")
+        let fresh = UserDefaults(suiteName: "mcpock.tests.scanok.\(UUID().uuidString)")!
+        let monitor = HealthMonitor(defaults: fresh, isUpdate: false)
+        monitor.discover = { [scanned, registry] }
+        monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
+        await monitor.reloadConfigs()
+        await monitor.refreshNow(force: true)
+        let group = monitor.groups.first { $0.name == "tool" }!
+        XCTAssertEqual(group.state, .healthy)
+        XCTAssertTrue(group.awaitsFileOK)
+        XCTAssertNotNil(CardText.awaitingFileNote(for: group, home: "/u"), "the card says one source waits")
+        PanelState(monitor: monitor, defaults: fresh).togglePause("tool")
+        XCTAssertTrue(monitor.isPaused("tool"), "Pause pauses")
+        XCTAssertTrue(monitor.allowedScanFiles.isEmpty, "and never approves the waiting file")
+        XCTAssertTrue(monitor.servers.allSatisfy { $0.state == .paused })
+        XCTAssertTrue(monitor.servers.first { $0.id == scanned.id }!.awaitingFileOK)
+    }
+
     @MainActor
     func testResumeGivesTheOKAndUpdatesKeepOldFiles() async {
         let scanned = config("scan:/u/.tool/mcp.json:global:a", name: "tool", path: "/u/.tool/mcp.json")
@@ -241,9 +270,15 @@ final class ScanOnlyFileTests: XCTestCase {
         XCTAssertNotNil(CardText.awaitingFileNote(for: group, home: "/u"))
         XCTAssertTrue(CardText.awaitingFileNote(for: group, home: "/u")!.contains("~/.tool/mcp.json"))
         XCTAssertTrue(monitor.awaitsFileOK("tool"))
-        PanelState(monitor: monitor, defaults: fresh).togglePause("tool")   // the card's and the menu's Resume
+        let panel = PanelState(monitor: monitor, defaults: fresh)
+        XCTAssertTrue(group.awaitsFileOK)
+        XCTAssertFalse(group.isPausedByUser, "no Resume for a file that only waits")
+        panel.togglePause("tool")   // paused rows only toggle her own pause
+        XCTAssertTrue(monitor.allowedScanFiles.isEmpty, "Resume never gives the file's OK")
+        panel.togglePause("tool")
+        panel.allowFile("tool")   // the card's and the menu's Allow this file
         XCTAssertEqual(monitor.allowedScanFiles, ["/u/.tool/mcp.json"])
-        XCTAssertFalse(monitor.isPaused("tool"), "Resume never pauses it instead")
+        XCTAssertFalse(monitor.isPaused("tool"), "Allow never pauses it instead")
         XCTAssertFalse(monitor.servers.first!.awaitingFileOK)
         XCTAssertEqual(AppPreferences.loadAllowedScanFiles(from: fresh), ["/u/.tool/mcp.json"], "remembered")
 

@@ -104,4 +104,13 @@ final class AgentConnectTests: XCTestCase {
     func testOnlyAgentsWithoutARowKeepPlainCopyRows() {
         XCTAssertEqual(SettingsConnectPane.otherTargets.map(\.name), ["Cline", "aka", "Other agents"])
     }
+
+    /// r3 92d4: Grok loads only servers with enabled = true, so its line has it.
+    func testSetupPromptGivesGrokEnabledTrue() throws {
+        let prompt = ConnectSnippets.claudeSetupPrompt(path: "/Applications/mcpock.app/Contents/MacOS/mcpock-mcp")
+        let grok = try XCTUnwrap(prompt.range(of: "- Grok (TOML)"))
+        let goose = try XCTUnwrap(prompt.range(of: "- Goose:", range: grok.upperBound..<prompt.endIndex))
+        XCTAssertTrue(prompt[grok.upperBound..<goose.lowerBound].contains("enabled = true"))
+        XCTAssertFalse(prompt.contains("TOML (Codex, Grok)"))
+    }
 }

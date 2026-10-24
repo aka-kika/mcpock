@@ -32,7 +32,7 @@ enum GooseConfig {
     /// One extension's fields → its entry, or nil if it's disabled, Goose-internal,
     /// or missing its endpoint.
     private static func entry(fromFields fields: [String: YAMLBlock.Value]) -> [String: Any]? {
-        if let enabled = fields["enabled"]?.scalar, enabled != "true" { return nil }
+        if let enabled = fields["enabled"]?.scalar, enabled.lowercased() != "true" { return nil }
         let type = fields["type"]?.scalar ?? ""
         guard type == "stdio" || type == "sse" || type == "streamable_http" else { return nil }
 

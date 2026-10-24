@@ -21,6 +21,9 @@ struct HealthMark: View {
     /// Being re-checked on its own (1.5.3): a small spinning arc takes the
     /// mark's place, in the same box, so nothing in the row moves.
     var checking = false
+    /// The accessibility word, when the row's own wording differs from the
+    /// state's ("Not checked", "Needs sign-in").
+    var word: String? = nil
 
     /// Every mark sits in the same box, so names line up whatever the shape.
     static let boxSize: CGFloat = 10
@@ -38,7 +41,7 @@ struct HealthMark: View {
         }
         .frame(width: Self.boxSize, height: Self.boxSize)
         .accessibilityElement()
-        .accessibilityLabel(checking ? "Checking again" : Self.word(for: state))
+        .accessibilityLabel(checking ? "Checking again" : word ?? Self.word(for: state))
     }
 
     @ViewBuilder
@@ -90,9 +93,18 @@ struct HealthMark: View {
         }
     }
 
+    /// The mark a row wears: a Not checked row (a `${VAR}` to fill) gets the
+    /// calm dash of a row waiting on something outside, not the amber ring
+    /// (r3 b964).
+    static func markState(for group: ServerGroup) -> HealthState {
+        group.needsVariable ? .needsApp : group.state
+    }
+
     /// The word for a whole row: an auth failure reads "Needs sign-in" rather than
     /// "Slow", and a healthy row that differs reads "Set up differently".
     static func word(for group: ServerGroup) -> String {
+        if group.needsVariable { return "Not checked" }
+        if group.waitsForFileOK { return "Waiting for your OK" }
         if group.state == .degraded,
            group.issues.contains(where: { $0.reason.hasPrefix("Needs authentication") }) {
             return "Needs sign-in"

@@ -330,7 +330,7 @@ private struct AgentServerRow: View {
         Button(action: actions.select) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    HealthMark(state: server.state, theme: theme, checking: isChecking)
+                    HealthMark(state: server.mark ?? server.state, theme: theme, checking: isChecking)
                     Text(server.name)
                         .font(.system(size: 12.5))
                         .foregroundStyle(theme.textPrimary)

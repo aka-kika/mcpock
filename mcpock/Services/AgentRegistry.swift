@@ -194,6 +194,13 @@ struct AgentBadge: Hashable, Sendable {
     /// but a detail card or an agent row reading "Code" says nothing.
     static let displayNames: [String: String] = [
         "Code": "Claude Code",
+        // Agents only the scan finds are named after their dot folder (r3 3301).
+        "gemini": "Gemini CLI",
+        "qwen": "Qwen Code",
+        "kiro": "Kiro",
+        "lmstudio": "LM Studio",
+        "trae": "Trae",
+        "junie": "Junie",
     ]
 
     /// A source label as people read it: "Code (MyApp)" becomes "Claude Code (MyApp)",

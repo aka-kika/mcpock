@@ -12,7 +12,10 @@ import Foundation
 /// Where Claude Code keeps the answer:
 /// - `~/.claude.json` `projects.<folder>`: `enabledMcpjsonServers`,
 ///   `disabledMcpjsonServers`, `enableAllProjectMcpServers`;
-/// - the same three keys in the user's `~/.claude/settings.json`;
+/// - the same three keys in the user's `~/.claude/settings.json`: its
+///   disabled list always counts, its approvals only for a trusted folder
+///   (r3 22cd: Claude Code never loads an untrusted folder's `.mcp.json`, so
+///   a user-wide `enableAllProjectMcpServers` must not start a stray file);
 /// - and in the project's own `.claude/settings.local.json` and
 ///   `.claude/settings.json`, read only once the folder is trusted
 ///   (`hasTrustDialogAccepted`): before that, a repo could approve itself.
@@ -57,7 +60,13 @@ struct ClaudeProjectApproval: Equatable {
         readFile: (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) }
     ) -> ClaudeProjectApproval {
         var approval = projects[ConfigScanner.canonicalPath(folder)] ?? ClaudeProjectApproval()
-        if let userSettings { approval.add(userSettings) }
+        if let userSettings {
+            if approval.trusted {
+                approval.add(userSettings)
+            } else {
+                approval.disabled.formUnion(userSettings["disabledMcpjsonServers"] as? [String] ?? [])
+            }
+        }
         if approval.trusted {
             for name in ["settings.local.json", "settings.json"] {
                 let path = ((folder as NSString).appendingPathComponent(".claude") as NSString).appendingPathComponent(name)

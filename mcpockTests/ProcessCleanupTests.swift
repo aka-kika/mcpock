@@ -24,6 +24,20 @@ final class ProcessCleanupTests: XCTestCase {
         XCTAssertFalse(isProcessAlive(pid), "Process \(pid) must not remain as an orphan")
     }
 
+    /// r3 4cd2: quitting mcpock mid-check stops every live server tree.
+    func testStopAllEndsLiveServersOnQuit() async throws {
+        let runner = try ProcessRunner(command: "/bin/sh", args: ["-c", "sleep 300 & wait"], env: [:])
+        let pid = runner.processIdentifier
+        XCTAssertGreaterThanOrEqual(ProcessRunner.liveCount, 1)
+        ProcessRunner.stopAll()
+        for _ in 0..<50 where isProcessAlive(pid) { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertFalse(isProcessAlive(pid), "the server is gone")
+        await runner.terminateAndReap()   // a probe's own teardown after it is a no-op
+        let ended = try ProcessRunner(command: "/bin/sh", args: ["-c", "exit 0"], env: [:])
+        await ended.terminateAndReap()
+        XCTAssertFalse(ProcessRunner.isLive(ended), "a finished runner drops out")
+    }
+
     /// Review 2026-10-20 (c46c): a child that double-forks into its own
     /// session escapes the group kill and holds the pipes open. The reader
     /// threads still end shortly after teardown instead of blocking forever.

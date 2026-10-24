@@ -48,6 +48,37 @@ final class PanelTextTests: XCTestCase {
         XCTAssertEqual(PanelText.summary(groups), "2 servers \u{00B7} 2 need sign-in")
     }
 
+    /// r3 6eef / b964: a Not checked row (a ${VAR} to fill) is named in the
+    /// footer, never "all fine", but stays calm: out of Needs you, no ring.
+    func testNotCheckedIsNamedButCalm() {
+        let notChecked = group("a", .degraded, reason: "Uses ${GITHUB_TOKEN}, which mcpock cannot fill")
+        XCTAssertTrue(notChecked.needsVariable)
+        XCTAssertEqual(PanelText.compactSummary([notChecked, group("b")]), "2 \u{00B7} 1 not checked")
+        XCTAssertEqual(PanelText.summary([notChecked, group("b")]), "2 servers \u{00B7} 1 not checked")
+        XCTAssertFalse(PanelSections.needsYou(notChecked))
+        XCTAssertEqual(HealthMonitor.iconState([notChecked, group("b")].map(HealthMonitor.iconInput)), .allHealthy)
+        XCTAssertEqual(HealthMark.markState(for: notChecked), .needsApp, "the calm dash")
+        XCTAssertEqual(HealthMark.word(for: notChecked), "Not checked")
+    }
+
+    /// r3 3301: a row only waiting for its scan-found file's OK is counted
+    /// and gets a note, instead of "all fine" and a bare dash.
+    func testWaitingForAFileOKIsCountedWithANote() {
+        let source = GroupSource(configID: "scan:x", label: "gemini", agent: "gemini", path: "/u/.gemini/settings.json",
+                                 transport: .stdio, target: "x", envKeys: [], headerKeys: [], state: .paused,
+                                 failureReason: nil, awaitingFileOK: true)
+        let waiting = ServerGroup(name: "w", state: .paused, sourceLabels: ["gemini"], tools: [], issues: [],
+                                  variantCount: 1, sources: [source])
+        XCTAssertTrue(waiting.waitsForFileOK)
+        XCTAssertEqual(PanelText.compactSummary([waiting, group("b")]), "2 \u{00B7} 1 waiting")
+        XCTAssertEqual(PanelText.summary([waiting]), "1 server \u{00B7} 1 waiting for your OK")
+        XCTAssertEqual(ShortReason.line(for: waiting), ShortReason.waitingNote)
+        XCTAssertEqual(AgentBadge.displayLabel("gemini"), "Gemini CLI")
+        XCTAssertEqual(AgentBadge.displayLabel("mcporter"), "mcporter", "lowercase brands stay as they are")
+        let section = AgentSections.build(groups: [waiting])[0]
+        XCTAssertEqual(section.servers[0].note, ShortReason.waitingNote)
+    }
+
     func testUnknownReadsAsChecking() {
         XCTAssertEqual(PanelText.summary([group("a", .unknown), group("b")]),
                        "2 servers \u{00B7} 1 checking")

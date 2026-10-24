@@ -123,7 +123,8 @@ struct DetailCardView: View {
 
     private var titleRow: some View {
         HStack(spacing: 10) {
-            HealthMark(state: group.state, theme: theme, checking: state.isChecking(group.name))
+            HealthMark(state: HealthMark.markState(for: group), theme: theme, checking: state.isChecking(group.name),
+                       word: HealthMark.word(for: group))
             Text(group.name)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
@@ -156,7 +157,8 @@ struct DetailCardView: View {
             return "Needs \(app) open. It belongs to \(app), which is closed, so it can't answer now. "
                 + "mcpock checks it again once \(app) is running."
         case .healthy, .degraded, .broken:
-            return nil
+            // Another source is checked, but one waits for its file's OK: say so.
+            return CardText.awaitingFileNote(for: group)
         }
     }
 
@@ -349,8 +351,13 @@ struct DetailCardView: View {
             HStack(spacing: 6) {
                 // Round 6: icon-only, same frame; the words are the tooltip
                 // and the accessibility label (`CardText.actionIcon`).
+                if group.awaitsFileOK {
+                    iconButton(.allowFile) { state.allowFile(group.name) }
+                }
                 if group.state == .paused {
-                    iconButton(.resume) { state.togglePause(group.name) }
+                    if group.isPausedByUser {
+                        iconButton(.resume) { state.togglePause(group.name) }
+                    }
                 } else {
                     iconButton(.checkAgain, spinning: state.isChecking(group.name)) {
                         state.checkAgain(group.name)

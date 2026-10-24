@@ -32,6 +32,20 @@ final class ConfigScannerTests: XCTestCase {
         XCTAssertFalse(found.contains { $0.path.contains("node_modules") }, "node_modules excluded")
     }
 
+    /// r3 17e7: folders macOS guards with a privacy prompt, and Apple's own,
+    /// are never listed; package caches in the home folder are not walked.
+    func testSkipsProtectedFoldersAndCaches() throws {
+        let server = #"{"mcpServers":{"x":{"command":"x"}}}"#
+        try write("AddressBook/mcp.json", server)
+        try write("com.apple.TCC/mcp.json", server)
+        try write("ok/mcp.json", server)
+        let found = ConfigScanner.scan(roots: [root.path], maxDepth: 2)
+        XCTAssertEqual(found.map(\.label), ["ok"])
+        XCTAssertTrue(ConfigScanner.skippedHomeDotDirs.contains(".npm"))
+        XCTAssertTrue(ConfigScanner.isProtectedTopDir("CallHistoryDB"))
+        XCTAssertFalse(ConfigScanner.isProtectedTopDir("Claude"))
+    }
+
     /// Argon 2026-10-16 #1: another app's settings file with a bare `servers` or
     /// `mcp` block must not become a source, or mcpock starts its `command` every
     /// minute. The same block in a file named like an MCP config still counts.

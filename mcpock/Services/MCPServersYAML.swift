@@ -20,10 +20,17 @@ import Foundation
 /// The field names already match the JSON `mcpServers` entry, so this is a thin
 /// map over `YAMLBlock`; `enabled: false` servers are dropped like everywhere else.
 enum MCPServersYAML {
+    /// YAML 1.1's false words (Hermes reads its config with PyYAML).
+    static func isYAMLFalse(_ value: String) -> Bool {
+        ["false", "no", "off", "n"].contains(value.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
     static func servers(fromYAML text: String) -> [String: [String: Any]] {
         var result: [String: [String: Any]] = [:]
         for (name, fields) in YAMLBlock.entries(in: text, under: "mcp_servers") {
-            if let enabled = fields["enabled"]?.scalar, enabled == "false" { continue }
+            // Every YAML false word, any case: `False`, `no`, `off` started the
+            // server anyway (r3 cdf6).
+            if let enabled = fields["enabled"]?.scalar, Self.isYAMLFalse(enabled) { continue }
             var entry: [String: Any] = [:]
             if let command = fields["command"]?.scalar, !command.isEmpty { entry["command"] = command }
             if let url = fields["url"]?.scalar, !url.isEmpty { entry["url"] = url }

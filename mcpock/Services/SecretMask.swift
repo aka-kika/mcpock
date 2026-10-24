@@ -179,8 +179,10 @@ enum SecretMask {
             // A URL value (`WEBHOOK_URL=https://user:pass@host/?key=…`): its
             // secret parts count wherever they turn up (Argon 2026-10-16 #10).
             if trimmed.contains("://") { values += urlSecrets(trimmed) }
-            if isSecretName(name) || looksLikeToken(trimmed)
-                || !(trimmed.hasPrefix("/") || trimmed.hasPrefix("~") || trimmed.contains("://")) {
+            // Only secret-looking names or token-like values: AWS_REGION or
+            // NODE_ENV blanked "us-east-1" everywhere, even inside a URL, and
+            // Compare could not be read (r3 ed08).
+            if isSecretName(name) || looksLikeToken(trimmed) {
                 values.append(trimmed)
             }
         }
@@ -193,6 +195,13 @@ enum SecretMask {
             }
         }
         return values
+    }
+
+    /// Everything of one config that must never appear: env and header
+    /// secrets plus the credential parts of its own URL, which no scrub was
+    /// given before (r3 d791).
+    static func knownSecrets(of config: ServerConfig) -> [String] {
+        knownSecrets(env: config.env, headers: config.headers) + (config.url.map(urlSecrets) ?? [])
     }
 
     /// The parts of a URL that can hold a credential: user, password, query
@@ -208,7 +217,7 @@ enum SecretMask {
     /// What a config launches, as safe to show and copy: its command line
     /// (stdio) or URL (http/sse) with every secret masked.
     static func target(of config: ServerConfig) -> String {
-        let known = knownSecrets(env: config.env, headers: config.headers)
+        let known = knownSecrets(of: config)
         return config.transport == .stdio
             ? commandLine(command: config.command, args: config.args, known: known)
             : url(config.url ?? "", known: known)

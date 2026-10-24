@@ -124,6 +124,8 @@ targets:
       # Reused from the app: JSON-RPC framing (and the types it throws).
       - path: mcpock/Services/MCPJSONRPC.swift
       - path: mcpock/Models/Models.swift
+      # ProbeError masks a server's reply with it (r3 d791).
+      - path: mcpock/Services/SecretMask.swift
     settings:
       base:
         PRODUCT_NAME: mcpock-mcp

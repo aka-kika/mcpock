@@ -121,8 +121,9 @@ enum SettingsLauncher {
         window.isReleasedWhenClosed = false
         window.animationBehavior = .default
         window.center()
-        // Keep settings above the menu-bar panel while open.
-        window.level = .floating
+        // A normal window: .floating kept Settings above every other app for
+        // as long as it was open (r3 e78a).
+        window.level = .normal
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         window.delegate = WindowCloser.shared
         // Apply the user's theme choice directly (NSApp.appearance is deliberately

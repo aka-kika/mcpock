@@ -105,4 +105,28 @@ final class SecretMaskTests: XCTestCase {
         XCTAssertFalse(text.contains("s1gn4ture99"))
         XCTAssertFalse(text.contains("pa55w0rdX"))
     }
+
+    /// r3 ed08: plain values under plain names stay readable, even in a URL.
+    func testPlainEnvValuesAreNotMasked() {
+        let known = SecretMask.knownSecrets(env: ["AWS_REGION": "us-east-1", "NODE_ENV": "staging",
+                                                  "GITHUB_TOKEN": "ghp_short1"], headers: [:])
+        XCTAssertFalse(known.contains("us-east-1"))
+        XCTAssertFalse(known.contains("staging"))
+        XCTAssertTrue(known.contains("ghp_short1"))
+        XCTAssertEqual(SecretMask.scrub("https://s3.us-east-1.amazonaws.com", known: known),
+                       "https://s3.us-east-1.amazonaws.com")
+    }
+
+    /// r3 d791: a short key in the server's own URL is masked in every error
+    /// text, and a reply body is masked before it is kept.
+    func testURLSecretsReachEveryScrub() {
+        let config = ServerConfig(id: "x", name: "x", source: ServerSource(label: "Code"), projectPath: nil,
+                                  transport: .http, command: nil, args: [], env: [:],
+                                  url: "https://mcp.example.com/mcp?k=abc123xyz", headers: [:])
+        let known = SecretMask.knownSecrets(of: config)
+        XCTAssertTrue(known.contains("abc123xyz"))
+        XCTAssertFalse(SecretMask.scrub("Protocol error: bad session for abc123xyz", known: known).contains("abc123xyz"))
+        let reply = ProbeError.httpError(500, "Authorization: Bearer sk-abcdefghijklmnop1234").errorDescription ?? ""
+        XCTAssertFalse(reply.contains("sk-abcdefghijklmnop1234"))
+    }
 }

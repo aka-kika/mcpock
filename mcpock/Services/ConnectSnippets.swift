@@ -196,10 +196,15 @@ enum ConnectSnippets {
               "\(serverName)": { "type": "stdio", "command": \(json), "args": [] }
             - OpenCode: inside "mcp" add
               "\(serverName)": { "type": "local", "command": [\(json)], "enabled": true }
-            - TOML (Codex, Grok): add this table
+            - Codex (TOML): add this table
               [mcp_servers.\(serverName)]
               command = \(json)
               args = []
+            - Grok (TOML): add this table (Grok loads only enabled servers)
+              [mcp_servers.\(serverName)]
+              command = \(json)
+              args = []
+              enabled = true
             - Goose: under "extensions:" add
                 \(serverName):
                   enabled: true

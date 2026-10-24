@@ -508,6 +508,7 @@ final class PanelState {
             checkAgain: { [weak self] in self?.checkAgain(name) },
             hide: { [weak self] in self?.hide(name) },
             togglePause: { [weak self] in self?.togglePause(name) },
+            allowFile: { [weak self] in self?.allowFile(name) },
             togglePin: { [weak self] in self?.togglePin(name) },
             setIntended: { [weak self] marked in self?.setMarkedAsIntended(marked, name: name) },
             copyDetails: { [weak self] in self?.copyServerDetails(name) },
@@ -552,10 +553,19 @@ final class PanelState {
         monitor.setDifferentOnPurpose(marked, name: name)
     }
 
+    /// Pause or Resume, decided from what the row shows. Never gives a
+    /// scan-only file its OK: a healthy row with a waiting source used to read
+    /// "paused" here, so Pause approved and started the file (r3 f9f2).
     func togglePause(_ name: String) {
-        // A row waiting for its scan-only file's OK reads paused: Resume gives it.
-        let paused = monitor.isPaused(name) || monitor.awaitsFileOK(name)
-        monitor.setPaused(!paused, name: name)
+        let shownPaused = monitor.groups.first { $0.name == name }?.state == .paused
+        monitor.setPaused(!shownPaused, name: name)
+    }
+
+    /// "Allow this file": the one way a scan-only file gets her OK; then the
+    /// row is checked at once.
+    func allowFile(_ name: String) {
+        guard monitor.allowScanFiles(forGroup: name) else { return }
+        checkAgain(name)
     }
 
     /// Re-probe one row, with the card's button spinning until it's done.

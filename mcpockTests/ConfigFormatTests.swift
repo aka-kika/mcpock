@@ -452,6 +452,15 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertEqual(Set(MCPServersYAML.servers(fromYAML: yaml).keys), ["wake"])
     }
 
+    /// r3 cdf6: PyYAML's false words in any case switch a Hermes server off.
+    func testHermesEnabledFalseInAnySpelling() {
+        let yaml = ["False", "no", "OFF", "false"].enumerated().map { i, word in
+            "  s\(i):\n    command: /bin/true\n    enabled: \(word)\n"
+        }.joined()
+        XCTAssertEqual(MCPServersYAML.servers(fromYAML: "mcp_servers:\n" + yaml + "  on:\n    command: /bin/true\n    enabled: True\n").keys.sorted(),
+                       ["on"])
+    }
+
     // MARK: - Hermes / YAML `mcp_servers:`
 
     /// Hermes writes the JSON field names in YAML, with list items indented one level

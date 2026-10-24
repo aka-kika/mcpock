@@ -19,7 +19,7 @@ enum PathResolver {
         }
 
         var searchPaths: [String] = []
-        if let pathValue = env["PATH"] ?? ProcessInfo.processInfo.environment["PATH"] {
+        if let pathValue = env["PATH"] ?? ShellEnvironment.current["PATH"] {
             searchPaths.append(contentsOf: pathValue.split(separator: ":").map(String.init))
         }
         for p in commonBinPaths where !searchPaths.contains(p) {
@@ -82,11 +82,12 @@ enum PathResolver {
         return path
     }
 
-    /// Build environment for a child process: base process env, common PATH prepend, then config env.
+    /// Build environment for a child process: the login shell's environment
+    /// (`ShellEnvironment`, r3 3c03), common PATH prepend, then config env.
     /// A PATH from the config comes first as written (`~` expanded in each
     /// entry), with the common bins only appended as fallbacks: a server set
     /// to a specific nvm Node or Python venv keeps it (Argon 2026-10-17 #5).
-    static func processEnvironment(configEnv: [String: String], base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+    static func processEnvironment(configEnv: [String: String], base: [String: String] = ShellEnvironment.current) -> [String: String] {
         var env = base
         env["PATH"] = prependingCommonBins(to: env["PATH"] ?? "")
 
@@ -101,12 +102,19 @@ enum PathResolver {
         return env
     }
 
-    /// Prepend any missing `commonBinPaths` to a colon-joined PATH, preserving order.
+    /// Add any missing `commonBinPaths` to a colon-joined PATH, keeping its
+    /// order: they go in just before `/usr/bin`, so Homebrew still beats the
+    /// system copy and a login shell's version-manager folders stay first.
     private static func prependingCommonBins(to path: String) -> String {
         var parts = path.split(separator: ":").map(String.init)
-        for p in commonBinPaths.reversed() where !parts.contains(p) {
-            parts.insert(p, at: 0)
+        // Just before the system folders: in launchd's short PATH that is the
+        // front, in a login-shell PATH it is after nvm, fnm, volta or mise.
+        var at = parts.firstIndex { $0 == "/usr/bin" || $0 == "/bin" } ?? parts.count
+        for p in commonBinPaths where !parts.contains(p) && p != "/usr/bin" && p != "/bin" {
+            parts.insert(p, at: at)
+            at += 1
         }
+        for p in ["/usr/bin", "/bin"] where !parts.contains(p) { parts.append(p) }
         return parts.joined(separator: ":")
     }
 

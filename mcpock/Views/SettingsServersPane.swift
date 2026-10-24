@@ -54,7 +54,7 @@ struct SettingsServersPane: View {
         let hidden = monitor?.isHidden(group.name) ?? false
         let tools = group.tools.count
         return HStack(spacing: 10) {
-            HealthMark(state: group.state, theme: theme)
+            HealthMark(state: HealthMark.markState(for: group), theme: theme, word: HealthMark.word(for: group))
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(group.name)
                     .foregroundStyle(hidden ? theme.textTertiary : theme.textPrimary)

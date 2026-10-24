@@ -156,7 +156,7 @@ enum AkaSource {
     /// on mcpock's PATH first, then where bun installs itself (`$BUN_INSTALL/bin`,
     /// `~/.bun/bin`). Plain `bun` when none is there (the probe then says so).
     static func bunCommand(
-        environment: [String: String] = ProcessInfo.processInfo.environment,
+        environment: [String: String] = ShellEnvironment.current,
         lookUp: (String) -> String = { PathResolver.resolveCommand($0, env: [:]) },
         isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) -> String {
@@ -221,19 +221,10 @@ enum AkaListener {
         return package["name"] as? String == packageName
     }
 
-    /// PIDs listening on the TCP port (lsof, as `HostApps.listeningApp`).
+    /// PIDs listening on the TCP port (`ListeningPorts`: no lsof when nothing
+    /// answers, 3 s at most when something does).
     static func listeningPIDs(port: Int) -> [pid_t] {
-        let task = Foundation.Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        task.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
-        let out = Pipe()
-        task.standardOutput = out
-        task.standardError = Pipe()
-        guard (try? task.run()) != nil else { return [] }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
-            .split(whereSeparator: \.isNewline).compactMap { pid_t($0) }
+        ListeningPorts.pids(port: port)
     }
 
     /// Owner, executable and working directory of a running process. A

@@ -57,6 +57,9 @@ struct MCPockApp: App {
             monitor.discover = { DemoData.configs }
             monitor.probe = { config, _ in DemoData.probeResult(for: config) }
         }
+        // Servers start with the login shell's PATH and keys, like an agent
+        // started from a terminal (r3 3c03). Read once, before the first check.
+        if !isHostingTests && !isDemo { monitor.prepareEnvironment = { await ShellEnvironment.loadOnce() } }
         // The status file agents read through mcpock-mcp (round 7). Never in
         // demo mode either: it is the real setup's own record.
         if !isHostingTests && !isDemo { monitor.statusWriter = StatusWriter() }
@@ -106,6 +109,11 @@ struct MCPockApp: App {
         StatusItemRightClick.install()
         // What's new, once after an update (1.10.7). Not in demo mode.
         if !isDemo { WhatsNewLauncher.showIfUpdated() }
+        // Quitting or updating mid-check stops the servers being checked;
+        // they used to keep running after mcpock was gone (r3 4cd2).
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: nil
+        ) { _ in ProcessRunner.stopAll() }
         // An app opening re-checks the servers waiting for it (2026-10-16).
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
