@@ -193,13 +193,16 @@ enum ConnectSnippets {
             Other MCP configs may exist too (for example a JSON file with an "mcpServers" block in a ~/.<agent> folder, \
             ~/.config or ~/Library/Application Support). List any you find and ask me before changing them.
 
-            Step 2. Back up before editing
-            Before you change a file, copy it next to itself as <file name>.mcpock-backup-<YYYYMMDD-HHMM>. \
-            If the backup fails, don't touch that file.
+            Step 2. Back up before editing, one file at a time
+            Work on one file at a time and finish it before the next. Before you change a file, copy it next to \
+            itself as <file name>.mcpock-backup-<YYYYMMDD-HHMM>. If the backup fails, don't touch that file. \
+            A backup holds the same API keys as the config, in plain text: never paste its contents anywhere.
 
             Step 3. Add \(serverName) where it's missing
             If a config already has an entry named \(serverName), leave it as it is ("already there"). \
-            Otherwise add it and keep everything else in the file exactly as it was:
+            Otherwise add it and keep everything else in the file exactly as it was. Write the change to a new \
+            copy first, check that the copy still reads as valid JSON, TOML or YAML, and only then put it in \
+            place of the file:
             - Claude Code: run  claude mcp add --scope user \(serverName) -- \(shell)
             - JSON with "mcpServers": inside "mcpServers" add
               "\(serverName)": { "command": \(json), "args": [] }
@@ -243,7 +246,8 @@ enum ConnectSnippets {
 
             Step 5. Report
             A short table: Agent | Config path | Result (added / already there / skipped: why) | \
-            Verified (yes / after restart / no). Then list the backup files you made.
+            Verified (yes / after restart / no). Then list the backup files you made, and remind me that they \
+            hold my keys in plain text, so I can delete them once everything works.
 
             From then on, when I say "check my mcpock", call mcpock_problems, tell me what it reports, and ask me before you change any config file.
             """

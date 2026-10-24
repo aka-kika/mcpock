@@ -30,8 +30,10 @@ struct SettingsConnectPane: View {
     static let rowCopiedSeconds: Double = 1.6
 
     static let claudeTitle = "Copy for Claude"
-    static let claudeText = "Paste it into Claude Code. It finds your agents\u{2019} configs, backs each one up, "
-        + "adds mcpock where it\u{2019}s missing, checks that it works and shows you a table."
+    /// Says the backups hold keys and the work goes file by file (r3 0177).
+    static let claudeText = "Paste it into Claude Code. It finds your agents\u{2019} configs and, one file at a "
+        + "time, backs each one up, adds mcpock where it\u{2019}s missing and checks the file still reads. "
+        + "The backups sit next to each config and hold the same keys: delete them once all is well."
     static let footerText = "mcpock never edits your agents\u{2019} configs. The server only reads mcpock\u{2019}s own status file."
     /// The agents without a status row keep their plain copy rows.
     static var otherTargets: [ConnectSnippets.Target] {
