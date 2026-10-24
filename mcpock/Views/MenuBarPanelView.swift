@@ -274,7 +274,7 @@ struct MenuBarPanelView: View {
             emptyState("No MCP servers found",
                        detail: "Configure servers in Claude Code, Claude Desktop, Cursor or another agent.")
         } else if monitor.visibleGroups.isEmpty {
-            emptyState("All servers hidden", detail: "Bring them back in Preferences.")
+            emptyState("All servers hidden", detail: "Bring them back in Settings > Servers.")
         } else if panel.filter == .problems {
             emptyState("Nothing needs you", detail: "Every server answered normally.")
         } else {

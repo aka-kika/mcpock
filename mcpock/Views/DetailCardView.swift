@@ -200,7 +200,8 @@ struct DetailCardView: View {
         CopyFlashButton(
             title: CardText.askAgentButton,
             help: "Copy a prompt that asks an agent to look into this and advise, without changing anything",
-            theme: theme
+            theme: theme,
+            copiedTitle: CardText.askAgentCopied
         ) { state.askAgent(group.name) }
     }
 
@@ -568,6 +569,8 @@ private struct CopyFlashButton: View {
     let title: String
     let help: String
     let theme: ThemeColors
+    /// What the flash says ("Copied"; Ask an agent says where it goes).
+    var copiedTitle = "Copied"
     /// Copies; false when there was nothing to copy (no flash then).
     let copy: () -> Bool
     @State private var copied = false
@@ -587,16 +590,18 @@ private struct CopyFlashButton: View {
         .overlay {
             ZStack {
                 RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Theme.claudeOrange)
-                Label("Copied", systemImage: "checkmark")
+                Label(copiedTitle, systemImage: "checkmark")
                     .font(.system(size: 12, weight: .medium))
                     .labelStyle(.titleAndIcon)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .foregroundStyle(.white)
             }
             .opacity(copied ? 1 : 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
-        .accessibilityLabel(copied ? "Copied" : title)
+        .accessibilityLabel(copied ? copiedTitle : title)
     }
 }
 

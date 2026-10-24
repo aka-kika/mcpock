@@ -150,11 +150,11 @@ struct ServerContextMenu: View {
         }
         if group.state == .paused {
             if group.isPausedByUser {
-                Button(action: actions.togglePause) { Label("Resume probing", systemImage: "play.circle") }
+                Button(action: actions.togglePause) { Label("Resume checks", systemImage: "play.circle") }
             }
         } else {
             Button(action: actions.checkAgain) { Label("Check again", systemImage: "arrow.clockwise") }
-            Button(action: actions.togglePause) { Label("Pause probing", systemImage: "pause.circle") }
+            Button(action: actions.togglePause) { Label("Pause checks", systemImage: "pause.circle") }
         }
         Button(action: actions.togglePin) {
             if isPinned {

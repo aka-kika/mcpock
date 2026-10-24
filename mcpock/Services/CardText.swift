@@ -75,6 +75,8 @@ enum CardText {
     /// case, `MenuText`).
     static let compareButton = "Compare"
     static let askAgentButton = "Ask an agent"
+    /// Ask an agent only copies: the flash says so (r3 191b).
+    static let askAgentCopied = "Prompt copied, paste it to your agent"
     static let copyDetailsButton = "Copy details"
     static let copyErrorsButton = "Copy errors"
     static let markAsIntendedButton = "Mark as intended"
