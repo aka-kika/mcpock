@@ -21,6 +21,7 @@ struct SettingsGeneralPane: View {
     @AppStorage(AppPreferences.openPanelHotKeyKey, store: AppPreferences.store) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
+    @State private var launchNeedsApproval = LaunchAtLogin.needsApproval
     @State private var exportNote: String?
     /// The slider's live position while dragging (and while it snaps); nil
     /// at rest. The stored interval changes only when the knob is let go, so
@@ -36,6 +37,7 @@ struct SettingsGeneralPane: View {
     static let hotKeyTitle = "Open with \(GlobalHotKey.displayText)"
     static let hotKeyHelp = "\(GlobalHotKey.spokenText) opens and closes the panel from any app. "
         + "Then use the arrow keys, Return and Escape."
+    static let widgetsUnavailableText = "Widgets can't get data: mcpock can't open its App Group folder."
     static let hotKeyTakenText = "Another app already uses \(GlobalHotKey.displayText), so mcpock can't."
     static let sliderWidth: CGFloat = 190
 
@@ -112,9 +114,11 @@ struct SettingsGeneralPane: View {
                         do {
                             try LaunchAtLogin.setEnabled(newValue)
                             launchAtLogin = LaunchAtLogin.isEnabled
+                            launchNeedsApproval = LaunchAtLogin.needsApproval
                             launchError = nil
                         } catch {
                             launchAtLogin = LaunchAtLogin.isEnabled
+                            launchNeedsApproval = LaunchAtLogin.needsApproval
                             launchError = error.localizedDescription
                         }
                     }
@@ -126,6 +130,10 @@ struct SettingsGeneralPane: View {
                     Text(launchError)
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusBroken)
+                } else if launchNeedsApproval {
+                    Text(LaunchAtLogin.approvalText)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.statusDegraded)
                 } else if openPanelHotKey && GlobalHotKey.shared.isTaken {
                     Text(Self.hotKeyTakenText)
                         .font(Theme.caption)
@@ -188,6 +196,14 @@ struct SettingsGeneralPane: View {
                         .foregroundStyle(theme.statusBroken)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // (r3 7183) An unsigned or ad-hoc build has no App Group: the
+                // widgets would show nothing, and nothing said why.
+                if AppGroup.containerURL == nil {
+                    Text(Self.widgetsUnavailableText)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(theme.statusDegraded)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text("Status")
             } footer: {
@@ -197,7 +213,10 @@ struct SettingsGeneralPane: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .panelScrollIndicators()
-        .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
+        .onAppear {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            launchNeedsApproval = LaunchAtLogin.needsApproval
+        }
         .onChange(of: probeIntervalRaw) { _, _ in
             monitor?.probeIntervalChanged()
         }

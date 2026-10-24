@@ -12,6 +12,7 @@ struct ProblemsWidgetView: View {
         Group {
             if let snapshot = entry.snapshot {
                 content(snapshot)
+                    .widgetStale(snapshot.isStale(now: entry.date))
             } else {
                 WidgetEmptyState()
             }
@@ -46,6 +47,12 @@ struct ProblemsWidgetView: View {
                                 .lineLimit(1)
                         }
                     }
+                    // The snapshot keeps only the worst few (r3 b5bc).
+                    if snapshot.problemCount > snapshot.problems.count {
+                        Text("+\(snapshot.problemCount - snapshot.problems.count) more")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -59,11 +66,11 @@ struct ProblemsWidgetView: View {
     @ViewBuilder
     private func footer(_ s: MCPockWidgetSnapshot) -> some View {
         if s.problems.isEmpty {
-            WidgetCheckedAt(date: s.generated)
+            WidgetCheckedAt(date: s.generated, stale: s.isStale(now: entry.date))
         } else {
             HStack(spacing: 3) {
                 Text("\(s.fineCount) more fine \u{00B7}")
-                WidgetCheckedAt(date: s.generated)
+                WidgetCheckedAt(date: s.generated, stale: s.isStale(now: entry.date))
             }
         }
     }

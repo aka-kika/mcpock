@@ -73,6 +73,14 @@ final class WidgetReloadPolicyTests: XCTestCase {
                                                      now: base.addingTimeInterval(5)), .none)
     }
 
+    /// r3 7183: every probe cycle flips `checking` twice and no widget draws it.
+    func testCheckingAloneDoesNotReload() {
+        let a = snapshot()
+        var b = snapshot()
+        b.checking = true
+        XCTAssertFalse(WidgetReloadPolicy.displayDiffers(a, b))
+    }
+
     func testIdenticalSnapshotNeverReloads() {
         let a = snapshot(problemCount: 2, problems: [.init(name: "x", status: "slow")])
         let b = a

@@ -24,11 +24,28 @@ struct WidgetEmptyState: View {
 /// minutes", so nothing more is added to it).
 struct WidgetCheckedAt: View {
     let date: Date
+    /// True when the snapshot is too old to trust (r3 7183): say so with the
+    /// clock time instead of a relative age that keeps counting up.
+    var stale = false
 
     var body: some View {
-        HStack(spacing: 3) {
-            Text("checked")
-            Text(date, style: .relative)
+        if stale {
+            HStack(spacing: 3) {
+                Text("Not updated since")
+                Text(date, style: .time)
+            }
+        } else {
+            HStack(spacing: 3) {
+                Text("checked")
+                Text(date, style: .relative)
+            }
         }
+    }
+}
+
+extension View {
+    /// Grey out a widget whose snapshot is stale (r3 7183).
+    func widgetStale(_ stale: Bool) -> some View {
+        saturation(stale ? 0 : 1).opacity(stale ? 0.7 : 1)
     }
 }

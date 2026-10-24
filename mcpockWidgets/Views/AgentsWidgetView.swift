@@ -12,6 +12,7 @@ struct AgentsWidgetView: View {
         Group {
             if let snapshot = entry.snapshot {
                 content(snapshot)
+                    .widgetStale(snapshot.isStale(now: entry.date))
             } else {
                 WidgetEmptyState()
             }
@@ -34,7 +35,7 @@ struct AgentsWidgetView: View {
                     }
                 }
                 Spacer(minLength: 0)
-                WidgetCheckedAt(date: snapshot.generated)
+                WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
