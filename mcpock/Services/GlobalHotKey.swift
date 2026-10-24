@@ -2,9 +2,10 @@ import AppKit
 import Carbon.HIToolbox
 import Observation
 
-/// One keyboard shortcut, ⌃⌥M, that opens and closes the panel from any app
-/// (1.10, from the Wasdy note: a shelf you call up like Raycast, then arrow,
-/// Return and Escape, which the panel already answers).
+/// One keyboard shortcut, ⌃⌥M unless she picked her own (`PanelShortcut`,
+/// 1.12), that opens and closes the panel from any app (1.10, from the Wasdy
+/// note: a shelf you call up like Raycast, then arrow, Return and Escape,
+/// which the panel already answers).
 ///
 /// Carbon's `RegisterEventHotKey`, not an `NSEvent` global monitor: it needs
 /// no Accessibility or Input Monitoring permission, and it swallows the key
@@ -20,14 +21,17 @@ import Observation
 final class GlobalHotKey {
     static let shared = GlobalHotKey()
 
-    /// Shown in Settings and the help text.
-    nonisolated static let displayText = "\u{2303}\u{2325}M"
-    nonisolated static let spokenText = "Control-Option-M"
-    nonisolated static let keyCode = UInt32(kVK_ANSI_M)
-    nonisolated static let modifiers = UInt32(controlKey | optionKey)
-
     /// True when the setting is on but another app already owns the shortcut.
     private(set) var isTaken = false
+
+    /// Settings is recording a new shortcut: the old one lets go meanwhile,
+    /// so pressing it again is recorded instead of opening the panel.
+    var isRecording = false {
+        didSet { if isRecording != oldValue { sync() } }
+    }
+
+    /// The shortcut held now (nil: none).
+    @ObservationIgnored private var registered: PanelShortcut?
 
     @ObservationIgnored private var hotKeyRef: EventHotKeyRef?
     @ObservationIgnored private var handlerRef: EventHandlerRef?
@@ -63,24 +67,27 @@ final class GlobalHotKey {
     /// Registers or unregisters to match the setting. Cheap when nothing
     /// changed: every defaults write anywhere in the app lands here.
     private func sync() {
-        let wanted = AppPreferences.loadOpenPanelHotKey(from: defaults)
-        if wanted, hotKeyRef == nil {
-            register()
+        let wanted = AppPreferences.loadOpenPanelHotKey(from: defaults) && !isRecording
+        let shortcut = AppPreferences.loadPanelShortcut(from: defaults)
+        if wanted, hotKeyRef == nil || registered != shortcut {
+            unregister()
+            register(shortcut)
         } else if !wanted {
             unregister()
-            if isTaken { isTaken = false }
+            if isTaken && !isRecording { isTaken = false }
         }
     }
 
-    private func register() {
+    private func register(_ shortcut: PanelShortcut) {
         var ref: EventHotKeyRef?
         let id = EventHotKeyID(signature: OSType(0x6D63_706B), id: 1) // 'mcpk'
         let status = RegisterEventHotKey(
-            Self.keyCode, Self.modifiers, id,
+            shortcut.keyCode, shortcut.modifiers, id,
             GetApplicationEventTarget(), OptionBits(kEventHotKeyExclusive), &ref
         )
         if status == noErr, let ref {
             hotKeyRef = ref
+            registered = shortcut
             if isTaken { isTaken = false }
         } else if !isTaken {
             isTaken = true
@@ -90,6 +97,7 @@ final class GlobalHotKey {
     private func unregister() {
         if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
         hotKeyRef = nil
+        registered = nil
     }
 
     private func installHandler() {

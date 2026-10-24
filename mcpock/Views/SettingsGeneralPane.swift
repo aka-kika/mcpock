@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import Carbon.HIToolbox
 
 /// The General pane (round 8): a native grouped form, like System Settings.
 /// Look (appearance, scroll bars), checking (interval, Open at Login), a small
@@ -19,6 +20,8 @@ struct SettingsGeneralPane: View {
     @AppStorage(AppPreferences.hideScrollBarsKey, store: AppPreferences.store) private var hideScrollBars = AppPreferences.defaultHideScrollBars
     @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
     @AppStorage(AppPreferences.openPanelHotKeyKey, store: AppPreferences.store) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
+    /// The saved shortcut's data; empty means ⌃⌥M (`PanelShortcut.standard`).
+    @AppStorage(AppPreferences.panelShortcutKey, store: AppPreferences.store) private var panelShortcutData = Data()
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
     @State private var launchNeedsApproval = LaunchAtLogin.needsApproval
@@ -34,12 +37,22 @@ struct SettingsGeneralPane: View {
 
     static let hideScrollBarsTitle = "Hide scroll bars"
     static let hideScrollBarsHelp = "Lists still scroll with the trackpad or mouse wheel."
-    static let hotKeyTitle = "Open with \(GlobalHotKey.displayText)"
-    static let hotKeyHelp = "\(GlobalHotKey.spokenText) opens and closes the panel from any app. "
-        + "Then use the arrow keys, Return and Escape."
+    static let hotKeyTitle = "Open with a shortcut"
+    static func hotKeyHelp(_ shortcut: PanelShortcut) -> String {
+        "\(shortcut.spokenText) opens and closes the panel from any app. "
+            + "Then use the arrow keys, Return and Escape."
+    }
+    static let recordingText = "Type a shortcut"
+    static let recordingHelp = "Press keys with Control, Option or Command. Escape cancels."
     static let widgetsUnavailableText = "Widgets can't get data: mcpock can't open its App Group folder."
-    static let hotKeyTakenText = "Another app already uses \(GlobalHotKey.displayText), so mcpock can't."
+    static func hotKeyTakenText(_ shortcut: PanelShortcut) -> String {
+        "Another app already uses \(shortcut.displayText), so mcpock can't. Pick another one."
+    }
     static let sliderWidth: CGFloat = 190
+
+    private var panelShortcut: PanelShortcut {
+        (try? JSONDecoder().decode(PanelShortcut.self, from: panelShortcutData)) ?? .standard
+    }
 
     /// Under the status file when its last write failed.
     static func statusFileErrorText(_ error: String) -> String {
@@ -124,7 +137,14 @@ struct SettingsGeneralPane: View {
                     }
                 ))
                 Toggle(Self.hotKeyTitle, isOn: $openPanelHotKey)
-                    .help(Self.hotKeyHelp)
+                    .help(Self.hotKeyHelp(panelShortcut))
+                if openPanelHotKey {
+                    LabeledContent("Shortcut") {
+                        ShortcutRecorder(shortcut: panelShortcut) { picked in
+                            AppPreferences.savePanelShortcut(picked)
+                        }
+                    }
+                }
             } footer: {
                 if let launchError {
                     Text(launchError)
@@ -135,7 +155,7 @@ struct SettingsGeneralPane: View {
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusDegraded)
                 } else if openPanelHotKey && GlobalHotKey.shared.isTaken {
-                    Text(Self.hotKeyTakenText)
+                    Text(Self.hotKeyTakenText(panelShortcut))
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusDegraded)
                 } else {
@@ -379,5 +399,62 @@ struct SettingsGeneralPane: View {
         } catch {
             exportNote = "Export failed: \(error.localizedDescription)"
         }
+    }
+}
+
+/// The shortcut as a button (1.12): click it, press the new keys, done.
+/// Escape or a click elsewhere cancels; Reset brings back ⌃⌥M.
+struct ShortcutRecorder: View {
+    let shortcut: PanelShortcut
+    let onPick: (PanelShortcut) -> Void
+
+    @State private var isRecording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if shortcut != .standard && !isRecording {
+                Button("Reset") { onPick(.standard) }
+                    .buttonStyle(.link)
+                    .help("Back to \(PanelShortcut.standard.displayText)")
+            }
+            Button(isRecording ? SettingsGeneralPane.recordingText : shortcut.displayText) {
+                isRecording ? stop() : start()
+            }
+            .help(isRecording ? SettingsGeneralPane.recordingHelp : "Click, then press a new shortcut.")
+            .accessibilityLabel(isRecording ? SettingsGeneralPane.recordingText : "Shortcut \(shortcut.spokenText)")
+        }
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        isRecording = true
+        GlobalHotKey.shared.isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { event in
+            guard event.type == .keyDown else {
+                stop()
+                return event
+            }
+            if Int(event.keyCode) == kVK_Escape {
+                stop()
+                return nil
+            }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if let picked = PanelShortcut.from(keyCode: event.keyCode, flags: flags,
+                                               characters: event.charactersIgnoringModifiers) {
+                onPick(picked)
+                stop()
+            } else {
+                NSSound.beep()
+            }
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        isRecording = false
+        GlobalHotKey.shared.isRecording = false
     }
 }

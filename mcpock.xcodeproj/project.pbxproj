@@ -23,6 +23,7 @@
 		11CCAAD14CC8A4C5BDFDAEFD /* PinnedServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9F671AA474D522512E93E33 /* PinnedServerTests.swift */; };
 		11D557A7AA8A7494ECEABAA8 /* SecretMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1AD044E3456D407A552D7F /* SecretMask.swift */; };
 		13DF8BBF8AFF5FF5DFFB9877 /* ServerReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA247B9C3B4895795AD580 /* ServerReportTests.swift */; };
+		18255138E8AAB20586C7F9E5 /* PanelShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3EA7CC6E427D9F1D032453 /* PanelShortcut.swift */; };
 		189A7EDD12C711D3B931BACC /* AgentRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2765FD4CC69069DC4E60598 /* AgentRegistry.swift */; };
 		19E4A5AD61E50EFBD95EB38B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 03C0B188EA5AA9D56DF7DBCC /* Sparkle */; };
 		1CB641B0E7927EBA7D74AB98 /* AppPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C92735F41064BC566077D27 /* AppPreferencesTests.swift */; };
@@ -192,6 +193,7 @@
 		E2FA789DD0B61BB981967566 /* GlassPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8392DD6E4378DD8694C1FC05 /* GlassPanelController.swift */; };
 		E3B8A5D21C3BDAB4B8DA7B4E /* ServerVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9845E457F80223D9B47DE9 /* ServerVisibility.swift */; };
 		E470A52B4097D0404D38E355 /* ThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D354EF49B4DADDD58F07225 /* ThemeTests.swift */; };
+		E782048ED8090FE640BC919C /* PanelShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B97A09B3350A10B0DCD3802 /* PanelShortcutTests.swift */; };
 		E9944FC32D1DAA2192457A53 /* CloudAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE397E6CC0E3D0CCDA156FA4 /* CloudAgentTests.swift */; };
 		EC02CD5EFEDC27CF49C52BD9 /* PanelChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213E339BB6EF4940549859F1 /* PanelChrome.swift */; };
 		EC0FC4E15DE8BA9074D50838 /* PathResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1EF8E0ECFC9342ECAFAF6 /* PathResolver.swift */; };
@@ -265,6 +267,7 @@
 		05AB1301367B07B1C9A2B721 /* ServerReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerReport.swift; sourceTree = "<group>"; };
 		084053D17945570F9E70B29D /* ConfigDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigDiscovery.swift; sourceTree = "<group>"; };
 		093499F646978DF81B60D197 /* StdioBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdioBannerTests.swift; sourceTree = "<group>"; };
+		0B3EA7CC6E427D9F1D032453 /* PanelShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelShortcut.swift; sourceTree = "<group>"; };
 		0D43856E058F8AB4450CFBB1 /* SettingsPanesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanesTests.swift; sourceTree = "<group>"; };
 		0F66B862F2AE178600480A3B /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		10A105700D24E8D55E4E55C1 /* YAMLBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YAMLBlock.swift; sourceTree = "<group>"; };
@@ -289,6 +292,7 @@
 		272869532F6C3CBC55C8DD57 /* DetailCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailCardView.swift; sourceTree = "<group>"; };
 		2768CE45B7D0E0AB286A985B /* UsageReaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageReaders.swift; sourceTree = "<group>"; };
 		282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLayoutTests.swift; sourceTree = "<group>"; };
+		2B97A09B3350A10B0DCD3802 /* PanelShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelShortcutTests.swift; sourceTree = "<group>"; };
 		30C906AC4EF47BD9001A45F5 /* MCPockApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPockApp.swift; sourceTree = "<group>"; };
 		310BCD66A81013E692865EC4 /* ProcessTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTreeTests.swift; sourceTree = "<group>"; };
 		312B5B2A56B0D489AF4D2B3D /* CursorUsageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageReader.swift; sourceTree = "<group>"; };
@@ -543,6 +547,7 @@
 				B7666F9F0F62C878DDD3FA84 /* NeedsAppTests.swift */,
 				282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */,
 				6AFAFBCD445939A4B4ED2150 /* PanelSectionsTests.swift */,
+				2B97A09B3350A10B0DCD3802 /* PanelShortcutTests.swift */,
 				668454E3E5795BEF3D1D37BC /* PanelStateTests.swift */,
 				BC402E4B597361B843F06092 /* PanelTextTests.swift */,
 				83A70B95A1B19A9DA05892E5 /* PausedServerTests.swift */,
@@ -636,6 +641,7 @@
 				14F98A52F49ACD8C24EA7164 /* MCPServersYAML.swift */,
 				F3171A9482FDF03BF28CF039 /* MenuText.swift */,
 				5BA6EB1467B930D7C6AC16EF /* PanelSections.swift */,
+				0B3EA7CC6E427D9F1D032453 /* PanelShortcut.swift */,
 				45A9E55708001F5411BD2EB3 /* PanelText.swift */,
 				04F1EF8E0ECFC9342ECAFAF6 /* PathResolver.swift */,
 				10C67F01C8AC6F0A8D186628 /* ProbeSession.swift */,
@@ -990,6 +996,7 @@
 				F8DA37BCF6E75A5ED9C8BAD1 /* PanelBackdrop.swift in Sources */,
 				EC02CD5EFEDC27CF49C52BD9 /* PanelChrome.swift in Sources */,
 				084B9A1C38F00ACB2181DEC5 /* PanelSections.swift in Sources */,
+				18255138E8AAB20586C7F9E5 /* PanelShortcut.swift in Sources */,
 				8D4158F933293DDACB45B09A /* PanelState.swift in Sources */,
 				A8804F994D92589CCF697237 /* PanelText.swift in Sources */,
 				EC0FC4E15DE8BA9074D50838 /* PathResolver.swift in Sources */,
@@ -1092,6 +1099,7 @@
 				DABB8776C5B127951751C0B8 /* NeedsAppTests.swift in Sources */,
 				430DACDEC25AE3A3323A3513 /* PanelLayoutTests.swift in Sources */,
 				D8091CD78501DFB5CDE0B467 /* PanelSectionsTests.swift in Sources */,
+				E782048ED8090FE640BC919C /* PanelShortcutTests.swift in Sources */,
 				D671EFF454362A46D18BBDF8 /* PanelStateTests.swift in Sources */,
 				BBB82DA3564F38E4D2D8D521 /* PanelTextTests.swift in Sources */,
 				5B6F862DA95810599FAA0CF6 /* PausedServerTests.swift in Sources */,
