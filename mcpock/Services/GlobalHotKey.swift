@@ -32,6 +32,7 @@ final class GlobalHotKey {
     @ObservationIgnored private var hotKeyRef: EventHotKeyRef?
     @ObservationIgnored private var handlerRef: EventHandlerRef?
     @ObservationIgnored private var defaultsObserver: NSObjectProtocol?
+    @ObservationIgnored private var quitObserver: NSObjectProtocol?
     @ObservationIgnored private var defaults: UserDefaults = .standard
     /// What a press does. Set by `start`; the app opens or closes the panel.
     @ObservationIgnored private var action: () -> Void = {}
@@ -48,6 +49,13 @@ final class GlobalHotKey {
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.sync() }
+        }
+        // Taken by another app: try again whenever an app quits, so the
+        // shortcut comes back once its owner is gone (r3 9d3d).
+        quitObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { if self?.isTaken == true { self?.sync() } }
         }
         sync()
     }
