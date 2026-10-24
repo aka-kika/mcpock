@@ -1,7 +1,14 @@
-# The secret-masking tests use made-up tokens on purpose.
+# The secret-masking tests use made-up tokens on purpose. Only the test files
+# that hold them are exempt (r3 b5bc), so a real key pasted anywhere else in
+# mcpockTests/ is still caught.
 [extend]
 useDefault = true
 
 [allowlist]
 description = "Fake tokens in mcpock's secret-masking tests"
-paths = ['''^mcpockTests/''']
+paths = [
+  '''(^|/)mcpockTests/SecretMaskTests\.swift$''',
+  '''(^|/)mcpockTests/DiffersTests\.swift$''',
+  '''(^|/)mcpockTests/ServerReportTests\.swift$''',
+  '''(^|/)mcpockTests/StatusSnapshotTests\.swift$''',
+]
