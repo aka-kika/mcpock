@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Builds the status file agents read through `mcpock-mcp` (round 7) from the
 /// monitor's snapshots. Pure, so `StatusSnapshotTests` checks the wording and,
@@ -30,7 +31,7 @@ enum StatusSnapshot {
         // with the problems list and the widgets (Argon 2026-10-16 #6).
         let shown = entries.filter { !$0.hidden }
         let counts = MCPockStatus.Counts(
-            total: groups.count,
+            total: shown.count,   // the shown rows, like every other count (r3 09ec)
             broken: shown.filter { $0.status == "broken" }.count,
             slow: shown.filter { $0.status == "slow" }.count,
             needsSignIn: shown.filter { $0.status == "needs sign-in" }.count,
@@ -156,6 +157,24 @@ enum StatusSnapshot {
 final class StatusWriter {
     let directory: URL
     private var pending: Task<Void, Never>?
+    /// Writes run one at a time, in the order they were queued, and a write
+    /// that a newer snapshot already passed is skipped (r3 09ec).
+    private let queue = DispatchQueue(label: "mcpock.status-writer", qos: .utility)
+    private var lastQueued = 0
+    private let order = WriteOrder()
+
+    /// Remembers the newest snapshot number written; an older one never lands after it.
+    final class WriteOrder: @unchecked Sendable {
+        private let newest = OSAllocatedUnfairLock(initialState: 0)
+        /// True when `number` may be written (nothing newer has been).
+        func claim(_ number: Int) -> Bool {
+            newest.withLock { latest in
+                guard number > latest else { return false }
+                latest = number
+                return true
+            }
+        }
+    }
     /// After each write: nil when it worked, else why it failed. A failed
     /// write used to be dropped, and agents read old results with nothing
     /// saying so (review 2026-10-20, f341).
@@ -179,14 +198,20 @@ final class StatusWriter {
             self.pending = nil
             guard let status = make() else { return }
             let directory = self.directory
-            let failure = await Task.detached(priority: .utility) { () -> String? in
-                do {
-                    try Self.write(status, to: directory)
-                    return nil
-                } catch {
-                    return error.localizedDescription
+            self.lastQueued += 1
+            let number = self.lastQueued
+            let order = self.order
+            let failure = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
+                self.queue.async {
+                    guard order.claim(number) else { return done.resume(returning: nil) }
+                    do {
+                        try Self.write(status, to: directory)
+                        done.resume(returning: nil)
+                    } catch {
+                        done.resume(returning: error.localizedDescription)
+                    }
                 }
-            }.value
+            }
             self.onWrite?(failure)
         }
     }

@@ -125,7 +125,7 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(status.schema, MCPockStatus.currentSchema)
         XCTAssertEqual(status.pid, 4242)
         XCTAssertEqual(status.checkEverySeconds, 900)
-        XCTAssertEqual(status.counts.total, 5)
+        XCTAssertEqual(status.counts.total, 4, "the shown rows only: the hidden one is in `hidden` (r3 09ec)")
         XCTAssertEqual(status.counts.broken, 2, "the broken hidden one is back, so it counts")
         XCTAssertEqual(status.counts.needsSignIn, 1)
         XCTAssertEqual(status.counts.differs, 1)
@@ -168,6 +168,36 @@ final class StatusSnapshotTests: XCTestCase {
         for name in ["status.json", "status.md", "usage.json"] {
             XCTAssertEqual(try mode(dir.appendingPathComponent(name)), 0o600, name)
         }
+    }
+
+    /// r3 09ec: a snapshot older than one already written never lands after it.
+    func testWriteOrderSkipsAnOlderSnapshot() {
+        let order = StatusWriter.WriteOrder()
+        XCTAssertTrue(order.claim(1))
+        XCTAssertTrue(order.claim(3))
+        XCTAssertFalse(order.claim(2), "2 is older than the 3 already written")
+        XCTAssertFalse(order.claim(3))
+        XCTAssertTrue(order.claim(4))
+    }
+
+    /// Two quick schedules leave the newest state on disk.
+    @MainActor
+    func testTwoSchedulesLeaveTheNewestOnDisk() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-order-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let writer = StatusWriter(directory: dir)
+        var written = 0
+        writer.onWrite = { _ in written += 1 }
+        var first = build()
+        first.pid = 1
+        writer.schedule { first }
+        for _ in 0..<100 where written < 1 { try await Task.sleep(for: .milliseconds(30)) }
+        var second = build()
+        second.pid = 2
+        writer.schedule { second }
+        for _ in 0..<100 where written < 2 { try await Task.sleep(for: .milliseconds(30)) }
+        guard case .loaded(let read) = StatusLoad.read(from: writer.statusURL) else { return XCTFail("status.json should read back") }
+        XCTAssertEqual(read.pid, 2)
     }
 
     func testTestMonitorHasNoWriter() {
