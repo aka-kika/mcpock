@@ -84,6 +84,34 @@ struct UsageCursor: Codable, Equatable, Sendable {
 }
 
 extension UsageCursor {
+    /// FNV-1a of `text` in hex: stable across launches (Swift's `Hashable` is
+    /// seeded per process), for cursor keys that must not hold a path.
+    static func stableHash(_ text: String) -> String {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        let prime: UInt64 = 0x0000_0100_0000_01b3
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* prime
+        }
+        return String(hash, radix: 16)
+    }
+
+    /// Moves everything kept under `old` to `new`, once: a source whose cursor
+    /// key changed (a full path, now hashed) keeps its offset and counted
+    /// times, so its calls are not counted again. Nothing moves if `new`
+    /// already has an entry; the old entries are dropped either way.
+    mutating func rekey(_ old: String, to new: String) {
+        guard old != new else { return }
+        func move<V>(_ dict: inout [String: V]) {
+            guard let value = dict.removeValue(forKey: old) else { return }
+            if dict[new] == nil { dict[new] = value }
+        }
+        move(&values)
+        move(&newest)
+        move(&restartCutoff)
+        move(&countedKeys)
+    }
+
     /// Cursors saved before 1.10.6 carry only `values`. In an extension so
     /// the memberwise `UsageCursor(values:)` stays.
     init(from decoder: Decoder) throws {

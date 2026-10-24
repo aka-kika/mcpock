@@ -162,6 +162,34 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         XCTAssertEqual(reader.read(since: saved, knownServers: []).events.map(\.server), ["eventkit"])
     }
 
+    /// r3 b935: cursor keys are hashes, never a path; an old full-path key
+    /// moves to its hash once and its calls are not counted again.
+    func testCursorKeysAreHashedAndOldPathKeysMigrate() {
+        let url = write([line(name: "mcp__skill-librarian__librarian_find")])
+        let reader = ClaudeCodeUsageReader(root: root)
+        let (_, cursor) = reader.read(since: .empty, knownServers: [])
+        for key in cursor.values.keys + Array(cursor.newest.keys) {
+            XCTAssertTrue(key.hasPrefix("cc:"), "no path in the cursor")
+            XCTAssertFalse(key.contains("mcpock.tests"))
+        }
+        XCTAssertFalse(cursor.values.isEmpty)
+
+        // An old cursor, keyed by the full path the enumerator produced, plus
+        // a leftover for a transcript that is gone.
+        let hashed = cursor.values.keys.first!
+        var old = UsageCursor.empty
+        old.values["/gone/project/x.jsonl"] = 10
+        old.newest["/gone/project/x.jsonl"] = 10
+        for path in [url.path, url.resolvingSymlinksInPath().path, "/private" + url.path] {
+            old.values[path] = cursor.values[hashed]
+        }
+        let (events, migrated) = reader.read(since: old, knownServers: [])
+        XCTAssertTrue(events.isEmpty, "already read: not counted twice")
+        XCTAssertEqual(migrated.values[hashed], cursor.values[hashed])
+        XCTAssertTrue(migrated.values.keys.allSatisfy { $0.hasPrefix("cc:") })
+        XCTAssertTrue(migrated.newest.keys.allSatisfy { $0.hasPrefix("cc:") })
+    }
+
     /// r3 394d: a damaged cursor with a negative offset must not trap.
     func testNegativeStoredOffsetIsClampedToStart() {
         let url = write([line(name: "mcp__skill-librarian__librarian_find")])
