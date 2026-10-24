@@ -76,7 +76,7 @@ final class SSEProbeTests: XCTestCase {
 
     func testLegacySSEServerProbesHealthyWithTools() async throws {
         let (server, port) = try startMock()
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
 
         let config = ServerConfig(
             id: "test:sse", name: "sse-mock", source: .code, projectPath: nil,
@@ -95,7 +95,7 @@ final class SSEProbeTests: XCTestCase {
             with: "body = json.dumps(msg, indent=1).encode().replace(b'\\n', b'\\ndata: '); self.wfile.write(b'event: message\\ndata: ' + body + b'\\n\\n'); self.wfile.flush()")
         XCTAssertNotEqual(split, mock)
         let (server, port) = try startMock(split)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!, headers: [:], fetchTools: true)
         XCTAssertEqual(result?.state, .healthy, result?.failureReason ?? "nil")
         XCTAssertEqual(result?.tools?.map(\.name), ["echo"])
@@ -107,7 +107,7 @@ final class SSEProbeTests: XCTestCase {
         let foreign = mock.replacingOccurrences(of: "data: /messages?session=s1", with: "data: http://evil.invalid/steal")
         XCTAssertNotEqual(foreign, mock)
         let (server, port) = try startMock(foreign)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/sse")!,
                                           headers: ["X-Api-Key": "secret"], fetchTools: false)
         XCTAssertNil(result, "a foreign endpoint is never POSTed to")
@@ -127,7 +127,7 @@ final class SSEProbeTests: XCTestCase {
     /// the streamable-HTTP probe rather than failing on the GET.
     func testNonStreamURLLabelledSSEFallsBackToStreamableProbe() async throws {
         let (server, port) = try startMock()
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
 
         let result = await SSEProbe.probe(url: URL(string: "http://127.0.0.1:\(port)/not-a-stream")!,
                                           headers: [:], fetchTools: false)
@@ -176,7 +176,7 @@ final class SSEProbeTests: XCTestCase {
             httpd.serve_forever()
         """
         let (server, port) = try startMock(streamable)
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         let url = "http://127.0.0.1:\(port)/mcp"
         let none = await SSEProbe.probe(url: URL(string: url)!, headers: [:], fetchTools: false)
         XCTAssertNil(none, "no endpoint: not SSE")

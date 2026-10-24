@@ -189,7 +189,7 @@ final class AkaSourceTests: XCTestCase {
         let out = Pipe()
         server.standardOutput = out
         try server.run()
-        defer { server.terminate(); server.waitUntilExit() }
+        defer { server.stopForTest() }
         var buffer = Data()
         while !buffer.contains(UInt8(ascii: "\n")) {
             let chunk = out.fileHandleForReading.availableData

@@ -189,7 +189,7 @@ final class HeadersHelperTests: XCTestCase {
         process.standardOutput = out
         process.standardError = Pipe()
         try process.run()
-        defer { process.terminate(); process.waitUntilExit() }
+        defer { process.stopForTest() }
         let line = out.fileHandleForReading.availableData
         let port = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertFalse(port.isEmpty)
@@ -243,7 +243,7 @@ final class HeadersHelperTests: XCTestCase {
         process.standardOutput = out
         process.standardError = Pipe()
         try process.run()
-        defer { process.terminate(); process.waitUntilExit() }
+        defer { process.stopForTest() }
         let port = String(decoding: out.fileHandleForReading.availableData, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
