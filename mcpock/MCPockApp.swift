@@ -77,7 +77,9 @@ struct MCPockApp: App {
         // Grok Bot is listed once installed, even with no servers (1.12.1).
         if !isHostingTests && !isDemo {
             monitor.findInstalledEmptyAgents = {
-                await Task.detached(priority: .utility) { AgentRegistry.installedEmptyAgents() }.value
+                let installed = await Task.detached(priority: .utility) { AgentRegistry.installedEmptyAgents() }.value
+                // aka asked for access (1.12.2): listed, calm, until it gives mcpock a token.
+                return installed + (AkaSource.needsAccess ? [AkaSource.label] : [])
             }
         }
         // Servers start with the login shell's PATH and keys, like an agent

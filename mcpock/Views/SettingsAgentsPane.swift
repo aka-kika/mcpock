@@ -112,7 +112,7 @@ struct SettingsAgentsPane: View {
                         .foregroundStyle(theme.textTertiary)
                 }
                 if entry.serverCount == 0, let line = AgentRegistry.listedWhenEmpty[entry.agent] {
-                    Text("\(AgentRegistry.noServersYet). \(line)")
+                    Text("\(AgentRegistry.emptyStatus(for: entry.agent)). \(line)")
                         .font(Theme.caption)
                         .foregroundStyle(theme.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)

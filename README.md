@@ -249,7 +249,8 @@ but never started. **aka** keeps its servers in its own database, so mcpock
 asks aka's local helper for the list (only when aka itself is the program on
 that port) and starts each server the way aka does;
 because aka launches servers its own way, it never counts toward "set up
-differently". **Tinycast** keeps its servers in its own settings and their
+differently". If aka asks for access before listing its servers (a newer aka
+wants a token mcpock does not have yet), aka shows as **Needs access**. **Tinycast** keeps its servers in its own settings and their
 keys and sign-ins in its own Keychain items, which mcpock never reads: a
 Tinycast server that needs one shows as managed by its app, the others are
 checked like any other. **Grok Bot** keeps its servers in your xAI account
@@ -333,7 +334,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-809 unit tests at v1.12.1. They cover the
+811 unit tests at v1.12.2. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's

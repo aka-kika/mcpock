@@ -69,4 +69,31 @@ final class ServerlessAgentTests: XCTestCase {
         let monitor = HealthMonitor(defaults: defaults, isUpdate: false)
         XCTAssertEqual(monitor.serverlessAgents, [])
     }
+
+    // MARK: - aka asks for access (1.12.2)
+
+    func testA401Or403FromAkaMeansNeedsAccessNotNoServers() {
+        XCTAssertNil(AkaSource.answer(statusCode: 401, data: nil, bun: "bun"))
+        XCTAssertNil(AkaSource.answer(statusCode: 403, data: Data("{}".utf8), bun: "bun"))
+        XCTAssertEqual(AkaSource.answer(statusCode: 500, data: nil, bun: "bun")?.count, 0)
+        XCTAssertEqual(AkaSource.answer(statusCode: nil, data: nil, bun: "bun")?.count, 0, "aka not running: no row")
+        let json = Data(#"{"servers": [{"name": "md", "path": "mcp-md", "enabled": true}]}"#.utf8)
+        XCTAssertEqual(AkaSource.answer(statusCode: 200, data: json, bun: "bun")?.map(\.name), ["md"])
+    }
+
+    func testAkaNeedingAccessIsListedCalmly() {
+        let sections = AgentSections.build(groups: HealthMonitor.groupByName([cursorRow("docs")]),
+                                           emptyAgents: [AkaSource.label])
+        let aka = sections.first { $0.agent == "aka" }
+        XCTAssertNotNil(aka)
+        XCTAssertEqual(aka.map(AgentSections.problemText), "Needs access")
+        XCTAssertEqual(aka?.problems.count, 0, "calm, not red")
+        XCTAssertEqual(aka?.emptyLine, "aka asked for access before listing its servers, so mcpock can't show them yet.")
+        XCTAssertEqual(sections.last?.agent, "aka", "still last")
+        XCTAssertEqual(AgentSections.compactSummary(sections), "2 agents, all fine")
+        let entries = SettingsAgentsPane.entries(from: [], emptyAgents: [AkaSource.label])
+        XCTAssertEqual(entries.map(\.agent), ["aka"])
+        XCTAssertEqual(AgentRegistry.emptyStatus(for: "aka"), "Needs access")
+        XCTAssertEqual(AgentRegistry.emptyStatus(for: "Grok Bot"), "No servers yet")
+    }
 }

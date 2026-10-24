@@ -247,7 +247,7 @@ enum AgentSections {
     static func problemText(_ section: AgentSection) -> String {
         let count = section.problems.count
         if count == 0 {
-            if section.emptyLine != nil { return AgentRegistry.noServersYet }
+            if section.emptyLine != nil { return AgentRegistry.emptyStatus(for: AgentBadge.agentName(fromLabel: section.agent)) }
             if section.checkingCount > 0 { return "Checking\u{2026}" }
             // Only waiting for its closed app (or a ${VAR}): say so calmly
             // instead of "All fine" (open loop from 2026-10-16).

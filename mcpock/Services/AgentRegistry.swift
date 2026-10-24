@@ -46,10 +46,21 @@ enum AgentRegistry {
     /// usual case, not an agent that isn't there.
     static let listedWhenEmpty: [String: String] = [
         grokBotLabel: "Grok Bot's servers live in your xAI account and run in xAI's cloud.",
+        AkaSource.label: akaNeedsAccessLine,
     ]
 
     /// What such an agent says beside its name while it has none.
     static let noServersYet = "No servers yet"
+
+    /// 1.12.2: aka answers 401 or 403 (`AkaSource.needsAccess`): listed with
+    /// this word and line instead, calm, never "no servers".
+    static let akaNeedsAccess = "Needs access"
+    static let akaNeedsAccessLine = "aka asked for access before listing its servers, so mcpock can't show them yet."
+
+    /// The word beside a serverless agent's name.
+    static func emptyStatus(for agent: String) -> String {
+        agent == AkaSource.label ? akaNeedsAccess : noServersYet
+    }
 
     /// What shows each of those is installed: its app or its own folder.
     static var installMarkers: [String: [String]] {

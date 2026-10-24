@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import os
 import Security
 
 /// aka (a desktop agent app, round 5) keeps its MCP servers in its own database,
@@ -49,17 +50,42 @@ enum AkaSource {
         endpoint: URL = AkaSource.endpoint,
         listenerIsAka: @Sendable () -> Bool = { AkaListener.isAka(port: AkaSource.endpoint.port ?? 6464) }
     ) async -> [ServerConfig] {
-        guard listenerIsAka() else { return [] }
+        guard listenerIsAka() else {
+            lastAnswerNeedsAccess.withLock { $0 = false }
+            return []
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
         configuration.urlCache = nil
         let session = URLSession(configuration: configuration)
         defer { session.finishTasksAndInvalidate() }
-        guard let (data, response) = try? await session.data(from: endpoint),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return [] }
-        return configs(fromJSON: data)
+        let reply = try? await session.data(from: endpoint)
+        let status = (reply?.1 as? HTTPURLResponse)?.statusCode
+        let result = answer(statusCode: status, data: reply?.0)
+        lastAnswerNeedsAccess.withLock { $0 = result == nil }
+        return result ?? []
     }
+
+    /// 1.12.2: aka's coming update asks for a token on this endpoint and
+    /// answers 401 (or 403) without one. mcpock has no token yet (it comes with
+    /// aka's read-only token, `docs/inbox/2026-10-24-aka-needs-access.md`), so
+    /// such an answer lists aka as "Needs access" instead of quietly showing no
+    /// aka servers. nil means that answer; no reply or any other status is no
+    /// servers, as before.
+    static func answer(statusCode: Int?, data: Data?, bun: String = AkaSource.bunCommand()) -> [ServerConfig]? {
+        switch statusCode {
+        case 200: return data.map { configs(fromJSON: $0, bun: bun) } ?? []
+        case 401, 403: return nil
+        default: return []
+        }
+    }
+
+    /// Whether aka's last answer asked for access (`answer` returned nil).
+    /// Read after each discovery by the agents listed without servers.
+    static let lastAnswerNeedsAccess = OSAllocatedUnfairLock(initialState: false)
+
+    static var needsAccess: Bool { lastAnswerNeedsAccess.withLock { $0 } }
 
     /// The payload mapped onto configs labelled "aka". Pure apart from `bun`,
     /// which tests replace.

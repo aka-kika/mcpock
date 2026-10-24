@@ -80,6 +80,7 @@ card is open).
 | `Services/AkaSource.swift` | aka keeps servers in a database, not a file: `GET http://127.0.0.1:6464/api/mcp/servers`, then launches each the way aka does (`bun x`, `python`, `bun run`). Asked only when `AkaListener` finds aka itself on the port (the user's process, inside an app validly signed as `ai.pipali`, or an aka source folder) |
 | `Services/ConfigShape.swift` (`GrokBotConfig`) | 1.12: Grok Bot's `~/.grokbot/settings.json` `mcpBoxServers` names become `builtin` rows with no command (they run in xAI's cloud); `AgentRegistry.cloudHosts` gives the row's "Runs in xAI's cloud" wording |
 | `AgentRegistry.installedEmptyAgents` / `HealthMonitor.serverlessAgents` | 1.12.1: Grok Bot is listed once installed (its app or `~/.grokbot`), with no servers: `AgentSections.build(emptyAgents:)` and `SettingsAgentsPane.entries(emptyAgents:)` add it with `AgentRegistry.listedWhenEmpty`'s line |
+| `AkaSource.answer` / `AkaSource.needsAccess` | 1.12.2: a 401 or 403 from aka's sidecar lists aka without servers as "Needs access" (calm), through the same serverless-agent path; token handling waits for aka's read-only token (`docs/inbox/2026-10-24-aka-needs-access.md`) |
 
 ### Probing
 
