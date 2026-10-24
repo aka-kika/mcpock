@@ -67,7 +67,13 @@ enum StdioProbe {
             let initMsg = try MCPJSONRPC.encodeLine(MCPJSONRPC.initializeRequest(id: 1))
             try process.write(initMsg)
 
-            let initResponse = try await readResponse(from: process, id: 1, deadline: deadline, limit: timeout)
+            var initResponse = try await readResponse(from: process, id: 1, deadline: deadline, limit: timeout)
+            // A server that refuses our protocol version names the one it speaks:
+            // ask once more with it (r3 a1f3).
+            if let retry = MCPJSONRPC.retryVersion(after: initResponse, sent: MCPJSONRPC.protocolVersion) {
+                try process.write(MCPJSONRPC.encodeLine(MCPJSONRPC.initializeRequest(id: 1, protocolVersion: retry)))
+                initResponse = try await readResponse(from: process, id: 1, deadline: deadline, limit: timeout)
+            }
             try MCPJSONRPC.validateInitializeResponse(initResponse)
 
             // notifications/initialized

@@ -2,6 +2,10 @@ import Foundation
 
 enum HTTPProbe {
     static let probeTimeout: TimeInterval = 10
+    /// The initialized notice and the closing DELETE are best-effort: a server
+    /// that sits on them must not add a full probe timeout each (Argon 2026-10-16 #14).
+    static let notificationTimeout: TimeInterval = 3
+    static let closeTimeout: TimeInterval = 2
 
     /// Probe an HTTP/SSE MCP server via JSON-RPC POST.
     static func probe(config: ServerConfig, fetchTools: Bool) async -> ProbeResult {
@@ -45,6 +49,11 @@ enum HTTPProbe {
             )
         }
 
+        // One budget for the whole probe: the SSE attempt, a fall-through to the
+        // streamable path, each request in it. Before, every step had its own 10 s
+        // and a slow server took 25 to 50 s (Argon 2026-10-16 #14).
+        let deadline = ContinuousClock.now + .seconds(probeTimeout)
+
         // Legacy SSE transport: a GET opens the event stream and announces a POST
         // endpoint; responses arrive on the stream. Posting JSON-RPC straight to the
         // stream URL (what the streamable path does) answers 405 or hangs, so every
@@ -52,7 +61,7 @@ enum HTTPProbe {
         // servers as `sse`, so a URL that doesn't serve an event stream falls
         // through to the streamable probe below.
         if config.transport == .sse,
-           let sse = await SSEProbe.probe(url: url, headers: config.headers, fetchTools: fetchTools) {
+           let sse = await SSEProbe.probe(url: url, headers: config.headers, fetchTools: fetchTools, deadline: deadline) {
             return sse
         }
 
@@ -62,15 +71,15 @@ enum HTTPProbe {
 
         let result: ProbeResult
         do {
-            let initBody = try MCPJSONRPC.encode(MCPJSONRPC.initializeRequest(id: 1))
-            let (initResponse, sessionId) = try await postJSON(url: url, body: initBody, headers: config.headers)
+            let (initResponse, sessionId, version) = try await initialize(
+                url: url, headers: config.headers, deadline: deadline)
             try MCPJSONRPC.validateInitializeResponse(initResponse)
 
             // Streamable-HTTP servers assign an Mcp-Session-Id on initialize and reject
             // follow-up requests that omit it. Replay it plus the negotiated protocol version.
             var headers = config.headers
             if headers["MCP-Protocol-Version"] == nil {
-                headers["MCP-Protocol-Version"] = MCPJSONRPC.protocolVersion
+                headers["MCP-Protocol-Version"] = version
             }
             if let sessionId {
                 headers["Mcp-Session-Id"] = sessionId
@@ -79,13 +88,16 @@ enum HTTPProbe {
 
             // Best-effort initialized notification (some servers require it)
             if let notifyBody = try? MCPJSONRPC.encode(MCPJSONRPC.initializedNotification()) {
-                _ = try? await postJSON(url: url, body: notifyBody, headers: headers, expectResponse: false)
+                _ = try? await postJSON(
+                    url: url, body: notifyBody, headers: headers, deadline: deadline, expectResponse: false,
+                    timeout: notificationTimeout
+                )
             }
 
             var tools: [MCPToolInfo]?
             if fetchTools {
                 let toolsBody = try MCPJSONRPC.encode(MCPJSONRPC.toolsListRequest(id: 2))
-                let (toolsResponse, _) = try await postJSON(url: url, body: toolsBody, headers: headers)
+                let (toolsResponse, _) = try await postJSON(url: url, body: toolsBody, headers: headers, deadline: deadline)
                 tools = try MCPJSONRPC.parseTools(from: toolsResponse)
             }
 
@@ -109,9 +121,47 @@ enum HTTPProbe {
         return result
     }
 
+    /// `initialize`, asked once more with the version a refusing server names
+    /// (r3 a1f3). The refusal may come as a JSON-RPC error in a 200 or in the
+    /// body of a 4xx. Returns the answer, the session id and the version the
+    /// probe settled on.
+    private static func initialize(
+        url: URL, headers: [String: String], deadline: ContinuousClock.Instant
+    ) async throws -> (json: [String: Any], sessionId: String?, version: String) {
+        func attempt(_ version: String) async throws -> (json: [String: Any], sessionId: String?) {
+            let body = try MCPJSONRPC.encode(
+                MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID, protocolVersion: version))
+            return try await postJSON(url: url, body: body, headers: headers, deadline: deadline)
+        }
+        let first: (json: [String: Any], sessionId: String?)
+        do {
+            first = try await attempt(MCPJSONRPC.protocolVersion)
+        } catch ProbeError.httpError(let status, let body) {
+            guard let json = try? MCPJSONRPC.parseJSONObject(Data(body.utf8)),
+                  let retry = MCPJSONRPC.retryVersion(after: json, sent: MCPJSONRPC.protocolVersion)
+            else { throw ProbeError.httpError(status, body) }
+            let second = try await attempt(retry)
+            return (second.json, second.sessionId, MCPJSONRPC.negotiatedVersion(second.json, sent: retry))
+        }
+        if let retry = MCPJSONRPC.retryVersion(after: first.json, sent: MCPJSONRPC.protocolVersion) {
+            let second = try await attempt(retry)
+            return (second.json, second.sessionId, MCPJSONRPC.negotiatedVersion(second.json, sent: retry))
+        }
+        return (first.json, first.sessionId, MCPJSONRPC.negotiatedVersion(first.json, sent: MCPJSONRPC.protocolVersion))
+    }
+
+    /// A request's timeout: what is left of the probe's budget, at most `cap`.
+    /// Nothing left is a timeout already.
+    static func timeoutInterval(until deadline: ContinuousClock.Instant, cap: TimeInterval) throws -> TimeInterval {
+        let left = deadline - ContinuousClock.now
+        guard left > .zero else { throw URLError(.timedOut) }
+        let seconds = Double(left.components.seconds) + Double(left.components.attoseconds) / 1e18
+        return min(cap, seconds)
+    }
+
     /// Best-effort session teardown; errors are irrelevant to the probe verdict.
     private static func closeSession(url: URL, headers: [String: String]) async {
-        var request = URLRequest(url: url, timeoutInterval: 5)
+        var request = URLRequest(url: url, timeoutInterval: closeTimeout)
         request.httpMethod = "DELETE"
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
@@ -120,12 +170,13 @@ enum HTTPProbe {
     }
 
     /// A slow-starting or momentarily-unreachable HTTP server is transient (smoothed to amber);
-    /// an explicit protocol/HTTP error is definitive.
+    /// an explicit protocol/HTTP error is definitive. A refused connection is
+    /// definitive too: nothing listens, which is not slow (r3 a9ec).
     static func isTransient(_ error: Error) -> Bool {
         if let probeError = error as? ProbeError { return probeError.isTransient }
         if let urlError = error as? URLError {
             switch urlError.code {
-            case .timedOut, .cannotConnectToHost, .networkConnectionLost, .notConnectedToInternet:
+            case .timedOut, .networkConnectionLost, .notConnectedToInternet:
                 return true
             default:
                 return false
@@ -139,16 +190,20 @@ enum HTTPProbe {
         url: URL,
         body: Data,
         headers: [String: String],
-        expectResponse: Bool = true
+        deadline: ContinuousClock.Instant,
+        expectResponse: Bool = true,
+        timeout: TimeInterval = probeTimeout
     ) async throws -> (json: [String: Any], sessionId: String?) {
-        var request = URLRequest(url: url, timeoutInterval: probeTimeout)
+        var request = URLRequest(url: url, timeoutInterval: try timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
+        // Set last: a config's own Accept or Content-Type would make a streamable
+        // server answer 406 to the probe's body (r3 3c71).
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
 
         // Streamed, not `data(for:)`: a Streamable-HTTP server may answer on an
         // event stream it keeps open, and waiting for its end timed out every
@@ -159,9 +214,7 @@ enum HTTPProbe {
             throw ProbeError.protocolError("Invalid HTTP response")
         }
         // The request's timeout only covers silence; a stream that keeps
-        // talking without ever answering stops here.
-        let deadline = ContinuousClock.now + .seconds(probeTimeout)
-
+        // talking without ever answering stops at the shared deadline.
         let sessionId = http.value(forHTTPHeaderField: "Mcp-Session-Id")
 
         if !(200...299).contains(http.statusCode) {
@@ -209,7 +262,7 @@ enum HTTPProbe {
 
     /// The whole body, at most `limit` bytes: past it, the cut text (an error
     /// page) or an error (an answer too large to be real).
-    private static func collect(
+    static func collect(
         _ bytes: URLSession.AsyncBytes, limit: Int, deadline: ContinuousClock.Instant, throwsOverLimit: Bool = true
     ) async throws -> Data {
         var data = Data()
@@ -219,7 +272,9 @@ enum HTTPProbe {
                 if throwsOverLimit { throw ProbeError.protocolError("Message too large") }
                 break
             }
-            if data.count % 4096 == 0, ContinuousClock.now > deadline { throw URLError(.timedOut) }
+            // Every byte, not every 4096th: a server dripping one byte at a
+            // time kept this loop alive for about an hour (r3 3e24).
+            if ContinuousClock.now > deadline { throw URLError(.timedOut) }
         }
         return data
     }

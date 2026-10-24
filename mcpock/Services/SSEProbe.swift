@@ -20,10 +20,13 @@ enum SSEProbe {
     /// answer to the GET, or a stream that never announces an endpoint) — the
     /// caller then tries the streamable-HTTP probe instead, because configs
     /// routinely label streamable servers `sse`.
-    static func probe(url: URL, headers: [String: String], fetchTools: Bool) async -> ProbeResult? {
-        var request = URLRequest(url: url, timeoutInterval: 10)
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+    static func probe(
+        url: URL, headers: [String: String], fetchTools: Bool,
+        deadline: ContinuousClock.Instant = ContinuousClock.now + probeTimeout
+    ) async -> ProbeResult? {
+        var request = URLRequest(url: url, timeoutInterval: (try? HTTPProbe.timeoutInterval(until: deadline, cap: 10)) ?? 0.001)
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")   // last, as in HTTPProbe (r3 3c71)
 
         let bytes: URLSession.AsyncBytes
         let response: URLResponse
@@ -52,12 +55,15 @@ enum SSEProbe {
         do {
             let result = try await withThrowingTaskGroup(of: ProbeResult.self) { group in
                 group.addTask {
-                    try await handshake(stream: bytes, base: url, headers: headers, fetchTools: fetchTools, endpoint: endpoint)
+                    try await handshake(
+                        stream: bytes, base: url, headers: headers, fetchTools: fetchTools, endpoint: endpoint,
+                        deadline: deadline
+                    )
                 }
                 group.addTask {
-                    try await Task.sleep(for: endpointTimeout)
+                    try await Task.sleep(for: min(endpointTimeout, deadline - ContinuousClock.now))
                     if !endpoint.seen { throw ProbeError.protocolError("SSE stream sent no endpoint event") }
-                    try await Task.sleep(for: probeTimeout - endpointTimeout)
+                    try await Task.sleep(until: deadline, clock: .continuous)
                     throw ProbeError.timeout(probeTimeout)
                 }
                 let first = try await group.next()!
@@ -94,7 +100,8 @@ enum SSEProbe {
     }
 
     private static func handshake(
-        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool, endpoint seen: EndpointSeen
+        stream: URLSession.AsyncBytes, base: URL, headers: [String: String], fetchTools: Bool, endpoint seen: EndpointSeen,
+        deadline: ContinuousClock.Instant
     ) async throws -> ProbeResult {
         var lines = stream.lines.makeAsyncIterator()
 
@@ -109,13 +116,25 @@ enum SSEProbe {
         // 2026-10-20, 7676).
         guard isSameOrigin(endpoint, as: base) else { throw ForeignEndpoint() }
 
-        try await post(MCPJSONRPC.initializeRequest(id: 1), to: endpoint, headers: headers)
-        try MCPJSONRPC.validateInitializeResponse(try await nextResponse(&lines, id: 1))
-        try await post(MCPJSONRPC.initializedNotification(), to: endpoint, headers: headers)
+        try await post(MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID), to: endpoint, headers: headers, deadline: deadline)
+        var initResponse = try await nextResponse(&lines, id: MCPJSONRPC.initializeID)
+        // A server that refuses our protocol version names the one it speaks:
+        // ask once more with it (r3 a1f3).
+        if let retry = MCPJSONRPC.retryVersion(after: initResponse, sent: MCPJSONRPC.protocolVersion) {
+            try await post(
+                MCPJSONRPC.initializeRequest(id: MCPJSONRPC.initializeID, protocolVersion: retry),
+                to: endpoint, headers: headers, deadline: deadline)
+            initResponse = try await nextResponse(&lines, id: MCPJSONRPC.initializeID)
+        }
+        try MCPJSONRPC.validateInitializeResponse(initResponse)
+        try await post(
+            MCPJSONRPC.initializedNotification(), to: endpoint, headers: headers, deadline: deadline,
+            timeout: HTTPProbe.notificationTimeout
+        )
 
         var tools: [MCPToolInfo]?
         if fetchTools {
-            try await post(MCPJSONRPC.toolsListRequest(id: 2), to: endpoint, headers: headers)
+            try await post(MCPJSONRPC.toolsListRequest(id: 2), to: endpoint, headers: headers, deadline: deadline)
             tools = try MCPJSONRPC.parseTools(from: try await nextResponse(&lines, id: 2))
         }
         return ProbeResult(state: .healthy, failureReason: nil, tools: tools)
@@ -125,14 +144,56 @@ enum SSEProbe {
     private struct ForeignEndpoint: Error {}
 
     /// Same scheme (http or https), host and port as the configured URL.
+    /// localhost, 127.0.0.1 and ::1 count as one host: a local server often
+    /// announces its endpoint under another name than the config uses (r3 d0d1).
     static func isSameOrigin(_ endpoint: URL, as base: URL) -> Bool {
         guard let scheme = endpoint.scheme?.lowercased(), ["http", "https"].contains(scheme),
               scheme == base.scheme?.lowercased(),
               let host = endpoint.host, let baseHost = base.host,
-              host.caseInsensitiveCompare(baseHost) == .orderedSame
+              canonicalHost(host) == canonicalHost(baseHost)
         else { return false }
         let defaultPort = scheme == "https" ? 443 : 80
         return (endpoint.port ?? defaultPort) == (base.port ?? defaultPort)
+    }
+
+    private static func canonicalHost(_ host: String) -> String {
+        let lower = host.lowercased()
+        return ["localhost", "127.0.0.1", "::1"].contains(lower) ? "localhost" : lower
+    }
+
+    /// The most a message split over `data:` lines may grow while waiting for
+    /// its closing brace. Past it the text goes out as it is (it will not parse
+    /// and is skipped), so a stream that never closes cannot grow without end.
+    /// A real tools list, pretty-printed, can be a few hundred KB.
+    static let maxJoinedBytes = 1024 * 1024
+
+    /// Follows `{` and `}` (and brackets) through text a line at a time,
+    /// ignoring those inside strings, so a split message is known to be
+    /// complete without parsing it again.
+    struct BraceScanner {
+        private var depth = 0
+        private var inString = false
+        private var escaped = false
+
+        var isOpen: Bool { depth > 0 }
+
+        mutating func feed(_ text: Substring) {
+            for byte in text.utf8 {
+                if inString {
+                    if escaped { escaped = false } else if byte == 0x5C { escaped = true } else if byte == 0x22 { inString = false }
+                    continue
+                }
+                switch byte {
+                case 0x22: inString = true
+                case 0x7B, 0x5B: depth += 1
+                case 0x7D, 0x5D: depth = max(0, depth - 1)
+                default: break
+                }
+            }
+            // A raw newline cannot sit inside a JSON string: one still open here is malformed.
+            inString = false
+            escaped = false
+        }
     }
 
     /// One parsed SSE event: `event:` name (default `message`) and its `data:` line.
@@ -146,11 +207,15 @@ enum SSEProbe {
     /// `AsyncLineSequence` swallows the blank lines that delimit SSE events, so an
     /// event is taken as complete at its `data:` line; the `event:` line before it
     /// names it. A message whose JSON is split over several `data:` lines is
-    /// joined with newlines, as SSE says, until it reads as one JSON object
-    /// (review 2026-10-20, 8c5b; the HTTP probe's streamed answers do the same).
+    /// joined with newlines, as SSE says, until its braces close (review
+    /// 2026-10-20, 8c5b). Each line is scanned once and the pieces are joined
+    /// once: re-parsing the growing text on every line burned a core on a
+    /// chatty stream (r3 669e).
     private static func nextEvent(_ lines: inout Lines, named wanted: String? = nil) async throws -> Event? {
         var name = "message"
-        var pending: String?
+        var pending: [Substring] = []
+        var pendingBytes = 0
+        var scanner = BraceScanner()
         while let line = try await lines.next() {
             if line.isEmpty || line.hasPrefix(":") { continue }   // keep-alive / comment
             guard let colon = line.firstIndex(of: ":") else { continue }
@@ -160,18 +225,22 @@ enum SSEProbe {
             switch field {
             case "event":
                 name = String(value)
-                pending = nil
+                pending = []
+                pendingBytes = 0
+                scanner = BraceScanner()
             case "data":
-                let data = pending.map { $0 + "\n" + value } ?? String(value)
+                pending.append(value)
+                pendingBytes += value.utf8.count + 1
                 // The endpoint is plain text on one line; a message is JSON.
-                if name != "endpoint", (try? MCPJSONRPC.parseJSONObject(Data(data.utf8))) == nil,
-                   data.utf8.count <= MCPMessageBuffer.maxBodyBytes {
-                    pending = data
-                    continue
+                if name != "endpoint" {
+                    scanner.feed(value)
+                    if scanner.isOpen, pendingBytes <= maxJoinedBytes { continue }
                 }
-                let event = Event(name: name, data: data)
+                let event = Event(name: name, data: pending.joined(separator: "\n"))
                 name = "message"
-                pending = nil
+                pending = []
+                pendingBytes = 0
+                scanner = BraceScanner()
                 if wanted == nil || event.name == wanted { return event }
             default:
                 break
@@ -192,12 +261,15 @@ enum SSEProbe {
 
     /// POST one JSON-RPC message to the announced endpoint; the answer (if any)
     /// comes back on the stream, so only the status code matters here.
-    private static func post(_ message: [String: Any], to endpoint: URL, headers: [String: String]) async throws {
-        var request = URLRequest(url: endpoint, timeoutInterval: 10)
+    private static func post(
+        _ message: [String: Any], to endpoint: URL, headers: [String: String],
+        deadline: ContinuousClock.Instant, timeout: TimeInterval = 10
+    ) async throws {
+        var request = URLRequest(url: endpoint, timeoutInterval: try HTTPProbe.timeoutInterval(until: deadline, cap: timeout))
         request.httpMethod = "POST"
         request.httpBody = try MCPJSONRPC.encode(message)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await ProbeSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ProbeError.protocolError("Invalid HTTP response")
