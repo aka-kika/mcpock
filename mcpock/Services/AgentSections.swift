@@ -247,9 +247,18 @@ enum AgentSections {
                 let waiting = section.servers.allSatisfy { $0.state != .paused || $0.note == ShortReason.waitingNote }
                 return waiting ? "Waiting for your OK" : "Paused"
             }
+            // Never checked by mcpock, so never "All fine" (seen in the VM, 1.12).
+            if unchecked(section) {
+                return AgentRegistry.cloudHost(forAgents: [section.agent]).map { "In \($0)" } ?? "Runs inside its app"
+            }
             return "All fine"
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
+    }
+
+    /// Every server runs inside its app or in the cloud: none was checked.
+    static func unchecked(_ section: AgentSection) -> Bool {
+        !section.servers.isEmpty && section.servers.allSatisfy { $0.state == .selfManaged }
     }
 
     /// "+N more / Show less" for an open agent's server list: only
@@ -305,6 +314,12 @@ enum AgentSections {
             return more + "\(checking) not checked yet" + pausedPart
         }
         if section.problems.isEmpty {
+            if unchecked(section) {
+                let n = section.servers.count
+                let place = AgentRegistry.cloudHost(forAgents: [section.agent]).map { "in \($0)" } ?? "inside its app"
+                return n == 1 ? "Its only server runs \(place), so mcpock doesn't check it"
+                    : "All \(n) servers run \(place), so mcpock doesn't check them"
+            }
             if rest == 0, paused == 0, waiting > 0 {
                 return waiting == 1 ? "Its only server is waiting" : "All \(waiting) servers are waiting"
             }

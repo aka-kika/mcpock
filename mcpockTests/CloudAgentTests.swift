@@ -55,6 +55,22 @@ final class CloudAgentTests: XCTestCase {
         XCTAssertEqual(AgentBadge.forLabel("Grok Bot").monogram, "GB")
     }
 
+    /// Seen in the VM: Grok Bot read "All fine" and "All 2 servers answer
+    /// normally", though mcpock checks none of them.
+    func testAGrokBotAgentNeverReadsAllFine() {
+        let rows = ["linear", "github"].map {
+            ServerSnapshot(config: ServerConfig(id: "reg:Grok Bot:global:\($0)", name: $0,
+                                                source: ServerSource(label: "Grok Bot", path: "/u/.grokbot/settings.json"),
+                                                projectPath: nil, transport: .stdio, command: nil, args: [], env: [:],
+                                                url: nil, headers: [:], builtin: true),
+                           state: .selfManaged)
+        }
+        let section = AgentSections.build(groups: HealthMonitor.groupByName(rows)).first { $0.agent == "Grok Bot" }!
+        XCTAssertEqual(AgentSections.problemText(section), "In xAI's cloud")
+        XCTAssertEqual(AgentSections.restText(section), "All 2 servers run in xAI's cloud, so mcpock doesn't check them")
+        XCTAssertEqual(section.servers.first?.note, "Runs in xAI's cloud")
+    }
+
     func testTheSetupPromptSkipsGrokBot() {
         let lines = ConnectSnippets.agentLines(AgentRegistry.known, home: NSHomeDirectory())
         XCTAssertTrue(lines.contains("- Grok Bot: skip it; its servers run in xAI's cloud, not on this Mac"))
