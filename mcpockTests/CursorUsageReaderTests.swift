@@ -56,6 +56,11 @@ final class CursorUsageReaderTests: XCTestCase {
             XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
         }
 
+        /// A row whose value is not JSON at all (a damaged or foreign row).
+        func putRaw(key: String, value: String) {
+            exec("INSERT INTO cursorDiskKV (key, value) VALUES ('\(key)', '\(value)');")
+        }
+
         private static func bubbleJSON(name: String?, status: String?, createdAt: String) -> String {
             var toolFormerData = "null"
             if let name {
@@ -273,6 +278,21 @@ final class CursorUsageReaderTests: XCTestCase {
         let result = CursorUsageReader(databasePath: path).read(since: .empty, knownServers: [])
         XCTAssertEqual(result.events.count, 1)
         XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 3)
+    }
+
+    /// r3 6c1d: one non-JSON row must not stop the scan, and reading in
+    /// small batches finds every call, with the cursor at the table's end.
+    func testNonJSONRowDoesNotStopTheScanAndBatchesCoverEveryRow() {
+        let path = root.appendingPathComponent("state.vscdb").path
+        let fixture = Fixture(at: path)
+        fixture.putBubble(key: "bubbleId:c:1", name: "mcp-serverone-a", status: "completed", createdAt: "2026-09-20T10:00:00.000Z")
+        fixture.putRaw(key: "bubbleId:c:bad", value: "not json {")
+        fixture.putBubble(key: "bubbleId:c:2", name: "mcp-servertwo-a", status: "completed", createdAt: "2026-09-20T10:00:01.000Z")
+        fixture.putBubble(key: "bubbleId:c:3", name: "mcp-serverone-b", status: "completed", createdAt: "2026-09-20T10:00:02.000Z")
+        fixture.putBubble(key: "bubbleId:c:4", name: "mcp-servertwo-b", status: "completed", createdAt: "2026-09-20T10:00:03.000Z")
+        let result = CursorUsageReader(databasePath: path, batchSize: 2).read(since: .empty, knownServers: [])
+        XCTAssertEqual(result.events.map(\.server), ["serverone", "servertwo", "serverone", "servertwo"])
+        XCTAssertEqual(result.cursor.values[CursorUsageReader.cursorKey], 5)
     }
 
     /// A missing database is not an error: no events, same cursor back.
