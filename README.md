@@ -291,7 +291,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-709 unit tests at v1.10.9, and the build keeps zero warnings. They cover the
+709 unit tests at v1.10.9. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
@@ -362,8 +362,10 @@ xcrun notarytool store-credentials my-notary \
 MCPOCK_NOTARY_PROFILE=my-notary MCPOCK_SIGN_IDENTITY=<identity hash> ./scripts/release.sh
 ```
 
-Without those two variables the script uses the maintainer's own profile and
-identity.
+You can put the two variables in `scripts/release.env` (git-ignored, see
+`scripts/release.env.example`) instead. Without them the script stops with an
+error. It also stops if `docs/release-notes/<version>.md` is missing, if the
+tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
 
 ## FAQ and troubleshooting
 
