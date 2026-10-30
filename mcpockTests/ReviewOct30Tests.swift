@@ -248,6 +248,16 @@ final class ReviewOct30WordingTests: XCTestCase {
         XCTAssertTrue(entry.needsAttention)
     }
 
+    /// a965: one fine and one paused or waiting server is not "All fine".
+    func testAgentWithAPausedServerIsNotAllFine() {
+        let fine = AgentServer(name: "a", state: .healthy, note: nil, rank: nil)
+        let paused = AgentServer(name: "b", state: .paused, note: nil, rank: nil)
+        let waiting = AgentServer(name: "c", state: .needsApp, note: "Needs Wake open", rank: nil)
+        XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine, paused])), "1 paused")
+        XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine, waiting])), "1 waiting")
+        XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine])), "All fine")
+    }
+
     /// f241: nothing to copy or ask about on a Not checked row.
     func testNotCheckedRowOffersNoErrorCopy() {
         let row = group(state: .degraded, reason: "Uses ${TOKEN}, which is not set where mcpock runs, so it was not checked.")

@@ -485,7 +485,8 @@ private struct HealthBar: View {
             (section.brokenCount, theme.statusBroken),
             (section.attentionCount, theme.statusDegraded),
             (section.fineCount, theme.statusHealthy),
-            (section.checkingCount, theme.elevated),
+            // Not checked, for now or by her choice: the neutral part (a965).
+            (section.checkingCount + section.pausedCount + section.waitingCount, theme.elevated),
         ].filter { $0.count > 0 }
     }
 }

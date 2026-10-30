@@ -266,6 +266,9 @@ enum AgentSections {
             if unchecked(section) {
                 return AgentRegistry.cloudHost(forAgents: [section.agent]).map { "In \($0)" } ?? "Runs inside its app"
             }
+            // Not "All fine" beside a server mcpock isn't checking (review 2026-10-30, a965).
+            if section.pausedCount > 0 { return "\(section.pausedCount) paused" }
+            if section.waitingCount > 0 { return "\(section.waitingCount) waiting" }
             return "All fine"
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
