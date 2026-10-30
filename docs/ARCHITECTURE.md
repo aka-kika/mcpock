@@ -110,6 +110,8 @@ card is open).
 | `Services/Differs.swift` | "Set up differently": a source whose launch target differs from the majority (aka never counts). 1.5.2: `fingerprints` (SHA-256 of each launch target, deduped) for "Mark as intended" |
 | `Services/ShortReason.swift`, `PanelText.swift`, `CardText.swift`, `MenuText.swift` | Every short line, footer summary, card sentence and menu text |
 | `Services/ServerVisibility.swift` | Pinned / Shown / Hidden |
+| `Services/NextStep.swift` | 1.13: the "Next step" line under a reason, one pure function: on the card, in `MCPockStatus.Server.nextStep`, so in `status.md` and `mcpock_problems` too. Fixed wording, never a server's own text |
+| `Services/ConfigWatcher.swift` | 1.13: notices a changed config (a `DispatchSource` on the file and on its folder, `O_EVTONLY`; a change is an inode, size or modified-time move; settles 1.5 s, at most one call per 10 s). `HealthMonitor.configFilesChanged` reads the files and checks only servers new or changed by the edit. Only `AgentRegistry.known` paths and allowed scan files. Reads only, off in Manual |
 | `Services/ErrorExport.swift` | The report of failing servers behind Copy All Problems on the panel's footer |
 | `Services/ServerReport.swift` | 1.5.3: the details ⌘C copies for a fine row and the Ask an Agent prompt, built on `StatusSnapshot.server` so they carry the status file's masking |
 | `Services/StatusSnapshot.swift`, `SecretMask.swift` | Builds the status file; masks tokens, URL secrets and every env/header value |

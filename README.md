@@ -28,23 +28,16 @@ mcpock gives you one place to look. It never changes your configs: it reads
 them, checks every server, and shows you what needs attention and why, so you
 (or your agent) can fix it.
 
-## What's new in 1.12
+## What's new in 1.13
 
-- **Grok Bot:** listed under its own name as soon as it is installed, on the
-  Agents tab and in Settings > Agents. Its connectors live in your Grok account,
-  so mcpock never starts them. Since 1.12.2 its rows show a mark drawn after its
-  own app icon.
-- **Antigravity:** its servers are read from `~/.gemini/config/mcp_config.json`.
-- **Lost in a session:** a server that dropped inside a Claude Code session that
-  is still open says so ("Lost in 1 open Claude Code session: run /mcp there").
-- **Your own shortcut:** pick the keys that open the panel in Settings > General.
-- **Checks every 15 minutes** instead of every minute, and reads only the config
-  files that changed. Refresh still checks everything at once.
-- **Usage note:** a one-time note says the call counts come from your agents'
-  chat history on this Mac, with Turn Off right there. In 1.12.1 it sits under
-  the list instead of covering it.
+- **Next step:** every reason has a line under it saying what to do, on the card,
+  in `status.md` and in `mcpock_problems`.
+- **A fix turns green by itself:** save a changed config and mcpock checks that
+  server again within seconds, with no click. Nothing is written.
+- **Smaller:** the footer says two numbers, three ways to copy instead of six, a
+  shorter Settings > General, and Usage counts as one switch, off for new installs.
 
-Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/1.12.1.md), [1.12.2](docs/release-notes/1.12.2.md).
+Full notes: [1.13.0](docs/release-notes/1.13.0.md). Earlier: [1.12.2](docs/release-notes/1.12.2.md), [1.12.1](docs/release-notes/1.12.1.md), [1.12.0](docs/release-notes/1.12.0.md).
 
 ## What it does
 
@@ -53,9 +46,10 @@ Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/
   standard MCP format. The same server in several agents shows as one row.
 - **Checks each one.** It starts a local server (or calls a remote one), does
   the MCP handshake, asks for its tool list, then closes it. Every 15 minutes
-  by default (1 minute to 4 hours, or only when you click Refresh). Each round
-  reads the config files it already knows again, so changed servers show up; a
-  config file in a new place is found at launch or when you click Refresh. A server that is already fine
+  by default (1 minute to 4 hours, or only when you click Refresh). It also
+  watches the config files it knows, without writing to them: a saved change is
+  read within seconds and only the servers it touched are checked (not in Manual).
+  A config file in a new place is found at launch or when you click Refresh. A server that is already fine
   keeps its tool list between rounds; Refresh and Check again ask for it anew.
 - **Shows health as a shape, not only a colour:**
 
