@@ -692,9 +692,15 @@ final class PanelState {
         return count
     }
 
+    /// Where every copy in the app goes (this is the only write): the clipboard,
+    /// except while hosting unit tests. The test host runs on the developer's own
+    /// Mac, and a test that copied overwrote what she had just copied herself.
+    static let pasteboard: NSPasteboard = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        ? NSPasteboard(name: NSPasteboard.Name("com.mcpock.tests")) : .general
+
     static func copyToPasteboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 
     // MARK: - Keyboard

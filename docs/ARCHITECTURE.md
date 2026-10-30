@@ -377,6 +377,11 @@ falls back to streamable HTTP, because many configs label streamable servers
     `Autoupdate` and `Updater.app` with Developer ID before the app, same as
     the helper and the widget, and removes the unused XPC services first
     (mcpock isn't sandboxed) — never `--deep` there either.
+27. **Tests never touch the real clipboard.** Every copy goes through
+    `PanelState.copyToPasteboard`, which writes to a named pasteboard while
+    hosting tests: the test host runs on the developer's own Mac. Tests read
+    `PanelState.pasteboard`, never `NSPasteboard.general`.
+    `testCopyingInATestLeavesTheRealClipboardAlone`.
 
 ---
 

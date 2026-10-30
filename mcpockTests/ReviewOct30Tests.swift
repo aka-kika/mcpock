@@ -194,6 +194,16 @@ final class ReviewOct30MonitorTests: XCTestCase {
         XCTAssertFalse(monitor.groups.first?.droppedInSession == true)
     }
 
+    /// A test run never touches the real clipboard: only its change count is
+    /// read here, never what is on it.
+    func testCopyingInATestLeavesTheRealClipboardAlone() {
+        XCTAssertNotEqual(PanelState.pasteboard.name, NSPasteboard.general.name)
+        let before = NSPasteboard.general.changeCount
+        PanelState.copyToPasteboard("from a test")
+        XCTAssertEqual(PanelState.pasteboard.string(forType: .string), "from a test")
+        XCTAssertEqual(NSPasteboard.general.changeCount, before)
+    }
+
     /// Merge 1: the footer's Copy All Problems.
     func testCopyAllProblemsCountsWhatItCopies() async {
         let monitor = monitor([config("alpha")])
@@ -203,7 +213,7 @@ final class ReviewOct30MonitorTests: XCTestCase {
         monitor.probe = { _, _ in ProbeResult(state: .broken, failureReason: "Non-zero exit (1)", tools: nil) }
         await monitor.refreshAll()
         XCTAssertEqual(panel.copyAllProblems(), 1)
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasPrefix("# mcpock error report"), true)
+        XCTAssertEqual(PanelState.pasteboard.string(forType: .string)?.hasPrefix("# mcpock error report"), true)
     }
 
     /// 462c: a search or the toggle closes the card of a row they took away.
