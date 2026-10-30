@@ -326,8 +326,9 @@ falls back to streamable HTTP, because many configs label streamable servers
     `SecretMaskTests`.
 12. **mcpock never writes another app's config.** Open Config… asks first,
     with Cancel as the default button.
-13. **Sandbox off, entitlements empty.** Needed to spawn servers and read
-    configs under `~`. Hardened runtime is added only when `scripts/release.sh`
+13. **Sandbox off; the only entitlement is the App Group** the widgets read
+    their snapshot from. No sandbox is needed to spawn servers and read configs
+    under `~`. Hardened runtime is added only when `scripts/release.sh`
     signs with Developer ID.
 14. **Theme through `AppearanceApplier`**, only on mcpock's own windows: the
     menu-bar icon always follows the system bar. A `MenuBarExtra` label keeps
