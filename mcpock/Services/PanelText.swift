@@ -27,6 +27,8 @@ enum PanelText {
         if counts.notChecked > 0 { parts.append("\(counts.notChecked) not checked") }
         if counts.waiting > 0 { parts.append("\(counts.waiting) waiting") }
         if counts.differs > 0 { parts.append("\(counts.differs) \(counts.differs == 1 ? "differs" : "differ")") }
+        // It sits in Needs you and rings the icon, so never "all fine" beside it (5442).
+        if counts.lost > 0 { parts.append("\(counts.lost) lost") }
         if counts.checking > 0 { parts.append("\(counts.checking) checking") }
         guard !parts.isEmpty else { return count(groups.count, "server", "servers") + ", all fine" }
         return (["\(groups.count)"] + parts).joined(separator: " \u{00B7} ")
