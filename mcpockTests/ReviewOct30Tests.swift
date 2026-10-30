@@ -125,4 +125,44 @@ final class ReviewOct30MonitorTests: XCTestCase {
         panel.pickFilter(.problems)
         XCTAssertFalse(panel.isCardOpen, "a fine row leaves Needs you")
     }
+
+    private func scanConfig(env: [String: String] = [:], headers: [String: String] = [:]) -> ServerConfig {
+        ServerConfig(id: "scan:/k/.x/mcp.json:a", name: "a", source: ServerSource(label: "x", path: "/k/.x/mcp.json"),
+                     projectPath: nil, transport: .stdio, command: "/bin/echo", args: [], env: env, url: nil, headers: headers)
+    }
+
+    /// 837b: a new env variable or header in an allowed file asks again.
+    func testFingerprintCoversEnvValuesAndHeaderNames() {
+        let plain = HealthMonitor.scanFileFingerprints([scanConfig(env: ["A": "1"])])
+        XCTAssertNotEqual(plain, HealthMonitor.scanFileFingerprints([scanConfig(env: ["A": "1", "NODE_OPTIONS": "--require x.js"])]))
+        XCTAssertNotEqual(plain, HealthMonitor.scanFileFingerprints([scanConfig(env: ["A": "2"])]))
+        XCTAssertNotEqual(plain, HealthMonitor.scanFileFingerprints([scanConfig(env: ["A": "1"], headers: ["X-Extra": "v"])]))
+        XCTAssertEqual(HealthMonitor.scanFileFingerprints([scanConfig(headers: ["H": "one"])]),
+                       HealthMonitor.scanFileFingerprints([scanConfig(headers: ["H": "two"])]), "a header value is not covered")
+    }
+
+    /// 837b: the update itself asks nothing for a file that didn't change.
+    func testUpdateKeepsAnUnchangedFileAllowed() async {
+        let path = "/k/.x/mcp.json"
+        let config = scanConfig(env: ["A": "1"])
+        AppPreferences.saveAllowedScanFiles([path], to: defaults)
+        AppPreferences.saveAllowedScanFingerprints(HealthMonitor.legacyScanFileFingerprints([config]), to: defaults)
+        defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
+        let monitor = HealthMonitor(defaults: defaults, isUpdate: true)
+        monitor.discover = { [config] }
+        await monitor.reloadConfigs()
+        XCTAssertFalse(monitor.servers.first?.awaitingFileOK ?? true)
+        XCTAssertEqual(AppPreferences.loadAllowedScanFingerprints(from: defaults), HealthMonitor.scanFileFingerprints([config]))
+
+        // And then a change does ask.
+        let changed = scanConfig(env: ["A": "1", "NODE_OPTIONS": "x"])
+        monitor.discover = { [changed] }
+        await monitor.reloadConfigs()
+        XCTAssertTrue(monitor.servers.first?.awaitingFileOK ?? false)
+    }
+
+    func testUpgradeKeepsTheOldPrintOfAChangedFile() {
+        XCTAssertEqual(HealthMonitor.upgradedFingerprints(["a": "old", "b": "old"], legacyNow: ["a": "old", "b": "new"], now: ["a": "A", "b": "B"]),
+                       ["a": "A", "b": "old"])
+    }
 }

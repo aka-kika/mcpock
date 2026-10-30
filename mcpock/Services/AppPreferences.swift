@@ -56,6 +56,9 @@ enum AppPreferences {
     /// fingerprint): a later edit or git pull that changes a command pauses
     /// the file again (r3 e46f).
     static let allowedScanFingerprintsKey = "allowedScanFingerprints"
+    /// Set once the prints saved before 1.13 were moved to the kind that also
+    /// covers env values and header names (review 2026-10-30, 837b).
+    static let scanFingerprintsUpgradedKey = "allowedScanFingerprintsUpgraded"
 
     static func loadAllowedScanFingerprints(from defaults: UserDefaults = store) -> [String: String] {
         defaults.dictionary(forKey: allowedScanFingerprintsKey) as? [String: String] ?? [:]

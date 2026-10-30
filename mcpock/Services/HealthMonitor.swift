@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -487,6 +488,12 @@ final class HealthMonitor {
         }
         defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
         scanFingerprints = Self.scanFileFingerprints(configs)
+        if !defaults.bool(forKey: AppPreferences.scanFingerprintsUpgradedKey) {
+            defaults.set(true, forKey: AppPreferences.scanFingerprintsUpgradedKey)
+            allowedScanFingerprints = Self.upgradedFingerprints(
+                allowedScanFingerprints, legacyNow: Self.legacyScanFileFingerprints(configs), now: scanFingerprints)
+            AppPreferences.saveAllowedScanFingerprints(allowedScanFingerprints, to: defaults)
+        }
         // A file allowed before fingerprints existed keeps what it starts now.
         var recorded = false
         for path in allowedScanFiles where allowedScanFingerprints[path] == nil {
@@ -512,17 +519,48 @@ final class HealthMonitor {
     }
 
     /// A hash of what each scan-only file starts: every server's name,
-    /// transport, command, args, url and headers helper (not env or header
-    /// values), so a changed helper asks again too (r3 1c25).
+    /// transport, command, args, url and headers helper, so a changed helper
+    /// asks again too (r3 1c25); its env names and values and its header names
+    /// too, so a pull that adds `NODE_OPTIONS` to an allowed file asks again
+    /// (review 2026-10-30, 837b). A rotated key in an env value asks again as
+    /// well; header values don't. SHA-256, since a value can be a key.
     nonisolated static func scanFileFingerprints(_ configs: [ServerConfig]) -> [String: String] {
         var lines: [String: [String]] = [:]
         for config in configs {
             guard let path = scanOnlyFile(config) else { continue }
-            let parts = [config.name, config.transport.rawValue, config.command ?? "", config.url ?? "",
-                         config.headersHelper ?? ""] + config.args
+            let env = config.env.keys.sorted().map { "\($0)=\(config.env[$0] ?? "")" }
+            let parts = legacyFingerprintParts(config) + ["\u{1E}"] + env + ["\u{1E}"] + config.headers.keys.sorted()
             lines[path, default: []].append(parts.joined(separator: "\u{1F}"))
         }
+        return lines.mapValues { text in
+            SHA256.hash(data: Data(text.sorted().joined(separator: "\n").utf8)).map { String(format: "%02x", $0) }.joined()
+        }
+    }
+
+    /// What a fingerprint covered before 1.13, only for reading a saved one.
+    nonisolated static func legacyScanFileFingerprints(_ configs: [ServerConfig]) -> [String: String] {
+        var lines: [String: [String]] = [:]
+        for config in configs {
+            guard let path = scanOnlyFile(config) else { continue }
+            lines[path, default: []].append(legacyFingerprintParts(config).joined(separator: "\u{1F}"))
+        }
         return lines.mapValues { UsageCursor.stableHash($0.sorted().joined(separator: "\n")) }
+    }
+
+    private nonisolated static func legacyFingerprintParts(_ config: ServerConfig) -> [String] {
+        [config.name, config.transport.rawValue, config.command ?? "", config.url ?? "",
+         config.headersHelper ?? ""] + config.args
+    }
+
+    /// One time, after the update to 1.13: a file still starting what she
+    /// allowed gets the new kind of fingerprint without asking again; one that
+    /// changed keeps its old print, so it does ask.
+    nonisolated static func upgradedFingerprints(
+        _ saved: [String: String], legacyNow: [String: String], now: [String: String]
+    ) -> [String: String] {
+        saved.reduce(into: saved) { result, entry in
+            if legacyNow[entry.key] == entry.value, let print = now[entry.key] { result[entry.key] = print }
+        }
     }
 
     /// Servers whose config file is being written right now (changed in the
