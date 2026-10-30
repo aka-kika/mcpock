@@ -78,7 +78,8 @@ enum HostApps {
     /// session), so a port learned now already names the app.
     nonisolated static func lookUp(
         _ config: ServerConfig, healthy: Bool, learned: [Int: String], skip: Set<Int>,
-        hostAppOf: (ServerConfig, [Int: String]) -> HostApp?, listeningApp: (Int) -> HostApp?
+        hostAppOf: (ServerConfig, [Int: String]) -> HostApp?, listeningApp: (Int) -> HostApp?,
+        portIsTaken: (Int) -> Bool = { !ListeningPorts.pids(port: $0).isEmpty }
     ) -> HostLookup {
         var lookup = HostLookup()
         if healthy {
@@ -91,6 +92,21 @@ enum HostApps {
                 if let app = listeningApp(port) {
                     lookup.learned[port] = app.bundlePath
                 } else if learned[port] != nil {
+                    lookup.forgotten.insert(port)
+                }
+            }
+        } else {
+            // Failing on a learned port: the port may have changed owner since,
+            // and a server that never worked since never got the check above
+            // (review 2026-10-30, cf4b). Nobody listening says nothing: that is
+            // just the app being closed, so the port stays learned, and it is not
+            // marked looked up, so a later success still checks it.
+            for port in localPorts(of: config) where !skip.contains(port) && learned[port] != nil {
+                if let app = listeningApp(port) {
+                    lookup.lookedUp.insert(port)
+                    lookup.learned[port] = app.bundlePath
+                } else if portIsTaken(port) {
+                    lookup.lookedUp.insert(port)
                     lookup.forgotten.insert(port)
                 }
             }

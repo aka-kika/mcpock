@@ -80,6 +80,35 @@ final class HostAppsTests: XCTestCase {
     }
 }
 
+/// Review 2026-10-30 (cf4b): a failing server on a learned port that changed owner.
+final class StaleLearnedPortTests: XCTestCase {
+    private let config = ServerConfig(id: "x", name: "x", source: ServerSource(label: "Cursor"), projectPath: nil, transport: .http,
+                                      command: nil, args: [], env: [:], url: "http://127.0.0.1:8742/mcp", headers: [:])
+    private let old = "/Applications/Old.app"
+
+    private func lookUp(listening: HostApp?, taken: Bool, skip: Set<Int> = []) -> HostLookup {
+        HostApps.lookUp(config, healthy: false, learned: [8742: old], skip: skip, hostAppOf: { _, _ in nil },
+                        listeningApp: { _ in listening }, portIsTaken: { _ in taken })
+    }
+
+    func testAPlainServerOnThePortForgetsIt() {
+        let lookup = lookUp(listening: nil, taken: true)
+        XCTAssertEqual(lookup.forgotten, [8742])
+        XCTAssertEqual(lookup.lookedUp, [8742])
+    }
+
+    func testAnotherAppOnThePortTakesIt() {
+        let lookup = lookUp(listening: HostApp(name: "New", bundlePath: "/Applications/New.app", bundleID: nil), taken: true)
+        XCTAssertEqual(lookup.learned[8742], "/Applications/New.app")
+    }
+
+    func testNobodyListeningKeepsIt() {
+        let lookup = lookUp(listening: nil, taken: false)
+        XCTAssertTrue(lookup.forgotten.isEmpty)
+        XCTAssertTrue(lookup.lookedUp.isEmpty, "a later success still checks it")
+    }
+}
+
 @MainActor
 final class NeedsAppMonitorTests: XCTestCase {
     private var suite: String!
