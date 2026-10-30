@@ -11,6 +11,7 @@ enum StatusSnapshot {
         isHidden: (String) -> Bool,
         isPinned: (String) -> Bool,
         acknowledged: [String: [String]] = [:],
+        sessionDrops: [String: [SessionDrop]] = [:],
         checking: Bool,
         firstCheckDone: Bool,
         interval: ProbeInterval,
@@ -18,7 +19,9 @@ enum StatusSnapshot {
         pid: Int32 = ProcessInfo.processInfo.processIdentifier,
         appVersion: String = MCPJSONRPC.clientVersion
     ) -> MCPockStatus {
-        let groups = HealthMonitor.groupByName(servers, acknowledged: acknowledged)
+        // The panel's own groups (review 2026-10-30, db82): without the drops
+        // the files said "fine" for a server the panel says was lost.
+        let groups = HealthMonitor.groupByName(servers, acknowledged: acknowledged, sessionDrops: sessionDrops)
         let byID = Dictionary(servers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let hiddenNames = Set(groups.filter { HealthMonitor.staysHidden($0, isHidden: isHidden($0.name)) }.map(\.name))
         let staysHidden = { (group: ServerGroup) in hiddenNames.contains(group.name) }
@@ -41,7 +44,8 @@ enum StatusSnapshot {
             paused: shown.filter { $0.status == "paused" }.count,
             selfManaged: shown.filter { $0.status == "managed by its app" }.count,
             hidden: groups.count - visible.count,
-            needsAppOpen: shown.filter { $0.needsApp != nil }.count
+            needsAppOpen: shown.filter { $0.needsApp != nil }.count,
+            lostInSession: shown.filter { $0.status == lostStatus }.count
         )
         // Round 8 (widgets): the Agents tab's own rows, same order it uses
         // (worst first, aka last) — `AgentSections.build` is already pure and
@@ -70,6 +74,9 @@ enum StatusSnapshot {
         )
     }
 
+    /// A server an open Claude Code session lost: it needs /mcp there (1.12).
+    static let lostStatus = "lost in an open Claude Code session"
+
     /// "broken", "slow", "needs sign-in", "set up differently", "fine",
     /// "checking", "paused", "managed by its app".
     static func statusWords(_ group: ServerGroup) -> String {
@@ -77,7 +84,7 @@ enum StatusSnapshot {
         case .broken: return "broken"
         case .degraded: return group.needsSignIn ? "needs sign-in" : group.notCheckedHere ? "not checked" : "slow"
         case .healthy:
-            if group.droppedInSession { return "lost in an open Claude Code session" }
+            if group.droppedInSession { return lostStatus }
             return group.differsNeedsAttention ? "set up differently" : "fine"
         case .unknown: return "checking"
         case .paused: return "paused"
@@ -131,7 +138,7 @@ enum StatusSnapshot {
             name: group.name,
             state: group.state.rawValue,
             status: status,
-            needsAttention: ["broken", "slow", "needs sign-in", "not checked", "set up differently"].contains(status),
+            needsAttention: ["broken", "slow", "needs sign-in", "not checked", "set up differently", lostStatus].contains(status),
             reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
             hidden: hidden,
             pinned: pinned,

@@ -81,6 +81,7 @@ enum StatusReport {
             lines.append("- waiting for their Mac app to be opened (not broken): \(waiting)")
         }
         lines.append("- set up differently: \(c.differs)")
+        if let lost = c.lostInSession, lost > 0 { lines.append("- lost in an open Claude Code session: \(lost)") }
         lines.append("- fine: \(c.fine)")
         if c.checking > 0 { lines.append("- not checked yet: \(c.checking)") }
         if c.paused > 0 { lines.append("- paused in mcpock: \(c.paused)") }

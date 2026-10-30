@@ -230,6 +230,26 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertEqual(grok.serverCount, 1)
         XCTAssertEqual(grok.problemCount, 1, "the odd one out on wake")
     }
+
+    /// Review 2026-10-30 (db82): the files agree with the panel about a server
+    /// an open Claude Code session lost.
+    func testLostInSessionReachesTheFiles() throws {
+        let snapshot = ServerSnapshot(config: config("xapi", agent: AgentRegistry.claudeCodeLabel, path: "/Users/k/.claude.json"),
+                                      state: .healthy, lastChecked: Date(timeIntervalSince1970: 1_800_000_000))
+        let drop = SessionDrop(folder: "/u/Recall", at: Date(timeIntervalSince1970: 1_800_000_000))
+        let status = StatusSnapshot.build(
+            servers: [snapshot], isHidden: { _ in false }, isPinned: { _ in false },
+            sessionDrops: ["xapi": [drop]], checking: false, firstCheckDone: true, interval: .fifteenMinutes,
+            now: Date(timeIntervalSince1970: 1_800_000_100))
+        let server = try XCTUnwrap(status.servers.first)
+        XCTAssertEqual(server.status, StatusSnapshot.lostStatus)
+        XCTAssertTrue(server.needsAttention)
+        XCTAssertEqual(status.counts.lostInSession, 1)
+        XCTAssertEqual(status.counts.fine, 0)
+        XCTAssertTrue(status.summary.contains("lost in a session"))
+        XCTAssertEqual(StatusReport.problems(in: status).map(\.name), ["xapi"])
+        XCTAssertTrue(StatusWriter.markdown(status).contains("run /mcp there"))
+    }
 }
 
 /// Review 2026-10-20 (f341): a failed status-file write is kept and shown,

@@ -65,6 +65,7 @@ final class HealthMonitor {
             isHidden: { [hiddenNames] in Self.isHidden($0, in: hiddenNames) },
             isPinned: { [pinnedNames] in pinnedNames.contains(Self.normalizedName($0)) },
             acknowledged: differsAcknowledged,
+            sessionDrops: sessionDrops,
             checking: isRefreshing,
             firstCheckDone: hasCompletedFirstPass,
             interval: AppPreferences.loadProbeInterval(from: defaults),

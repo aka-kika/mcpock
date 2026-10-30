@@ -47,6 +47,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// Waiting for the Mac app they belong to, which is closed (2026-10-16).
         /// Not broken, never a problem. Optional: older files have none.
         var needsAppOpen: Int? = nil
+        /// Lost in an open Claude Code session while mcpock's own check works
+        /// (review 2026-10-30, db82). Optional: older files have none.
+        var lostInSession: Int? = nil
     }
 
     struct Server: Codable, Equatable, Sendable {
@@ -54,9 +57,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// mcpock's raw state: unknown, healthy, degraded, broken, selfManaged, paused.
         var state: String
         /// In plain words: broken, slow, needs sign-in, set up differently, fine,
-        /// checking, paused, managed by its app.
+        /// checking, paused, managed by its app, lost in an open Claude Code session.
         var status: String
-        /// True for broken, slow, needs sign-in and set up differently.
+        /// True for broken, slow, needs sign-in, set up differently and lost in a session.
         var needsAttention: Bool
         /// The panel's one-line reason, when there is one.
         var reason: String?
