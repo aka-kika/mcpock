@@ -265,6 +265,12 @@ final class DetailCardPlacementTests: XCTestCase {
         XCTAssertNotNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5:8080/mcp", headers: ["Authorization"])))
         XCTAssertNil(CardText.plainHTTPWarning(for: group("http://127.0.0.1:8080/mcp", headers: ["Authorization"])))
         XCTAssertNil(CardText.plainHTTPWarning(for: group("https://x.test/mcp", headers: ["Authorization"])))
+        // Review 2026-10-30 (7458): a key in the URL, as the card sees it: masked.
+        XCTAssertNotNil(CardText.plainHTTPWarning(for: group(SecretMask.url("http://10.0.0.5/mcp?token=abc123"), headers: [])))
+        XCTAssertNotNil(CardText.plainHTTPWarning(for: group(SecretMask.url("http://me:pa55word@10.0.0.5/mcp"), headers: [])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5/mcp", headers: [])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group(SecretMask.url("http://127.0.0.1/mcp?token=abc123"), headers: [])))
+        XCTAssertNil(CardText.plainHTTPWarning(for: group(SecretMask.url("https://x.test/mcp?token=abc123"), headers: [])))
         XCTAssertNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5:8080/mcp", headers: [])))
     }
 }

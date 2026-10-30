@@ -202,14 +202,17 @@ enum CardText {
             + "Allow this file (right-click the row) checks it from now on."
     }
 
-    /// A source that sends header keys over plain http to another machine:
-    /// anyone on the network can read them (r3 c5e8). Nil when none does.
+    /// A source that sends keys over plain http to another machine, in its
+    /// headers (r3 c5e8) or in the URL itself (`?token=`, `user:pass@`; review
+    /// 2026-10-30, 7458): anyone on the network can read them. Nil when none does.
     static func plainHTTPWarning(for group: ServerGroup) -> String? {
         let exposed = group.sources.filter { source in
-            guard source.transport != .stdio, !source.headerKeys.isEmpty,
+            guard source.transport != .stdio,
                   let url = URLComponents(string: source.target), url.scheme?.lowercased() == "http",
-                  let host = url.host?.lowercased() else { return false }
-            return !["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)
+                  let host = url.host?.lowercased(),
+                  !["localhost", "127.0.0.1", "::1", "[::1]"].contains(host) else { return false }
+            let keyInURL = url.user != nil || url.password != nil || url.queryItems?.contains { $0.value != nil } == true
+            return !source.headerKeys.isEmpty || keyInURL
         }
         guard !exposed.isEmpty else { return nil }
         let labels = exposed.map { AgentBadge.displayLabel($0.label) }
