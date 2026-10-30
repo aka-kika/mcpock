@@ -117,7 +117,7 @@ final class HealthMonitor {
     private(set) var installedEmptyAgents: [String] = []
 
     /// Those of them with no server at all, hidden ones included: the agents
-    /// the Agents tab and Settings list with their "No servers yet" line.
+    /// the Agents tab and Settings list with their "Not visible here" line.
     var serverlessAgents: [String] {
         guard !installedEmptyAgents.isEmpty else { return [] }
         let named = Set(groups.flatMap { $0.sources.map { AgentBadge.agentName(fromLabel: $0.agent) } })

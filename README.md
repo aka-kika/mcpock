@@ -31,9 +31,9 @@ them, checks every server, and shows you what needs attention and why, so you
 ## What's new in 1.12
 
 - **Grok Bot:** listed under its own name as soon as it is installed, on the
-  Agents tab and in Settings > Agents, even with no servers yet. Its servers
-  live in your xAI account and run in xAI's cloud, so mcpock lists them and
-  never starts them. Since 1.12.2 its rows show a mark drawn after its own app icon.
+  Agents tab and in Settings > Agents. Its connectors live in your Grok account,
+  so mcpock never starts them. Since 1.12.2 its rows show a mark drawn after its
+  own app icon.
 - **Antigravity:** its servers are read from `~/.gemini/config/mcp_config.json`.
 - **Lost in a session:** a server that dropped inside a Claude Code session that
   is still open says so ("Lost in 1 open Claude Code session: run /mcp there").
@@ -259,11 +259,12 @@ differently". If aka asks for access before listing its servers (a newer aka
 wants a token mcpock does not have yet), aka shows as **Needs access**. **Tinycast** keeps its servers in its own settings and their
 keys and sign-ins in its own Keychain items, which mcpock never reads: a
 Tinycast server that needs one shows as managed by its app, the others are
-checked like any other. **Grok Bot** keeps its servers in your xAI account
-and runs them in xAI's cloud; its settings file holds only their names, so
-mcpock lists them under Grok Bot and never starts them. Grok Bot is listed
-once installed (its app or `~/.grokbot`), with "No servers yet" while its list
-is empty. A remote server
+checked like any other. **Grok Bot** keeps its connectors in your Grok account and runs them on its
+own computers; its settings file holds at most their names, so mcpock lists
+those under Grok Bot and never starts them. Nothing on this Mac lists the rest,
+so Grok Bot is listed once installed (its app or `~/.grokbot`), and with an
+empty list it reads **Not visible here**: check its connectors in Grok Bot's own
+settings. A remote server
 written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty-one agents have their real logo in the app (Grok Bot since 1.12.2); others show two
 letters.
 

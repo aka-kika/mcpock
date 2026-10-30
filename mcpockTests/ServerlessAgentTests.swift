@@ -34,7 +34,7 @@ final class ServerlessAgentTests: XCTestCase {
         let grokBot = sections.first { $0.agent == "Grok Bot" }
         XCTAssertNotNil(grokBot)
         XCTAssertEqual(grokBot?.servers.count, 0)
-        XCTAssertEqual(grokBot.map(AgentSections.problemText), "No servers yet")
+        XCTAssertEqual(grokBot.map(AgentSections.problemText), "Not visible here")
         XCTAssertEqual(grokBot?.emptyLine, "Grok Bot's servers live in your xAI account and run in xAI's cloud.")
         XCTAssertEqual(AgentSections.compactSummary(sections), "2 agents, all fine")
     }
@@ -94,6 +94,6 @@ final class ServerlessAgentTests: XCTestCase {
         let entries = SettingsAgentsPane.entries(from: [], emptyAgents: [AkaSource.label])
         XCTAssertEqual(entries.map(\.agent), ["aka"])
         XCTAssertEqual(AgentRegistry.emptyStatus(for: "aka"), "Needs access")
-        XCTAssertEqual(AgentRegistry.emptyStatus(for: "Grok Bot"), "No servers yet")
+        XCTAssertEqual(AgentRegistry.emptyStatus(for: "Grok Bot"), "Not visible here")
     }
 }

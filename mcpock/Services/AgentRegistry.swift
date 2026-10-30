@@ -42,15 +42,18 @@ enum AgentRegistry {
 
     /// Agents listed even with no servers, once they are on this Mac (1.12.1):
     /// label -> the line that says where its servers would be. Grok Bot keeps
-    /// its list in the xAI account, so an empty or missing settings file is the
-    /// usual case, not an agent that isn't there.
+    /// its connectors in the Grok account (grok-desk issue #42: no API lists
+    /// them), so an empty or missing settings file is the usual case, not an
+    /// agent that isn't there.
     static let listedWhenEmpty: [String: String] = [
-        grokBotLabel: "Grok Bot's servers live in your xAI account and run in xAI's cloud.",
+        grokBotLabel: "Grok Bot keeps its connectors in your Grok account. mcpock can't see them from this Mac; check them in Grok Bot's own settings.",
         AkaSource.label: akaNeedsAccessLine,
     ]
 
-    /// What such an agent says beside its name while it has none.
-    static let noServersYet = "No servers yet"
+    /// What such an agent says beside its name while it has none. Not "No
+    /// servers yet": that reads as "wait and they come", and they never will
+    /// from this Mac (1.13, inbox 2026-10-30).
+    static let notVisibleHere = "Not visible here"
 
     /// 1.12.2: aka answers 401 or 403 (`AkaSource.needsAccess`): listed with
     /// this word and line instead, calm, never "no servers".
@@ -59,7 +62,7 @@ enum AgentRegistry {
 
     /// The word beside a serverless agent's name.
     static func emptyStatus(for agent: String) -> String {
-        agent == AkaSource.label ? akaNeedsAccess : noServersYet
+        agent == AkaSource.label ? akaNeedsAccess : notVisibleHere
     }
 
     /// What shows each of those is installed: its app or its own folder.
