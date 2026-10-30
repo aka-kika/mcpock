@@ -243,8 +243,11 @@ reads without your OK.
 
 Notes: servers turned off with `enabled: false` are skipped. `${VAR}`,
 `${env:VAR}` and `${workspaceFolder}` are filled in before a check, from
-mcpock's own environment and the project folder; a server that needs one
-mcpock can't fill (like `${input:...}`) reads **Not checked**. Servers marked
+mcpock's own environment and the project folder. A server whose command, args,
+URL or headers use one mcpock can't fill (like `${input:...}`) reads **Not
+checked**; in an env value it stays as written and the server still starts,
+because most servers start without their key and ask for it only when a tool
+runs. Servers marked
 `"builtin": true` (they run inside their own app) are shown
 but never started. **aka** keeps its servers in its own database, so mcpock
 asks aka's local helper for the list (only when aka itself is the program on
@@ -291,9 +294,10 @@ letters.
 - **Usage counts read, never keep, your chats.** To count calls, mcpock reads
   the agents' own history files and databases (read-only) and keeps only the
   agent, the server name and the day, in `~/Library/Application
-  Support/mcpock/usage.json`, plus, for each history file, the time of the
-  newest call it counted (so a rewritten file is never counted twice).
-  Never a message, an argument or a result.
+  Support/mcpock/usage.json`, plus what it needs to never count a call twice:
+  for each history file a hashed key, how far it has read and the time of the
+  newest call it counted, and for Cursor the record keys of recent calls with
+  their times. Never a message, an argument, a result or a file path.
   Settings > General > Usage > Off stops the reading.
 - **Session logs, read only.** To spot a server lost in an open Claude Code
   session, mcpock reads `~/.claude/sessions/*.json` (which sessions run, and
