@@ -459,10 +459,7 @@ struct MenuBarPanelView: View {
     private func footerTooltip(now: Date) -> String {
         let lastChecked = ServerGroup.newestCheck(monitor.groups)
         let hidden = monitor.hiddenGroups.count
-        if panel.tab == .agents {
-            return AgentSections.summary(panel.allAgentSections) + "\n"
-                + PanelText.footer(lastChecked: lastChecked, hiddenCount: hidden, now: now)
-        }
+        // The whole breakdown, on either tab: the footer itself says two numbers.
         return PanelText.footerTooltip(
             monitor.visibleGroups,
             firstPass: !monitor.hasCompletedFirstPass,

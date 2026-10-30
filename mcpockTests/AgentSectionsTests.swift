@@ -258,7 +258,7 @@ final class AgentSectionsTests: XCTestCase {
             group("a", [src("Code", .broken, reason: "x")]),
             group("b", [src("Grok", .broken, reason: "x")]),
         ])
-        XCTAssertEqual(AgentSections.compactSummary(allBad), "2 agents, all need you")
+        XCTAssertEqual(AgentSections.compactSummary(allBad), "2 agents \u{00B7} 2 need you")
         XCTAssertEqual(AgentSections.compactSummary([]), "No agents found")
         XCTAssertEqual(AgentSections.compactSummary([], checking: true), "Checking\u{2026}")
     }

@@ -4,11 +4,13 @@ import Foundation
 /// tooltip (the full sentence plus "Checked 1 min ago · 2 hidden"). Pure, so
 /// `PanelTextTests` covers the wording without a view.
 enum PanelText {
-    /// The footer's left side (round 2): short enough to sit beside four glyphs in
-    /// a 380pt panel. "44 · 3 broken · 1 sign-in · 2 differ"; with nothing to
-    /// report "44 servers, all fine". While any check runs (the first pass after
-    /// launch included) it reads "Checking…", next to the spinning refresh glyph.
-    /// The full sentence lives in the tooltip (`footerTooltip`).
+    /// The footer's left side (round 2; two numbers since 1.13): the line
+    /// people scan. "41 servers · 4 need you · 5 not checked", or "41 servers,
+    /// all fine". Everything that needs her is one number, and "not checked"
+    /// is paused, waiting for her OK, waiting for its app, a `${VAR}`, in the
+    /// cloud, inside its app or signed in by the agent. While a check runs it
+    /// counts how far along it is. The breakdown lives in the tooltip
+    /// (`footerTooltip`).
     static func compactSummary(_ groups: [ServerGroup], checking: Bool = false) -> String {
         // While rows still wait for their first answer, count them (r3 2c74):
         // "Checking…" alone hid the counts for the whole first pass.
@@ -17,22 +19,19 @@ enum PanelText {
             return done < groups.count ? "Checking \(done) of \(groups.count)" : "Checking\u{2026}"
         }
         guard !groups.isEmpty else { return "No servers found" }
-        let counts = Counts(groups)
-        var parts: [String] = []
-        if counts.broken > 0 { parts.append("\(counts.broken) broken") }
-        if counts.slow > 0 { parts.append("\(counts.slow) slow") }
-        if counts.incomplete > 0 { parts.append("\(counts.incomplete) bad config") }
-        if counts.signIn > 0 { parts.append("\(counts.signIn) sign-in") }
-        // r3 6eef: Not checked and waiting rows were left out, so the footer
-        // read "all fine" beside them.
-        if counts.notChecked > 0 { parts.append("\(counts.notChecked) not checked") }
-        if counts.waiting > 0 { parts.append("\(counts.waiting) waiting") }
-        if counts.differs > 0 { parts.append("\(counts.differs) \(counts.differs == 1 ? "differs" : "differ")") }
-        // It sits in Needs you and rings the icon, so never "all fine" beside it (5442).
-        if counts.lost > 0 { parts.append("\(counts.lost) lost") }
-        if counts.checking > 0 { parts.append("\(counts.checking) checking") }
-        guard !parts.isEmpty else { return count(groups.count, "server", "servers") + ", all fine" }
-        return (["\(groups.count)"] + parts).joined(separator: " \u{00B7} ")
+        let needs = groups.filter(PanelSections.needsYou).count
+        let notChecked = groups.filter { !PanelSections.needsYou($0) && $0.isNotCheckedByMcpock }.count
+        return twoNumbers(count(groups.count, "server", "servers"), needs: needs, notChecked: notChecked)
+    }
+
+    /// "41 servers · 4 need you · 5 not checked", "41 servers, all fine". The
+    /// Agents tab says the same about its agents.
+    static func twoNumbers(_ total: String, needs: Int, notChecked: Int) -> String {
+        guard needs > 0 || notChecked > 0 else { return total + ", all fine" }
+        var parts = [total]
+        if needs > 0 { parts.append("\(needs) \(needs == 1 ? "needs" : "need") you") }
+        if notChecked > 0 { parts.append("\(notChecked) not checked") }
+        return parts.joined(separator: " \u{00B7} ")
     }
 
     /// The footer summary's tooltip: the full sentence on the first line, when it
@@ -165,6 +164,11 @@ extension ServerGroup {
     var agents: [String] {
         var seen = Set<String>()
         return sources.map(\.agent).filter { seen.insert($0).inserted }
+    }
+
+    /// mcpock has no answer of its own for this row, whatever the reason.
+    var isNotCheckedByMcpock: Bool {
+        notCheckedHere || state == .paused || state == .selfManaged || state == .needsApp || state == .unknown
     }
 
     /// Newest probe time across a set of rows, for the footer.

@@ -53,7 +53,7 @@ final class PanelTextTests: XCTestCase {
     func testNotCheckedIsNamedButCalm() {
         let notChecked = group("a", .degraded, reason: "Uses ${GITHUB_TOKEN}, which mcpock cannot fill")
         XCTAssertTrue(notChecked.needsVariable)
-        XCTAssertEqual(PanelText.compactSummary([notChecked, group("b")]), "2 \u{00B7} 1 not checked")
+        XCTAssertEqual(PanelText.compactSummary([notChecked, group("b")]), "2 servers \u{00B7} 1 not checked")
         XCTAssertEqual(PanelText.summary([notChecked, group("b")]), "2 servers \u{00B7} 1 not checked")
         XCTAssertFalse(PanelSections.needsYou(notChecked))
         XCTAssertEqual(HealthMonitor.iconState([notChecked, group("b")].map(HealthMonitor.iconInput)), .allHealthy)
@@ -70,7 +70,7 @@ final class PanelTextTests: XCTestCase {
         let waiting = ServerGroup(name: "w", state: .paused, sourceLabels: ["gemini"], tools: [], issues: [],
                                   variantCount: 1, sources: [source])
         XCTAssertTrue(waiting.waitsForFileOK)
-        XCTAssertEqual(PanelText.compactSummary([waiting, group("b")]), "2 \u{00B7} 1 waiting")
+        XCTAssertEqual(PanelText.compactSummary([waiting, group("b")]), "2 servers \u{00B7} 1 not checked")
         XCTAssertEqual(PanelText.summary([waiting]), "1 server \u{00B7} 1 waiting for your OK")
         XCTAssertEqual(ShortReason.line(for: waiting), ShortReason.waitingNote)
         XCTAssertEqual(AgentBadge.displayLabel("gemini"), "Gemini CLI")
@@ -155,7 +155,7 @@ final class PanelTextTests: XCTestCase {
             group("e", differs: true),
             group("f", differs: true),
         ] + (1...38).map { group("ok\($0)") }
-        XCTAssertEqual(PanelText.compactSummary(groups), "44 \u{00B7} 3 broken \u{00B7} 1 sign-in \u{00B7} 2 differ")
+        XCTAssertEqual(PanelText.compactSummary(groups), "44 servers \u{00B7} 6 need you")
     }
 
     func testCompactSummaryAllFine() {
@@ -170,7 +170,7 @@ final class PanelTextTests: XCTestCase {
             group("b", differs: true),
             group("c", .unknown),
         ]
-        XCTAssertEqual(PanelText.compactSummary(groups), "3 \u{00B7} 1 slow \u{00B7} 1 differs \u{00B7} 1 checking")
+        XCTAssertEqual(PanelText.compactSummary(groups), "3 servers \u{00B7} 2 need you \u{00B7} 1 not checked")
     }
 
     /// While any check runs (the first pass included) the footer says so and

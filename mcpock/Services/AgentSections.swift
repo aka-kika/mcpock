@@ -228,18 +228,25 @@ enum AgentSections {
         return "\(count) agent\(count == 1 ? "" : "s") \u{00B7} sorted by what needs you"
     }
 
-    /// The footer on the Agents tab (round 2): "13 agents · 3 need you",
-    /// "13 agents, all need you" or "13 agents, all fine"; "Checking…" while a
-    /// check runs.
+    /// The footer on the Agents tab (round 2; two numbers since 1.13): "13
+    /// agents · 3 need you · 2 not checked", "13 agents, all fine"; "Checking…"
+    /// while a check runs. Not checked: nothing wrong, but a server mcpock has
+    /// no answer for. An agent listed with no servers (Grok Bot, 1.12.1) can
+    /// never have one, so it never counts here: that would be a number for good.
     static func compactSummary(_ sections: [AgentSection], checking: Bool = false) -> String {
         if checking { return "Checking\u{2026}" }
         guard !sections.isEmpty else { return "No agents found" }
         let count = sections.count
-        let agents = "\(count) agent\(count == 1 ? "" : "s")"
         let needing = sections.filter { !$0.problems.isEmpty }.count
-        if needing == 0 { return agents + ", all fine" }
-        if needing == count && count > 1 { return agents + ", all need you" }
-        return agents + " \u{00B7} \(needing) \(needing == 1 ? "needs" : "need") you"
+        let notChecked = sections.filter { $0.problems.isEmpty && hasUncheckedServers($0) }.count
+        return PanelText.twoNumbers("\(count) agent\(count == 1 ? "" : "s")", needs: needing, notChecked: notChecked)
+    }
+
+    /// `AgentServer` keeps a calm `mark` for a `${VAR}` or a sign-in the agent holds.
+    private static func hasUncheckedServers(_ section: AgentSection) -> Bool {
+        section.servers.contains {
+            [.unknown, .paused, .selfManaged, .needsApp].contains($0.state) || $0.mark == .needsApp
+        }
     }
 
     /// "3 need you", "1 needs you", "Checking…" (nothing wrong so far, but not

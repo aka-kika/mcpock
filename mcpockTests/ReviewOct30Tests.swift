@@ -269,7 +269,7 @@ final class ReviewOct30WordingTests: XCTestCase {
         XCTAssertEqual(HealthMark.word(for: row), "Bad config")
         XCTAssertEqual(StatusSnapshot.statusWords(row), "bad config")
         XCTAssertEqual(CardText.whyTitle(for: row), "Why it is not checked")
-        XCTAssertEqual(PanelText.compactSummary([row]), "1 \u{00B7} 1 bad config")
+        XCTAssertEqual(PanelText.compactSummary([row]), "1 server \u{00B7} 1 needs you")
         XCTAssertFalse(PanelText.summary([row]).contains("slow"))
         let entry = StatusSnapshot.server(row, byID: [:], hidden: false, pinned: false)
         XCTAssertTrue(entry.needsAttention)
