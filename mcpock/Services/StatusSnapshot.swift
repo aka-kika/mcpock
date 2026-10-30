@@ -45,7 +45,8 @@ enum StatusSnapshot {
             selfManaged: shown.filter { $0.status == "managed by its app" }.count,
             hidden: groups.count - visible.count,
             needsAppOpen: shown.filter { $0.needsApp != nil }.count,
-            lostInSession: shown.filter { $0.status == lostStatus }.count
+            lostInSession: shown.filter { $0.status == lostStatus }.count,
+            notChecked: shown.filter { $0.status == notCheckedStatus }.count
         )
         // Round 8 (widgets): the Agents tab's own rows, same order it uses
         // (worst first, aka last) — `AgentSections.build` is already pure and
@@ -74,6 +75,10 @@ enum StatusSnapshot {
         )
     }
 
+    /// A `${VAR}` mcpock can't fill, or a sign-in its agent holds: calm in the
+    /// panel, so never a problem here (review 2026-10-30, fe94); only counted.
+    static let notCheckedStatus = "not checked"
+
     /// A server an open Claude Code session lost: it needs /mcp there (1.12).
     static let lostStatus = "lost in an open Claude Code session"
 
@@ -82,7 +87,7 @@ enum StatusSnapshot {
     static func statusWords(_ group: ServerGroup) -> String {
         switch group.state {
         case .broken: return "broken"
-        case .degraded: return group.needsSignIn ? "needs sign-in" : group.notCheckedHere ? "not checked" : "slow"
+        case .degraded: return group.needsSignIn ? "needs sign-in" : group.notCheckedHere ? notCheckedStatus : "slow"
         case .healthy:
             if group.droppedInSession { return lostStatus }
             return group.differsNeedsAttention ? "set up differently" : "fine"
@@ -138,7 +143,7 @@ enum StatusSnapshot {
             name: group.name,
             state: group.state.rawValue,
             status: status,
-            needsAttention: ["broken", "slow", "needs sign-in", "not checked", "set up differently", lostStatus].contains(status),
+            needsAttention: ["broken", "slow", "needs sign-in", "set up differently", lostStatus].contains(status),
             reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
             hidden: hidden,
             pinned: pinned,

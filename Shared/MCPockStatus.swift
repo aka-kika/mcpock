@@ -50,6 +50,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// Lost in an open Claude Code session while mcpock's own check works
         /// (review 2026-10-30, db82). Optional: older files have none.
         var lostInSession: Int? = nil
+        /// A `${VAR}` mcpock can't fill, or a sign-in its agent holds (review
+        /// 2026-10-30, fe94). Calm, never a problem. Optional: older files have none.
+        var notChecked: Int? = nil
     }
 
     struct Server: Codable, Equatable, Sendable {

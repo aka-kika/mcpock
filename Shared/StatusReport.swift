@@ -84,6 +84,7 @@ enum StatusReport {
         if let lost = c.lostInSession, lost > 0 { lines.append("- lost in an open Claude Code session: \(lost)") }
         lines.append("- fine: \(c.fine)")
         if c.checking > 0 { lines.append("- not checked yet: \(c.checking)") }
+        if let calm = c.notChecked, calm > 0 { lines.append("- not checked by mcpock, nothing to fix: \(calm)") }
         if c.paused > 0 { lines.append("- paused in mcpock: \(c.paused)") }
         if c.selfManaged > 0 { lines.append("- managed by their own app: \(c.selfManaged)") }
         if c.hidden > 0 { lines.append("- hidden in mcpock: \(c.hidden)") }
@@ -136,6 +137,12 @@ enum StatusReport {
             lines.append("Not broken, waiting for their Mac app: "
                 + waiting.map { "\($0.name) needs \($0.needsApp ?? "its app") open" }.joined(separator: "; ")
                 + ". Ask the user to open the app instead of fixing a config; mcpock checks again once it runs.")
+        }
+        let calm = status.servers.filter { $0.status == "not checked" && !$0.hidden }.map(\.name)
+        if !calm.isEmpty {
+            lines.append("")
+            lines.append("Not checked by mcpock, nothing to fix here: \(calm.joined(separator: ", ")). "
+                + "Each uses a variable or a sign-in only its agent has.")
         }
         if !hiddenProblems.isEmpty {
             lines.append("")
