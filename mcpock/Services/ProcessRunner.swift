@@ -40,6 +40,10 @@ final class ProcessRunner: @unchecked Sendable {
     /// fork into its own session) still holds the other end open (review
     /// 2026-10-20, c46c). Before, two threads per check stayed blocked forever.
     private let readersAbandoned = OSAllocatedUnfairLock(initialState: false)
+    /// The tree a teardown is stopping, while it runs. The runner stays in
+    /// `live` until then, so quitting inside that second can still force-kill a
+    /// child that ignores SIGTERM (review 2026-10-30, d983).
+    private let teardownTree = OSAllocatedUnfairLock<[TreeMember]?>(initialState: nil)
 
     /// Every runner whose process may still be running, so quitting or
     /// updating mid-check can stop them all (r3 4cd2): before, npx and node
@@ -131,6 +135,12 @@ final class ProcessRunner: @unchecked Sendable {
 
         let fm = FileManager.default
         if !fm.fileExists(atPath: resolved) {
+            // In a global config nothing says what `./server` is relative to:
+            // the agent uses the folder it started in, which mcpock can't know
+            // (review 2026-10-30, 80cf).
+            if !resolved.hasPrefix("/") {
+                throw ProbeError.spawnFailed("Command not found: \(resolved) (a relative path, and this config names no folder for it)")
+            }
             throw ProbeError.spawnFailed("Command not found: \(resolved)")
         }
         if !fm.isExecutableFile(atPath: resolved) {
@@ -273,7 +283,10 @@ final class ProcessRunner: @unchecked Sendable {
             return false
         }
         if alreadyDone { return }
-        setLive(false)
+        defer {
+            teardownTree.withLock { $0 = nil }
+            setLive(false)
+        }
 
         // List the tree BEFORE closing stdin (1.9.0): a server that exits on
         // stdin EOF gets reparented children that a parent-pid lookup can no longer find
@@ -282,6 +295,8 @@ final class ProcessRunner: @unchecked Sendable {
         let rootPIDBeforeClose = process.processIdentifier
         let tree = rootPIDBeforeClose > 0 && process.isRunning
             ? Self.treeSnapshot(of: rootPIDBeforeClose) : []
+
+        teardownTree.withLock { $0 = tree }
 
         try? stdinPipe.fileHandleForWriting.close()
 
@@ -358,7 +373,17 @@ final class ProcessRunner: @unchecked Sendable {
             state.didTerminate = true
             return false
         }
-        if alreadyDone { return }
+        if alreadyDone {
+            // Unless a teardown is still at it (mcpock is quitting right now):
+            // then only the members pinned to their start time, and the root.
+            guard let tree = teardownTree.withLock({ $0 }) else { return }
+            let root = process.processIdentifier
+            signalRoot(root, SIGKILL)
+            Self.merged(tree, groupMembers(of: root))
+                .filter { $0.isStillTheSameProcess }
+                .forEach { kill($0.pid, SIGKILL) }
+            return
+        }
         setLive(false)
 
         try? stdinPipe.fileHandleForWriting.close()
@@ -406,7 +431,7 @@ final class ProcessRunner: @unchecked Sendable {
     }
 
     /// One process of a server's tree, pinned to its start time.
-    struct TreeMember {
+    struct TreeMember: @unchecked Sendable {
         let pid: Int32
         let started: timeval
 

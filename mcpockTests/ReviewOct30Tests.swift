@@ -100,6 +100,33 @@ final class ReviewOct30ProbeTests: XCTestCase {
         XCTAssertNil(ProcessRunner.startTime(of: pid), "its sleep is gone")
     }
 
+    /// d983: quitting during a teardown still stops a child that ignores SIGTERM.
+    func testQuittingDuringTeardownForceKills() async throws {
+        let runner = try ProcessRunner(command: "/bin/sh", args: ["-c", "trap '' TERM; /bin/sleep 120 & wait; /bin/sleep 120"], env: [:])
+        try await Task.sleep(for: .milliseconds(300))
+        let tree = ProcessRunner.treeSnapshot(of: runner.processIdentifier)
+        XCTAssertFalse(tree.isEmpty)
+        let teardown = Task { await runner.terminateAndReap(gracePeriod: .seconds(30)) }
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(ProcessRunner.isLive(runner), "still listed while it is being stopped")
+
+        ProcessRunner.stopAll()
+        for _ in 0..<100 where runner.isRunning { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertFalse(runner.isRunning, "not after the 30 s grace period")
+        XCTAssertTrue(tree.allSatisfy { !$0.isStillTheSameProcess })
+        await teardown.value
+        XCTAssertFalse(ProcessRunner.isLive(runner))
+    }
+
+    /// 80cf: a relative command in a global config says why it wasn't found.
+    func testRelativeCommandWithNoFolderSaysSo() async {
+        let config = ServerConfig(id: "r", name: "r", source: ServerSource(label: "Cursor"), projectPath: nil, transport: .stdio,
+                                  command: "./no-such-server", args: [], env: [:], url: nil, headers: [:])
+        let result = await StdioProbe.probe(config: config, fetchTools: false, timeout: .seconds(2))
+        XCTAssertTrue(result.failureReason?.contains("a relative path") == true, result.failureReason ?? "")
+        XCTAssertEqual(result.failureReason.map { ShortReason.from($0, state: .broken) }, "Could not start: command not found")
+    }
+
     /// 1279: a `${VAR}` secret a server echoes is masked, though the config
     /// mcpock keeps only says `${VAR}`.
     func testEchoedVariableSecretIsMasked() async throws {
