@@ -22,7 +22,8 @@ enum SSEProbe {
     /// routinely label streamable servers `sse`.
     static func probe(
         url: URL, headers: [String: String], fetchTools: Bool,
-        deadline: ContinuousClock.Instant = ContinuousClock.now + probeTimeout
+        deadline: ContinuousClock.Instant = ContinuousClock.now + probeTimeout,
+        endpointWait: Duration = endpointTimeout
     ) async -> ProbeResult? {
         var request = URLRequest(url: url, timeoutInterval: (try? HTTPProbe.timeoutInterval(until: deadline, cap: 10)) ?? 0.001)
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
@@ -61,7 +62,7 @@ enum SSEProbe {
                     )
                 }
                 group.addTask {
-                    try await Task.sleep(for: min(endpointTimeout, deadline - ContinuousClock.now))
+                    try await Task.sleep(for: min(endpointWait, deadline - ContinuousClock.now))
                     if !endpoint.seen { throw ProbeError.protocolError("SSE stream sent no endpoint event") }
                     try await Task.sleep(until: deadline, clock: .continuous)
                     throw ProbeError.timeout(probeTimeout)

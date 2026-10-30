@@ -45,6 +45,7 @@
 		2CA4202BCA42967F84035F03 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC2D9DE193DB838D652DFE6 /* AppGroup.swift */; };
 		2F71DECACA2F2DEE19508698 /* ProbeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C67F01C8AC6F0A8D186628 /* ProbeSession.swift */; };
 		31413E48BB81260FE36E7994 /* MCPockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C906AC4EF47BD9001A45F5 /* MCPockApp.swift */; };
+		3185E11BC80AAD1AE84D0799 /* ReviewOct30Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E214C4E855670FC348210FD /* ReviewOct30Tests.swift */; };
 		32C4916F78A128A9E0E80AD0 /* ConfigFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C23756C8C12BD59D125F68F /* ConfigFormatTests.swift */; };
 		36105EE649981123D3E120CE /* StdioBannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 093499F646978DF81B60D197 /* StdioBannerTests.swift */; };
 		36E4B87517DBB6C316E010D9 /* ProbeDedupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE4B062C3405D422E83B4A59 /* ProbeDedupTests.swift */; };
@@ -360,6 +361,7 @@
 		7BB8D8C1AA5DBFDBF7064BC3 /* ListeningPortsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningPortsTests.swift; sourceTree = "<group>"; };
 		7C222956F06F9ED1724E9F35 /* mcpock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mcpock.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7CECA6A856BE0688490D9B54 /* GlassPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassPanelTests.swift; sourceTree = "<group>"; };
+		7E214C4E855670FC348210FD /* ReviewOct30Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewOct30Tests.swift; sourceTree = "<group>"; };
 		7EB8DB58B294596CA01E69EC /* AppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceTests.swift; sourceTree = "<group>"; };
 		7ECBF68BF697915631533D71 /* ProblemsWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemsWidgetView.swift; sourceTree = "<group>"; };
 		811003DF5DEB18550B9F1F65 /* AppBundleProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBundleProbeTests.swift; sourceTree = "<group>"; };
@@ -561,6 +563,7 @@
 				310BCD66A81013E692865EC4 /* ProcessTreeTests.swift */,
 				E601A8F74EB72825DEE95A5B /* RedirectTests.swift */,
 				4FE6071A232F85D26C4B020D /* RefreshTests.swift */,
+				7E214C4E855670FC348210FD /* ReviewOct30Tests.swift */,
 				48177E2F6C2917AC259221BC /* Round7SettingsTests.swift */,
 				372F87873A61B8A0864AD991 /* Round8SettingsTests.swift */,
 				69DB12EF59D0AE5F5B1262DD /* Round9SettingsTests.swift */,
@@ -1114,6 +1117,7 @@
 				0A2708FC2A9F2FC537832B03 /* ProcessTreeTests.swift in Sources */,
 				BB6A6F3B03C43828BBE81E12 /* RedirectTests.swift in Sources */,
 				5AC9BEE922294E1F50F10137 /* RefreshTests.swift in Sources */,
+				3185E11BC80AAD1AE84D0799 /* ReviewOct30Tests.swift in Sources */,
 				F4AEC5D0D00681F0D356BECB /* Round7SettingsTests.swift in Sources */,
 				B1663EB3DCB3F27A206BEB0C /* Round8SettingsTests.swift in Sources */,
 				92F4F792AE5D8B8E05ACBC62 /* Round9SettingsTests.swift in Sources */,

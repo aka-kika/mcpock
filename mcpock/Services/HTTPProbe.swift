@@ -118,8 +118,23 @@ enum HTTPProbe {
         if let sessionHeaders {
             await closeSession(url: url, headers: sessionHeaders)
         }
+        // The stream may only have been slow: a legacy SSE server on a cold
+        // start can take over 3 s to name its endpoint, and POSTing to its
+        // stream URL then fails. With the plain path failed too, the rest of
+        // the budget goes to waiting for that endpoint (review 2026-10-30, 1258).
+        if config.transport == .sse, result.state != .healthy, !isAuthFailure(result) {
+            let left = deadline - ContinuousClock.now
+            if left > .zero,
+               let slow = await SSEProbe.probe(url: url, headers: config.headers, fetchTools: fetchTools,
+                                               deadline: deadline, endpointWait: left),
+               slow.state == .healthy {
+                return slow
+            }
+        }
         return result
     }
+
+    private static func isAuthFailure(_ result: ProbeResult) -> Bool { result.needsAttention }
 
     /// `initialize`, asked once more with the version a refusing server names
     /// (r3 a1f3). The refusal may come as a JSON-RPC error in a 200 or in the

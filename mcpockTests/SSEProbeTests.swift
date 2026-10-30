@@ -179,6 +179,25 @@ final class SSEProbeTests: XCTestCase {
 
     /// A URL labelled `sse` that does not serve an event stream falls through to
     /// the streamable-HTTP probe rather than failing on the GET.
+    /// Review 2026-10-30 (1258): a legacy server that takes over 3 s to name
+    /// its endpoint on a cold start, and has nothing at its stream URL for a POST.
+    func testSlowEndpointIsWaitedForOnceThePlainPathFailed() async throws {
+        let slow = mock.replacingOccurrences(
+            of: "self.wfile.write(b'event: endpoint",
+            with: "import time; time.sleep(3.5); self.wfile.write(b'event: endpoint")
+            .replacingOccurrences(
+                of: "if not self.path.startswith('/messages'):\n                self.send_response(404)",
+                with: "if not self.path.startswith('/messages'):\n                self.send_response(405)")
+        XCTAssertNotEqual(slow, mock)
+        let (server, port) = try startMock(slow)
+        defer { server.terminate() }
+        let config = ServerConfig(id: "s", name: "s", source: ServerSource(label: "Goose"), projectPath: nil, transport: .sse,
+                                  command: nil, args: [], env: [:], url: "http://127.0.0.1:\(port)/sse", headers: [:])
+        let result = await HTTPProbe.probe(config: config, fetchTools: true)
+        XCTAssertEqual(result.state, .healthy, result.failureReason ?? "")
+        XCTAssertEqual(result.tools?.map(\.name), ["echo"])
+    }
+
     func testNonStreamURLLabelledSSEFallsBackToStreamableProbe() async throws {
         let (server, port) = try startMock()
         defer { server.stopForTest() }
