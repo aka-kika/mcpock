@@ -42,9 +42,8 @@ enum AgentRegistry {
 
     /// Agents listed even with no servers, once they are on this Mac (1.12.1):
     /// label -> the line that says where its servers would be. Grok Bot keeps
-    /// its connectors in the Grok account (grok-desk issue #42: no API lists
-    /// them), so an empty or missing settings file is the usual case, not an
-    /// agent that isn't there.
+    /// its connectors in the Grok account, and no API lists them, so an empty
+    /// or missing settings file is the usual case, not an agent that isn't there.
     static let listedWhenEmpty: [String: String] = [
         grokBotLabel: "Grok Bot keeps its connectors in your Grok account. mcpock can't see them from this Mac; check them in Grok Bot's own settings.",
         AkaSource.label: akaNeedsAccessLine,
