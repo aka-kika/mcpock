@@ -34,20 +34,42 @@ enum SecretMask {
         return secretWords.contains { lower.contains($0) }
     }
 
-    /// A word that looks like a credential on its own: a known key prefix, or a
-    /// long run of letters and digits with no path or URL punctuation.
+    /// A word that looks like a credential on its own: a known key prefix, a
+    /// long run of letters and digits with no path or URL punctuation, or a
+    /// shorter one (16 to 31) of nothing but letters and digits, at least two
+    /// of each: keys that short reached the status files unmasked (review
+    /// 2026-10-30, 4901). Punctuation keeps such a word out: `some-tool-v2.1.3`
+    /// is a name, not a key.
     static func looksLikeToken(_ word: String) -> Bool {
         let lower = word.lowercased()
         if word.count >= 16, tokenPrefixes.contains(where: { lower.hasPrefix($0) })
             || exactPrefixes.contains(where: { word.hasPrefix($0) }) {
             return true
         }
+        if word.count >= 16, isMixedWord(word) { return true }
         guard word.count >= 32 else { return false }
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_+=."))
         guard word.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return false }
         let hasDigit = word.contains { $0.isNumber }
         let hasLetter = word.contains { $0.isLetter }
         return hasDigit && hasLetter
+    }
+
+    /// One path segment of a URL: a place a key often sits with nothing else
+    /// around it (`/mcp/abc123xyz9/sse`), so a shorter one counts. Short ones
+    /// with digits stay (`v2`, `oauth2`, `2025-03-26`): an agent needs them to
+    /// fix a wrong address.
+    static func looksLikePathToken(_ segment: String) -> Bool {
+        if looksLikeToken(segment) { return true }
+        if segment.count >= 10, isMixedWord(segment) { return true }
+        let bare = segment.filter { $0 != "-" && $0 != "_" }
+        return segment.count >= 16 && bare.count >= 12 && isMixedWord(bare)
+    }
+
+    /// Only ASCII letters and digits, at least two of each.
+    private static func isMixedWord(_ word: String) -> Bool {
+        guard word.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return false }
+        return word.filter(\.isNumber).count >= 2 && word.filter(\.isLetter).count >= 2
     }
 
     // MARK: - Command lines
@@ -134,7 +156,7 @@ enum SecretMask {
         if !parts.path.isEmpty {
             let segments = parts.path.split(separator: "/", omittingEmptySubsequences: false).map { segment -> String in
                 let text = String(segment)
-                return looksLikeToken(text) || known.contains(where: { isKnown($0) && text.contains($0) }) ? dots : text
+                return looksLikePathToken(text) || known.contains(where: { isKnown($0) && text.contains($0) }) ? dots : text
             }
             parts.path = segments.joined(separator: "/")
         }
@@ -210,7 +232,7 @@ enum SecretMask {
         guard let parts = URLComponents(string: text), parts.scheme != nil else { return [] }
         var found = [parts.user, parts.password].compactMap { $0 }
         found += (parts.queryItems ?? []).compactMap(\.value)
-        found += parts.path.split(separator: "/").map(String.init).filter(looksLikeToken)
+        found += parts.path.split(separator: "/").map(String.init).filter(looksLikePathToken)
         return found.filter(isKnown)
     }
 

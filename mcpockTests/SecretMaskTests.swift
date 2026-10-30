@@ -129,4 +129,29 @@ final class SecretMaskTests: XCTestCase {
         let reply = ProbeError.httpError(500, "Authorization: Bearer sk-abcdefghijklmnop1234").errorDescription ?? ""
         XCTAssertFalse(reply.contains("sk-abcdefghijklmnop1234"))
     }
+
+    /// Review 2026-10-30 (4901): a key of 16 to 31 plain characters.
+    func testShortPlainKeysAreMasked() {
+        let key = "a1b2c3d4e5f6g7h8"
+        XCTAssertEqual(SecretMask.scrub("rejected key \(key) for this user"), "rejected key \(SecretMask.dots) for this user")
+        XCTAssertEqual(SecretMask.url("https://mcp.example.com/s/\(key)/sse"), "https://mcp.example.com/s/\(dots)/sse")
+        XCTAssertEqual(SecretMask.commandLine(command: "run", args: [key]), "run \(dots)")
+    }
+
+    func testURLPathSegmentsWithLettersAndDigitsAreMasked() {
+        XCTAssertEqual(SecretMask.url("https://h.io/mcp/abc123xyz9/sse"), "https://h.io/mcp/\(dots)/sse")
+        XCTAssertEqual(SecretMask.url("https://h.io/mcp/ab12-cd34-ef56-gh78/sse"), "https://h.io/mcp/\(dots)/sse")
+        XCTAssertTrue(SecretMask.urlSecrets("https://h.io/mcp/abc123xyz9/sse").contains("abc123xyz9"))
+    }
+
+    /// The words an agent needs stay readable.
+    func testOrdinaryNamesWithDigitsStay() {
+        for url in ["https://h.io/api/v2/mcp", "https://h.io/oauth2/sse", "https://h.io/mcp/2025-03-26",
+                    "https://h.io/server-name/mcp"] {
+            XCTAssertEqual(SecretMask.url(url), url)
+        }
+        for text in ["Cannot find module 'server2.js'", "sqlite3database not found", "language-server-4.3.3 failed"] {
+            XCTAssertEqual(SecretMask.scrub(text), text)
+        }
+    }
 }
