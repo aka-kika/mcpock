@@ -242,7 +242,7 @@ final class AgentSectionsTests: XCTestCase {
         let code = sections.first { $0.agent == "Code" }!
         XCTAssertEqual(AgentSections.problemText(toolx), "Paused")
         XCTAssertEqual(AgentSections.restText(toolx), "Its only server is paused")
-        XCTAssertEqual(AgentSections.problemText(code), "All fine")
+        XCTAssertEqual(AgentSections.problemText(code), "1 paused", "not All fine beside it (review 2026-10-30, a965)")
         XCTAssertEqual(AgentSections.restText(code), "1 answers normally, 1 paused")
     }
 

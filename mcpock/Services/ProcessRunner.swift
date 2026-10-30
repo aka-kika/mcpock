@@ -293,9 +293,6 @@ final class ProcessRunner: @unchecked Sendable {
         if rootPID > 0, process.isRunning {
             // SIGTERM the whole tree first
             signalProcessTree(root: rootPID, signal: SIGTERM)
-            if process.isRunning {
-                process.terminate()
-            }
 
             let deadline = ContinuousClock.now + gracePeriod
             while process.isRunning && ContinuousClock.now < deadline {
@@ -304,7 +301,6 @@ final class ProcessRunner: @unchecked Sendable {
 
             if process.isRunning {
                 signalProcessTree(root: rootPID, signal: SIGKILL)
-                kill(rootPID, SIGKILL)
                 let killDeadline = ContinuousClock.now + .milliseconds(500)
                 while process.isRunning && ContinuousClock.now < killDeadline {
                     await Self.pause(.milliseconds(20))
@@ -369,7 +365,6 @@ final class ProcessRunner: @unchecked Sendable {
         let rootPID = process.processIdentifier
         if rootPID > 0, process.isRunning {
             signalProcessTree(root: rootPID, signal: SIGKILL)
-            kill(rootPID, SIGKILL)
         }
         groupMembers(of: rootPID)
             .filter { $0.isStillTheSameProcess }
@@ -399,6 +394,14 @@ final class ProcessRunner: @unchecked Sendable {
         for member in Self.treeSnapshot(of: root) where member.isStillTheSameProcess {
             kill(member.pid, signal)
         }
+        signalRoot(root, signal)
+    }
+
+    /// The root, only while its PID is still this runner's process: the same
+    /// start-time pin as every other member (review 2026-10-30, 847c).
+    private func signalRoot(_ root: Int32, _ signal: Int32) {
+        guard let rootStarted, let now = Self.startTime(of: root),
+              now.tv_sec == rootStarted.tv_sec, now.tv_usec == rootStarted.tv_usec else { return }
         kill(root, signal)
     }
 

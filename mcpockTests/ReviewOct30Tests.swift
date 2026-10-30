@@ -94,7 +94,7 @@ final class ReviewOct30ProbeTests: XCTestCase {
         try "#!/bin/sh\n/bin/sleep 120 &\necho $! > '\(pidFile.path)'\nwait\n".write(to: shell, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
 
-        XCTAssertNil(ShellEnvironment.read(shell: shell.path, timeout: 0.5))
+        XCTAssertNil(ShellEnvironment.read(shell: shell.path, timeout: 3))
 
         let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
         XCTAssertNil(ProcessRunner.startTime(of: pid), "its sleep is gone")
