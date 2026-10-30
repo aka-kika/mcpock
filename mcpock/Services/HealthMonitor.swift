@@ -387,11 +387,18 @@ final class HealthMonitor {
     /// Discovery (registry + scan + aka). Replaceable so tests can run a full
     /// Refresh without scanning this Mac or launching its real servers.
     @ObservationIgnored var discover: @Sendable () async -> [ServerConfig] = {
-        async let aka = AkaSource.discover()
-        let configs = await Task.detached(priority: .utility) {
-            ConfigDiscovery.discover()
-        }.value
-        return configs + (await aka)
+        await HealthMonitor.discoverOffMainThread(aka: { await AkaSource.discover() }, read: { ConfigDiscovery.discover() })
+    }
+
+    /// The scan touches hundreds of folders, so `read` never runs on the main
+    /// thread. Parts as parameters so a test can see where it runs.
+    nonisolated static func discoverOffMainThread(
+        aka: @escaping @Sendable () async -> [ServerConfig],
+        read: @escaping @Sendable () -> [ServerConfig]
+    ) async -> [ServerConfig] {
+        async let akaConfigs = aka()
+        let configs = await Task.detached(priority: .utility) { read() }.value
+        return configs + (await akaConfigs)
     }
 
     /// A timer round's read (9180): only the known agents' files and the

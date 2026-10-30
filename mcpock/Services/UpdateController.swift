@@ -28,6 +28,14 @@ final class UpdateController {
         )
     }
 
+    /// The one place that decides whether the updater starts: never while
+    /// hosting unit tests, never in demo mode. `make` builds it, so a test can
+    /// see that it isn't called without starting Sparkle.
+    static func startIfAllowed<Updater>(isHostingTests: Bool, isDemo: Bool, make: () -> Updater) -> Updater? {
+        guard !isHostingTests, !isDemo else { return nil }
+        return make()
+    }
+
     /// Settings > About "Check for Updates…" and the status-item right-click
     /// menu both call this. Sparkle shows its own progress window.
     func checkForUpdates() {

@@ -257,3 +257,34 @@ final class ReviewOct30WordingTests: XCTestCase {
         XCTAssertNotNil(MenuText.copyError(for: group(state: .broken, reason: "Non-zero exit (1)")))
     }
 }
+
+/// 4c5e: the rules ARCHITECTURE names that had no test.
+final class ReviewOct30RuleTests: XCTestCase {
+    private final class Flag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: Bool?
+        var wasMain: Bool? { lock.withLock { value } }
+        func set(_ main: Bool) { lock.withLock { value = main } }
+    }
+
+    /// Rule 8-ish: discovery never runs on the main thread, even asked from it.
+    @MainActor
+    func testDiscoveryRunsOffTheMainThread() async {
+        let flag = Flag()
+        let found = await HealthMonitor.discoverOffMainThread(aka: { [] }, read: {
+            flag.set(Thread.isMainThread)
+            return []
+        })
+        XCTAssertTrue(found.isEmpty)
+        XCTAssertEqual(flag.wasMain, false)
+    }
+
+    /// Rule 12: Return and Escape never open a config by accident.
+    @MainActor
+    func testOpenConfigDefaultsToCancel() {
+        let alert = ConfigFileActions.confirmAlert("/k/.cursor/mcp.json", appName: "Cursor")
+        XCTAssertEqual(alert.buttons.map(\.title), ["Cancel", MenuText.openConfigConfirm])
+        XCTAssertEqual(alert.buttons[0].keyEquivalent, "\r")
+        XCTAssertEqual(alert.buttons[1].keyEquivalent, "")
+    }
+}

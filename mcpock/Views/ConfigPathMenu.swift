@@ -53,6 +53,11 @@ enum ConfigFileActions {
     /// Return or Escape never opens it by accident.
     private static func confirmOpen(_ path: String, appName: String?) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
+        return confirmAlert(path, appName: appName).runModal() == .alertSecondButtonReturn
+    }
+
+    /// Built apart from showing it, so `ConfigPathMenuTests` can check who is the default.
+    static func confirmAlert(_ path: String, appName: String?) -> NSAlert {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = MenuText.openConfigQuestion(path: path)
@@ -61,7 +66,7 @@ enum ConfigFileActions {
         let open = alert.addButton(withTitle: MenuText.openConfigConfirm)
         cancel.keyEquivalent = "\r"
         open.keyEquivalent = ""
-        return alert.runModal() == .alertSecondButtonReturn
+        return alert
     }
 }
 

@@ -119,8 +119,9 @@ struct MCPockApp: App {
         // the network or shows Sparkle's permission prompt.
         // Not in demo mode either: it opens no network connection (review,
         // 2026-10-14), so Settings shows no update controls there.
-        if !isDemo {
-            let updateController = UpdateController()
+        if let updateController = UpdateController.startIfAllowed(
+            isHostingTests: isHostingTests, isDemo: isDemo, make: { UpdateController() }
+        ) {
             _updateController = State(initialValue: updateController)
             SettingsLauncher.updateController = updateController
         }

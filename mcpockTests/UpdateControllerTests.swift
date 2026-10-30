@@ -3,12 +3,26 @@ import XCTest
 
 /// In-app updates (round 10). `UpdateController` itself is deliberately not
 /// exercised here: constructing one for real starts Sparkle's own updater —
-/// exactly what `MCPockApp.init`'s `isHostingTests` guard exists to prevent a
-/// test run from doing (see `ARCHITECTURE.md` §6, rule 26). What's testable
-/// without touching the network or Sparkle's own state is the static
-/// configuration it depends on: the Info.plist keys Sparkle reads, and the
-/// wording the Settings and menu UI show.
+/// exactly what `startIfAllowed`'s guard exists to prevent a test run from
+/// doing (see `ARCHITECTURE.md` §6, rule 26). What's testable without touching
+/// the network or Sparkle's own state is that guard, the static configuration
+/// it depends on (the Info.plist keys Sparkle reads), and the wording the
+/// Settings and menu UI show.
 final class UpdateControllerTests: XCTestCase {
+
+    /// Rule 26, review 2026-10-30 (4c5e).
+    @MainActor
+    func testUpdaterStartsOnlyOutsideTestsAndDemoMode() {
+        var made = 0
+        let make = { () -> Int in
+            made += 1
+            return made
+        }
+        XCTAssertNil(UpdateController.startIfAllowed(isHostingTests: true, isDemo: false, make: make))
+        XCTAssertNil(UpdateController.startIfAllowed(isHostingTests: false, isDemo: true, make: make))
+        XCTAssertEqual(made, 0)
+        XCTAssertEqual(UpdateController.startIfAllowed(isHostingTests: false, isDemo: false, make: make), 1)
+    }
 
     /// The test host is `mcpock.app` itself (`project.yml`'s `TEST_HOST`), so
     /// `Bundle.main` here is the real app bundle with the real Info.plist —
