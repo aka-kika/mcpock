@@ -64,3 +64,45 @@ final class ReviewOct30ProbeTests: XCTestCase {
         XCTAssertEqual(result.failureReason?.components(separatedBy: " — ").first, "Timed out after 2s")
     }
 }
+
+@MainActor
+final class ReviewOct30MonitorTests: XCTestCase {
+    private var suite: String!
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        suite = "mcpock.tests.oct30.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)
+    }
+
+    override func tearDown() {
+        defaults.retireSuite(named: suite)
+        super.tearDown()
+    }
+
+    private func config(_ name: String = "xapi") -> ServerConfig {
+        ServerConfig(id: "Code:\(name)", name: name, source: ServerSource(label: AgentRegistry.claudeCodeLabel, path: "/k/.claude.json"),
+                     projectPath: nil, transport: .stdio, command: "/bin/echo", args: [], env: [:], url: nil, headers: [:])
+    }
+
+    private func monitor(_ configs: [ServerConfig]) -> HealthMonitor {
+        let monitor = HealthMonitor(defaults: defaults, isUpdate: false)
+        monitor.discover = { configs }
+        monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
+        return monitor
+    }
+
+    /// 2a27: Check again reads the session logs too.
+    func testCheckAgainRefreshesSessionDrops() async {
+        let monitor = monitor([config()])
+        await monitor.refreshAll()
+        let drop = SessionDrop(folder: "/u/Recall", at: Date())
+        monitor.readSessionDrops = { ["xapi": [drop]] }
+        await monitor.refresh(groupName: "xapi")
+        XCTAssertTrue(monitor.groups.first?.droppedInSession == true)
+        monitor.readSessionDrops = { [:] }
+        await monitor.refresh(groupName: "xapi")
+        XCTAssertFalse(monitor.groups.first?.droppedInSession == true)
+    }
+}

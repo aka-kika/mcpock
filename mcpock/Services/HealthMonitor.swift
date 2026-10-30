@@ -767,6 +767,9 @@ final class HealthMonitor {
                 guard let (result, lookup) = results[self.servers[index].id] else { continue }
                 self.apply(result, at: index, lookup: lookup)
             }
+            // She pressed Check again, maybe right after /mcp: a lost row must
+            // not linger until the next round (review 2026-10-30, 2a27).
+            await self.refreshSessionDrops()
         }
         probeTask = task
         probeTaskIsFullCycle = false
