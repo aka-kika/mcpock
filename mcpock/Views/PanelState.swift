@@ -53,7 +53,9 @@ final class PanelState {
     }
     /// The search text. Only ever non-empty while the search field is open: a
     /// closed field must never filter the list out of sight.
-    var query = ""
+    var query = "" {
+        didSet { if query != oldValue { dropRowsNoLongerListed() } }
+    }
     /// The search field under the tabs. Closed by default; the footer's
     /// magnifier or ⌘F opens it, Escape or Return closes and clears it.
     private(set) var isSearchOpen = false
@@ -344,6 +346,18 @@ final class PanelState {
     func pickFilter(_ newFilter: PanelFilter) {
         userPickedFilter = true
         filter = newFilter
+        dropRowsNoLongerListed()
+    }
+
+    /// The search or the attention toggle took the selected row out of the list:
+    /// its card goes with it, instead of staying open over a list that no
+    /// longer shows it (review 2026-10-30, 462c).
+    private func dropRowsNoLongerListed() {
+        if let selectedName, !orderedNames.contains(selectedName) {
+            closeCard()
+            self.selectedName = nil
+        }
+        dropStaleAgentSelection()
     }
 
     /// The footer's attention toggle: Needs you on, or back to All.
@@ -403,13 +417,7 @@ final class PanelState {
         filter = .problems
         isAutoFiltering = false
         didJumpToNeedsYou = true
-        // The selected row may not be a problem; don't leave its card open over a
-        // list that no longer shows it.
-        if let selectedName, !orderedNames.contains(selectedName) {
-            closeCard()
-            self.selectedName = nil
-        }
-        dropStaleAgentSelection()
+        dropRowsNoLongerListed()
     }
 
     /// Whether the panel should switch itself to Needs you. Pure.

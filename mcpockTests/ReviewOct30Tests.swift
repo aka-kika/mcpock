@@ -105,4 +105,24 @@ final class ReviewOct30MonitorTests: XCTestCase {
         await monitor.refresh(groupName: "xapi")
         XCTAssertFalse(monitor.groups.first?.droppedInSession == true)
     }
+
+    /// 462c: a search or the toggle closes the card of a row they took away.
+    func testSearchAndToggleCloseTheCardOfARowThatLeft() async {
+        let monitor = monitor([config("alpha"), config("beta")])
+        await monitor.refreshAll()
+        let panel = PanelState(monitor: monitor, defaults: defaults)
+        panel.tab = .servers
+        panel.rowClicked("alpha")
+        XCTAssertTrue(panel.isCardOpen)
+        panel.query = "alp"
+        XCTAssertTrue(panel.isCardOpen, "still listed")
+        panel.query = "beta"
+        XCTAssertFalse(panel.isCardOpen)
+        XCTAssertNil(panel.selectedName)
+
+        panel.query = ""
+        panel.rowClicked("alpha")
+        panel.pickFilter(.problems)
+        XCTAssertFalse(panel.isCardOpen, "a fine row leaves Needs you")
+    }
 }
