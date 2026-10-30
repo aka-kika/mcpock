@@ -83,6 +83,7 @@ enum DemoData {
     /// this at discovery time).
     static func seedPreferences(_ defaults: UserDefaults) {
         AppPreferences.savePausedServers([HealthMonitor.normalizedName(pausedServerName)], to: defaults)
+        AppPreferences.saveUsageWindow(.thirtyDays, to: defaults)   // the screenshots show the counts
     }
 
     /// A scratch directory for the usage store, so `UsageStore.load()` never

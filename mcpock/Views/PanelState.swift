@@ -187,7 +187,7 @@ final class PanelState {
     var showsUsageNote = false
     nonisolated static let usageNoteShownKey = "usageNoteShown"
     nonisolated static let usageNoteText = "The call counts beside servers come from your agents' chat history "
-        + "on this Mac, read only here. To stop it, turn Usage off in Settings > General."
+        + "on this Mac, read only here. To stop it, turn Usage counts off in Settings > General."
 
     nonisolated static func shouldShowUsageNote(defaults: UserDefaults) -> Bool {
         !defaults.bool(forKey: usageNoteShownKey) && AppPreferences.loadUsageWindow(from: defaults) != .off

@@ -29,6 +29,9 @@ struct SettingsGeneralPane: View {
     /// The short snap to the nearest stop after a drag.
     @State private var snapTask: Task<Void, Never>?
 
+    static let usageTitle = "Usage counts"
+    static let usageText = "How many times each agent called each server, over the last 30 days. "
+        + "Counted from your agents' chat history on this Mac, read only here."
     static let hotKeyTitle = "Open with a shortcut"
     static func hotKeyHelp(_ shortcut: PanelShortcut) -> String {
         "\(shortcut.spokenText) opens and closes the panel from any app. "
@@ -84,23 +87,21 @@ struct SettingsGeneralPane: View {
                         accessibilityLabel: "Appearance",
                         trackFill: theme.rowHighlight
                     )
-                    // 240, not 200: four stops now (Glass, 1.8), same width as
-                    // the Usage segments below so neither row crowds its text.
+                    // 240, not 200: four stops now (Glass, 1.8).
                     .frame(width: 240)
                 }
-                HStack {
-                    Text("Usage")
-                    Spacer(minLength: 12)
-                    NeutralSegments(
-                        options: UsageWindow.allCases.map { ($0.rawValue, $0.title) },
-                        selection: $usageWindowRaw,
-                        theme: theme,
-                        accessibilityLabel: "Usage",
-                        trackFill: theme.rowHighlight
-                    )
-                    .frame(width: 240)
+                Toggle(isOn: Binding(
+                    get: { usageWindowRaw != UsageWindow.off.rawValue },
+                    set: { usageWindowRaw = ($0 ? UsageWindow.thirtyDays : .off).rawValue }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(Self.usageTitle)
+                        Text(Self.usageText)
+                            .font(Theme.caption)
+                            .foregroundStyle(theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .help("How many times each agent called each server, next to its name in the Agents tab.")
             }
 
             Section {

@@ -81,11 +81,11 @@ Full notes: [1.12.0](docs/release-notes/1.12.0.md), [1.12.1](docs/release-notes/
   first 5, **+N more** for the rest; servers that need you always show) and
   its config file. With the problems toggle on, agents with nothing wrong
   stay listed below, faded.
-- **Usage counts.** Next to each server under an agent: how many times that
-  agent called it in the last 7 days, 30 days or all time (Settings >
-  General > Usage, or Off). Read from the agent's own history on your Mac:
-  Claude Code, Grok, Cursor and Hermes today. A dash means that agent keeps
-  no record mcpock can read yet. The panel says so once, with a Turn Off.
+- **Usage counts, if you want them.** One switch in Settings > General, off for
+  a new install. Then, next to each server under an agent: how many times that
+  agent called it in the last 30 days. Read from the agent's own history on your
+  Mac: Claude Code, Grok, Cursor and Hermes today. A dash means that agent keeps
+  no record mcpock can read yet.
 - **Detail card.** Click a row: the full error (with **Ask an agent** and
   **Copy errors**), which agents use the server and where their config lives,
   its tools (name and short description; **+N more** lists them all), and
@@ -303,7 +303,8 @@ letters.
   for each history file a hashed key, how far it has read and the time of the
   newest call it counted, and for Cursor the record keys of recent calls with
   their times. Never a message, an argument, a result or a file path.
-  Settings > General > Usage > Off stops the reading.
+  They are off until you turn on **Usage counts** in Settings > General, and
+  turning them off stops the reading.
 - **Session logs, read only.** To spot a server lost in an open Claude Code
   session, mcpock reads `~/.claude/sessions/*.json` (which sessions run, and
   in which folder) and those sessions' lines in Claude Code's own MCP logs

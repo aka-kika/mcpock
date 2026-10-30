@@ -275,8 +275,24 @@ final class UsageTextTests: XCTestCase {
 // MARK: - UsageWindow / AppPreferences
 
 final class UsageWindowPreferenceTests: XCTestCase {
-    func testDefaultIsThirtyDays() {
-        XCTAssertEqual(UsageWindow.default, .thirtyDays)
+    /// 1.13: off for a new install, and an earlier one keeps counting.
+    func testDefaultIsOffAndEarlierInstallsKeepCounting() {
+        XCTAssertEqual(UsageWindow.default, .off)
+        let suite = "mcpock.tests.usagedefault.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.retireSuite(named: suite) }
+
+        AppPreferences.keepUsageForEarlierInstall(ranBefore: false, defaults: defaults)
+        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .off, "a new install")
+
+        AppPreferences.keepUsageForEarlierInstall(ranBefore: true, defaults: defaults)
+        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .thirtyDays, "never touched: it was counting")
+
+        for chosen in [UsageWindow.sevenDays, .allTime, .off] {
+            AppPreferences.saveUsageWindow(chosen, to: defaults)
+            AppPreferences.keepUsageForEarlierInstall(ranBefore: true, defaults: defaults)
+            XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), chosen, "its own choice stays")
+        }
     }
 
     func testDaysForEachStop() {
@@ -291,7 +307,7 @@ final class UsageWindowPreferenceTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.retireSuite(named: suite) }
 
-        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .thirtyDays, "default when nothing saved")
+        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .off, "default when nothing saved")
         AppPreferences.saveUsageWindow(.off, to: defaults)
         XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .off)
         AppPreferences.saveUsageWindow(.allTime, to: defaults)

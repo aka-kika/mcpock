@@ -160,10 +160,11 @@ enum AppPreferences {
         defaults.set(interval.rawValue, forKey: probeIntervalKey)
     }
 
-    /// Settings > General "Usage" (1.7): how many days of MCP calls per
-    /// server `UsageStore` counts, next to a server's name when its agent is
-    /// open in the Agents tab. Off hides the numbers and stops reading
-    /// entirely.
+    /// Settings > General "Usage counts" (1.7; one switch since 1.13): how many
+    /// days of MCP calls per server `UsageStore` counts, next to a server's name
+    /// when its agent is open in the Agents tab. Off hides the numbers and stops
+    /// reading entirely. New installs start off; 30 days is what the switch turns
+    /// on, and an earlier install keeps the 7 days or All time it chose.
     static let usageWindowKey = "usageWindow"
 
     /// Settings > General "Open with ⌃⌥M" (1.10): the shortcut that opens
@@ -184,28 +185,26 @@ enum AppPreferences {
     static func saveUsageWindow(_ window: UsageWindow, to defaults: UserDefaults = store) {
         defaults.set(window.rawValue, forKey: usageWindowKey)
     }
+
+    /// The default changed from 30 days to off in 1.13, and an earlier install
+    /// that never touched the choice has nothing saved: it keeps counting. Run
+    /// once at launch, before anything reads it.
+    static func keepUsageForEarlierInstall(ranBefore: Bool, defaults: UserDefaults = store) {
+        guard ranBefore, defaults.object(forKey: usageWindowKey) == nil else { return }
+        saveUsageWindow(.thirtyDays, to: defaults)
+    }
 }
 
-/// Settings > General "Usage" slider stops, left to right: Off, then how far
-/// back `UsageStore` counts.
-enum UsageWindow: Int, CaseIterable, Identifiable {
+/// How far back `UsageStore` counts. The switch in Settings is off or 30 days;
+/// 7 days and All time remain for an install that chose them before 1.13.
+enum UsageWindow: Int {
     case off = 0
     case sevenDays = 7
     case thirtyDays = 30
     case allTime = -1
 
-    static let `default` = UsageWindow.thirtyDays
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .off: return "Off"
-        case .sevenDays: return "7 days"
-        case .thirtyDays: return "30 days"
-        case .allTime: return "All time"
-        }
-    }
+    /// Off, so a first launch has no note about reading chat history (1.13).
+    static let `default` = UsageWindow.off
 
     /// Days to count back, inclusive of today; nil = no limit (All time, and
     /// Off, which is never queried — the view hides the count entirely).

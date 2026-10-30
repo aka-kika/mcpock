@@ -252,13 +252,15 @@ final class PanelStateTests: XCTestCase {
     /// r3 3da1: the usage note shows once, until OK or Turn Off, and never
     /// while Usage is off. Turn Off sets Usage to Off.
     func testUsageNoteOnceAndTurnOff() {
+        XCTAssertFalse(PanelState.shouldShowUsageNote(defaults: defaults), "a new install starts off: nothing to say")
+        AppPreferences.saveUsageWindow(.thirtyDays, to: defaults)
         XCTAssertTrue(PanelState.shouldShowUsageNote(defaults: defaults))
         let state = makeState()
         state.showsUsageNote = true
         state.dismissUsageNote(turnOff: false)
         XCTAssertFalse(state.showsUsageNote)
         XCTAssertFalse(PanelState.shouldShowUsageNote(defaults: defaults), "only once")
-        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .default, "OK keeps Usage on")
+        XCTAssertEqual(AppPreferences.loadUsageWindow(from: defaults), .thirtyDays, "OK keeps Usage on")
 
         defaults.removeObject(forKey: PanelState.usageNoteShownKey)
         state.dismissUsageNote(turnOff: true)

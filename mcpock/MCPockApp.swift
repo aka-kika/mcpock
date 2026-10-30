@@ -47,6 +47,8 @@ struct MCPockApp: App {
         // Settings and files left by the 1.10.7 test builds' test calls,
         // dropped before the release (2026-10-17). Same guard: real setup only.
         if !isHostingTests && !isDemo { TestCallLeftovers.remove() }
+        // Read before the first status write, like the welcome line below.
+        if !isHostingTests && !isDemo { AppPreferences.keepUsageForEarlierInstall(ranBefore: HealthMonitor.ranBefore()) }
         // Demo mode's monitor, panel and Settings persist into a throwaway
         // suite, never `.standard` (the user's real saved pins, hidden/paused
         // servers, theme…): `AppPreferences.store`.
