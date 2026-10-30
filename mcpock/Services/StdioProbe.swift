@@ -54,6 +54,7 @@ enum StdioProbe {
 
         let deadline = ContinuousClock.now + timeout
         var runner: ProcessRunner?
+        var initialized = false
         do {
             let process = try ProcessRunner(
                 command: command,
@@ -75,6 +76,7 @@ enum StdioProbe {
                 initResponse = try await readResponse(from: process, id: 1, deadline: deadline, limit: timeout)
             }
             try MCPJSONRPC.validateInitializeResponse(initResponse)
+            initialized = true
 
             // notifications/initialized
             let notified = try MCPJSONRPC.encodeLine(MCPJSONRPC.initializedNotification())
@@ -99,7 +101,7 @@ enum StdioProbe {
             let transient = (error as? ProbeError)?.isTransient ?? false
             return ProbeResult(
                 state: .broken,
-                failureReason: failureReason(for: error, runner: runner),
+                failureReason: failureReason(for: error, runner: runner, initialized: initialized),
                 tools: nil,
                 transientFailure: transient
             )
@@ -146,7 +148,7 @@ enum StdioProbe {
     /// server died on its own, and append its stderr reason when present — the
     /// first line that looks like the real error (if the tail alone wouldn't
     /// show it), then the tail.
-    private static func failureReason(for error: Error, runner: ProcessRunner?) -> String {
+    private static func failureReason(for error: Error, runner: ProcessRunner?, initialized: Bool) -> String {
         var head = (error as? ProbeError)?.localizedDescription ?? error.localizedDescription
 
         // If the process exited on its own (not killed by a signal — ours or anyone
@@ -155,7 +157,8 @@ enum StdioProbe {
         if let runner, (error as? ProbeError)?.isTransient != true, !runner.isRunning, runner.exitedNormally {
             let status = runner.terminationStatus
             if status != 0 {
-                head = ProbeError.nonZeroExit(status).localizedDescription
+                let exit: ProbeError = initialized ? .exitedAfterStart(status) : .nonZeroExit(status)
+                head = exit.localizedDescription
             }
         }
 

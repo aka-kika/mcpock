@@ -373,6 +373,8 @@ enum ProbeError: Error, LocalizedError, Sendable {
     case timeout(Duration)
     case handshakeRejected(String)
     case nonZeroExit(Int32)
+    /// It answered initialize, then died (review 2026-10-30, c660).
+    case exitedAfterStart(Int32)
     case invalidURL(String)
     case httpError(Int, String)
     case protocolError(String)
@@ -397,6 +399,8 @@ enum ProbeError: Error, LocalizedError, Sendable {
             return "Handshake rejected: \(SecretMask.scrub(String(detail.prefix(240))))"
         case .nonZeroExit(let code):
             return "Non-zero exit (\(code))"
+        case .exitedAfterStart(let code):
+            return "Exited after start (\(code))"
         case .invalidURL(let url):
             return "Invalid URL: \(url)"
         case .httpError(let code, let body):
@@ -433,7 +437,7 @@ enum ProbeError: Error, LocalizedError, Sendable {
         switch self {
         case .timeout:
             return true
-        case .spawnFailed, .handshakeRejected, .nonZeroExit,
+        case .spawnFailed, .handshakeRejected, .nonZeroExit, .exitedAfterStart,
              .invalidURL, .httpError, .protocolError, .noData, .headerHelper:
             return false
         }

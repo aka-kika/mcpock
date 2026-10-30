@@ -81,6 +81,10 @@ enum ShortReason {
             let code = rest.hasSuffix(")") ? String(rest.dropLast()) : rest
             return "Quit on start (exit \(code))"
         }
+        if let rest = trimmed.dropPrefix("Exited after start (") {
+            let code = rest.hasSuffix(")") ? String(rest.dropLast()) : rest
+            return "Quit after starting (exit \(code))"
+        }
         if trimmed.hasPrefix("Handshake rejected") {
             return "Refused the handshake"
         }

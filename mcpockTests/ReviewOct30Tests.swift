@@ -74,6 +74,19 @@ final class ReviewOct30ProbeTests: XCTestCase {
         XCTAssertEqual(result.tools?.map(\.name), ["ok"])
     }
 
+    /// c660: "Quit on start" only when it never answered initialize.
+    func testExitAfterInitializeIsNotQuitOnStart() async throws {
+        let config = try server(onInitialize: Self.answerInitialize, onTools: "sys.exit(3)")
+        let result = await StdioProbe.probe(config: config, fetchTools: true, timeout: .seconds(5))
+        let reason = try XCTUnwrap(result.failureReason)
+        XCTAssertEqual(reason.components(separatedBy: " — ").first, "Exited after start (3)")
+        XCTAssertEqual(ShortReason.from(reason, state: .broken), "Quit after starting (exit 3)")
+
+        let early = try server(onInitialize: "sys.exit(3)", onTools: "pass")
+        let earlyResult = await StdioProbe.probe(config: early, fetchTools: true, timeout: .seconds(5))
+        XCTAssertEqual(earlyResult.failureReason.map { ShortReason.from($0, state: .broken) }, "Quit on start (exit 3)")
+    }
+
     /// 1279: a `${VAR}` secret a server echoes is masked, though the config
     /// mcpock keeps only says `${VAR}`.
     func testEchoedVariableSecretIsMasked() async throws {
