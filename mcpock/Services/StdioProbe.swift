@@ -118,7 +118,14 @@ enum StdioProbe {
         while true {
             let remaining = deadline - ContinuousClock.now
             guard remaining > .zero else { throw ProbeError.timeout(limit) }
-            let data = try await process.readMessage(timeout: remaining)
+            let data: Data
+            do {
+                data = try await process.readMessage(timeout: remaining)
+            } catch ProbeError.timeout {
+                // The whole attempt's budget, not what was left of it: a slow
+                // initialize used to read "No answer in 12 s" (review 2026-10-30, 2cbb).
+                throw ProbeError.timeout(limit)
+            }
             // A line that only looks like JSON (a banner such as
             // `{path: .env}`) is noise, not a broken server (Argon 2026-10-17 #1).
             guard let message = try? MCPJSONRPC.parseJSONObject(data) else { continue }
