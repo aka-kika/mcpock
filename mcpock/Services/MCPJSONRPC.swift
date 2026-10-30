@@ -69,6 +69,14 @@ enum MCPJSONRPC {
         return id == initializeID && message["error"] != nil && (message["id"] == nil || message["id"] is NSNull)
     }
 
+    /// The message of an error with a null id: a server's answer to something
+    /// it could not read, or nil for anything else.
+    static func nullIDError(_ message: [String: Any]) -> String? {
+        guard message["id"] == nil || message["id"] is NSNull,
+              let error = message["error"] as? [String: Any] else { return nil }
+        return error["message"] as? String ?? "Error with no id"
+    }
+
     static func parseJSONObject(_ data: Data) throws -> [String: Any] {
         let obj = try JSONSerialization.jsonObject(with: data, options: [])
         guard let dict = obj as? [String: Any] else {

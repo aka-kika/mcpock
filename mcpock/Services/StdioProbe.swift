@@ -115,16 +115,22 @@ enum StdioProbe {
         deadline: ContinuousClock.Instant,
         limit: Duration
     ) async throws -> [String: Any] {
+        // A null-id error can't stand in for the answer to tools/list (r3 f730),
+        // but if the answer never comes it is what the server had to say: better
+        // than "Timed out" (review 2026-10-30, 1266).
+        var refusal: String?
         while true {
             let remaining = deadline - ContinuousClock.now
-            guard remaining > .zero else { throw ProbeError.timeout(limit) }
+            guard remaining > .zero else {
+                throw refusal.map(ProbeError.protocolError) ?? ProbeError.timeout(limit)
+            }
             let data: Data
             do {
                 data = try await process.readMessage(timeout: remaining)
             } catch ProbeError.timeout {
                 // The whole attempt's budget, not what was left of it: a slow
                 // initialize used to read "No answer in 12 s" (review 2026-10-30, 2cbb).
-                throw ProbeError.timeout(limit)
+                throw refusal.map(ProbeError.protocolError) ?? ProbeError.timeout(limit)
             }
             // A line that only looks like JSON (a banner such as
             // `{path: .env}`) is noise, not a broken server (Argon 2026-10-17 #1).
@@ -132,6 +138,7 @@ enum StdioProbe {
             if MCPJSONRPC.isResponse(message, to: id) {
                 return message
             }
+            refusal = MCPJSONRPC.nullIDError(message) ?? refusal
         }
     }
 

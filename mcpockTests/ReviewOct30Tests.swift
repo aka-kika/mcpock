@@ -54,6 +54,26 @@ final class ReviewOct30ProbeTests: XCTestCase {
                             command: "/usr/bin/python3", args: ["-u", url.path], env: env, url: nil, headers: [:])
     }
 
+    /// 1266: a null-id error to tools/list is reported when no answer comes.
+    func testNullIDErrorIsWhatTheTimeoutReports() async throws {
+        let refuse = "send({'jsonrpc': '2.0', 'id': None, 'error': {'code': -32600, 'message': 'bad request'}})"
+        let config = try server(onInitialize: Self.answerInitialize, onTools: refuse)
+        let result = await StdioProbe.probe(config: config, fetchTools: true, timeout: .seconds(1))
+        XCTAssertEqual(result.state, .broken)
+        XCTAssertFalse(result.transientFailure)
+        XCTAssertEqual(result.failureReason?.components(separatedBy: " — ").first, "Protocol error: bad request")
+    }
+
+    /// r3 f730 still holds: the real answer wins over a null-id error before it.
+    func testNullIDErrorDoesNotStandInForTheAnswer() async throws {
+        let refuseThenAnswer = "send({'jsonrpc': '2.0', 'id': None, 'error': {'code': -32600, 'message': 'no'}}); "
+            + "send({'jsonrpc': '2.0', 'id': msg['id'], 'result': {'tools': [{'name': 'ok'}]}})"
+        let config = try server(onInitialize: Self.answerInitialize, onTools: refuseThenAnswer)
+        let result = await StdioProbe.probe(config: config, fetchTools: true, timeout: .seconds(5))
+        XCTAssertEqual(result.state, .healthy)
+        XCTAssertEqual(result.tools?.map(\.name), ["ok"])
+    }
+
     /// 1279: a `${VAR}` secret a server echoes is masked, though the config
     /// mcpock keeps only says `${VAR}`.
     func testEchoedVariableSecretIsMasked() async throws {
