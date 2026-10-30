@@ -216,8 +216,9 @@ standard formats (JSON `mcpServers`, `servers` or `mcp`; TOML
 `[mcp_servers.*]`; YAML `extensions:` or `mcp_servers:`) in `~/.config`,
 `~/Library/Application Support` or a hidden folder in your home folder is found
 by the scan, with no code change. A server from a file only the scan found shows
-**Paused** until you choose **Resume** once (right-click the row): mcpock never
-starts a command from a file no agent it knows reads without your OK.
+**Waiting for your OK** until you choose **Allow this file** once (on its card, or
+right-click the row): mcpock never starts a command from a file no agent it knows
+reads without your OK.
 
 | Agent | Config file | Format |
 |-------|-------------|--------|
