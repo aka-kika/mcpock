@@ -66,6 +66,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         var needsAttention: Bool
         /// The panel's one-line reason, when there is one.
         var reason: String?
+        /// What to do about it (`NextStep`), fixed wording. Optional: absent in
+        /// older files and on rows with nothing to add.
+        var nextStep: String? = nil
         var hidden: Bool
         var pinned: Bool
         var transports: [String]

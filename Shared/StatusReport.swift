@@ -176,6 +176,7 @@ enum StatusReport {
             lines.append(indent + "Reason:")
             lines.append(contentsOf: untrustedBlock(reason, indent: indent))
         }
+        if let step = s.nextStep, !step.isEmpty { lines.append(indent + "Next step: \(step)") }
         if let note = s.note, !note.isEmpty { lines.append(indent + "Note: \(note)") }
         if let app = s.needsApp {
             lines.append(indent + "Not broken: it belongs to the \(app) app, which is closed. "

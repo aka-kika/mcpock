@@ -191,6 +191,7 @@ struct DetailCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            nextStepLine
             // A quiet way to the config, without the right-click and the
             // warning (r3 50f1): Finder only, mcpock never opens it for editing.
             if let path = CardText.failingConfigPath(for: group) {
@@ -222,6 +223,17 @@ struct DetailCardView: View {
         .modifier(ToneBox(tone: tone))
     }
 
+    /// "Next step: …" (1.13), the same words agents read in `mcpock_problems`.
+    @ViewBuilder
+    private var nextStepLine: some View {
+        if let step = NextStep.line(for: group) {
+            Text("Next step: \(step)")
+                .font(Theme.caption)
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     /// Gap between the problem boxes' buttons, across and down.
     private static let buttonGap: CGFloat = 6
 
@@ -243,6 +255,7 @@ struct DetailCardView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(theme.statusDegraded)
                 .fixedSize(horizontal: false, vertical: true)
+            nextStepLine
             // Layout B (1.5.3): two by two, every button the same width and
             // height, nothing wraps.
             VStack(spacing: Self.buttonGap) {

@@ -151,6 +151,7 @@ enum StatusSnapshot {
             status: status,
             needsAttention: ["broken", "slow", "needs sign-in", "set up differently", badConfigStatus, lostStatus].contains(status),
             reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
+            nextStep: NextStep.line(for: group),
             hidden: hidden,
             pinned: pinned,
             transports: CardText.transports(of: group).components(separatedBy: " / ").filter { !$0.isEmpty },
