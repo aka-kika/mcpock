@@ -111,7 +111,7 @@ card is open).
 | `Services/ShortReason.swift`, `PanelText.swift`, `CardText.swift`, `MenuText.swift` | Every short line, footer summary, card sentence and menu text |
 | `Services/ServerVisibility.swift` | Pinned / Shown / Hidden |
 | `Services/ErrorExport.swift` | Markdown/JSON report of failing servers (Settings > General > Errors) |
-| `Services/ServerReport.swift` | 1.5.3: the server menu's Copy Details and the Ask an Agent prompt, built on `StatusSnapshot.server` so they carry the status file's masking |
+| `Services/ServerReport.swift` | 1.5.3: the details ⌘C copies for a fine row and the Ask an Agent prompt, built on `StatusSnapshot.server` so they carry the status file's masking |
 | `Services/StatusSnapshot.swift`, `SecretMask.swift` | Builds the status file; masks tokens, URL secrets and every env/header value |
 | `Services/ConnectSnippets.swift` | What Settings > Connect copies: per-agent snippets and the Copy for Claude prompt |
 | `Services/AgentConnect/AgentHost.swift` | Settings > Connect's agent rows (1.10.7, the list from Kartina): whether each agent's file already has an `mcpock` entry, read with the scan's own readers, and the line to paste. Read-only |
@@ -337,7 +337,7 @@ falls back to streamable HTTP, because many configs label streamable servers
 16. **"Mark as intended" stores fingerprints, never targets** (a URL can hold
     a token), and only silences the differs note: an acknowledged row is still
     probed and its failures still count. `DifferentOnPurposeTests`.
-17. **Copy Details and Ask an Agent go through `StatusSnapshot.server`**
+17. **⌘C's details and Ask an Agent go through `StatusSnapshot.server`**
     (1.5.3), so the clipboard gets the status file's masking. Ask an Agent
     asks the agent to investigate and advise, never to change anything first.
     `ServerReportTests`.

@@ -29,10 +29,8 @@ final class MenuTextTests: XCTestCase {
         }
     }
 
-    /// 1.5.3: exactly two copy items and Ask an Agent, as specified
-    /// (title case in menus).
+    /// Title case in menus.
     func testServerMenuTitles() {
-        XCTAssertEqual(MenuText.copyDetailsTitle, "Copy Details")
         XCTAssertEqual(MenuText.copyErrorsTitle, "Copy Errors")
         XCTAssertEqual(MenuText.askAgentTitle, "Ask an Agent")
         XCTAssertEqual(MenuText.markAsIntendedTitle, "Mark as Intended")

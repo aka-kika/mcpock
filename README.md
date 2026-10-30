@@ -147,12 +147,14 @@ Needs **macOS 26 or later** on Apple Silicon.
 2. Click a row that needs you. The card says why, in plain words.
 3. Click **Copy errors** (or **Ask an agent**) and paste it to your agent, or
    fix the config yourself.
-4. Click **Check again** on the card (or press Cmd-R) to confirm. It reads the
-   config file again first, so a fix shows up right away.
-5. Right-click any server for Pause, Pin, Hide, **Copy Details**,
-   **Copy Errors** and **Ask an Agent** (a prompt that asks an agent to look into
-   the problem and advise you before it changes anything). Pause a server
-   that opens a login page or an app each time it starts.
+4. Save the fix. mcpock sees the changed config within seconds and checks that
+   server again, so the row turns green by itself. **Check again** on the card
+   (or Cmd-R) does it at once; with checks set to Manual, it waits for you.
+5. Right-click any server for Pause, Pin, Hide, **Copy Errors** and **Ask an
+   Agent** (a prompt that asks an agent to look into the problem and advise you
+   before it changes anything). Pause a server that opens a login page or an
+   app each time it starts. Right-click the summary at the bottom of the panel
+   for **Copy All Problems**.
 
 ## Connect your agents
 

@@ -105,7 +105,7 @@ enum StatusSnapshot {
     }
 
     /// One row as the status file holds it, secrets masked. Also what the
-    /// right-click "Copy Details" and "Ask an Agent" build on (1.5.3), so the
+    /// ⌘C on a fine row and "Ask an Agent" build on (1.5.3), so the
     /// clipboard gets exactly the status file's masking.
     static func server(
         _ group: ServerGroup,

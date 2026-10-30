@@ -12,8 +12,6 @@ struct ServerRowActions {
     let togglePin: () -> Void
     /// "Mark as Intended" (true) / "Unmark as Intended" (false) (1.5.2).
     let setIntended: (Bool) -> Void
-    /// "Copy Details" (1.5.3): masked like the status file.
-    let copyDetails: () -> Void
     /// "Ask an Agent" (1.5.3): a prompt that asks an agent to investigate and advise.
     let askAgent: () -> Void
 }
@@ -153,9 +151,9 @@ struct ServerRowView: View {
 /// A server's right-click menu, the same in the Servers tab, inside an open
 /// agent and on the card's title (round 5). Kept from v1.4: pause, hide, copy;
 /// round 5 added Check again (the card's button, so it spins there too).
-/// 1.5.3: exactly two copy items, Copy Details (always) and Copy Errors (only
-/// with an error), and Ask an Agent for a row that needs you. A row marked as
-/// intended offers only Unmark as Intended, never Mark again.
+/// 1.13: Copy Errors (only with an error) and Ask an Agent (only for a row
+/// that needs you); Copy All Problems lives on the agent rows and the footer.
+/// A row marked as intended offers only Unmark as Intended, never Mark again.
 struct ServerContextMenu: View {
     let group: ServerGroup
     let isPinned: Bool
@@ -188,9 +186,8 @@ struct ServerContextMenu: View {
                 Label(item.title, systemImage: item.systemImage)
             }
         }
-        Divider()
-        Button(action: actions.copyDetails) {
-            Label(MenuText.copyDetailsTitle, systemImage: "doc.on.doc")
+        if MenuText.copyError(for: group) != nil || ServerReport.canAskAgent(group) {
+            Divider()
         }
         if let errors = MenuText.copyError(for: group) {
             Button { PanelState.copyToPasteboard(errors) } label: {

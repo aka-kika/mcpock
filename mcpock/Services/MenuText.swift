@@ -3,11 +3,10 @@ import Foundation
 /// What the right-click menus copy (round 5: "right-click everywhere"). Pure, so
 /// `MenuTextTests` checks the texts without a menu.
 enum MenuText {
-    /// The server menu's copy items (1.5.3: exactly two): the details of
-    /// any row, and the errors of a row that has them. Plus "Ask an Agent" for
-    /// a row that needs you. Menu items use title case; the card's buttons say
-    /// the same in sentence case (`CardText`).
-    static let copyDetailsTitle = "Copy Details"
+    /// Three ways to copy, all told (1.13): the errors of a row that has them,
+    /// "Ask an Agent" for a row that needs you, and "Copy All Problems" for an
+    /// agent or, from the footer, the whole setup. Menu items use title case;
+    /// the card's buttons say the same in sentence case (`CardText`).
     static let copyErrorsTitle = "Copy Errors"
     static let askAgentTitle = "Ask an Agent"
 

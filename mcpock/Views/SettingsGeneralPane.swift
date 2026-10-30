@@ -200,8 +200,6 @@ struct SettingsGeneralPane: View {
                         }
                     }
                     Spacer(minLength: 12)
-                    Button("Copy All") { copyAllErrors() }
-                        .help("Copy a report of every failing server, ready to paste to an agent")
                     Button("Export\u{2026}") { exportErrors() }
                         .help("Save the same report as Markdown or JSON")
                 }
@@ -361,21 +359,6 @@ struct SettingsGeneralPane: View {
 
     private func save(_ stop: ProbeInterval) {
         if stop.rawValue != probeIntervalRaw { probeIntervalRaw = stop.rawValue }
-    }
-
-    /// Put the same report "Export…" writes onto the clipboard — the panel's
-    /// per-row "Copy errors" is one server; this is all of them at once.
-    private func copyAllErrors() {
-        guard let status = monitor?.statusSnapshot() else { return }
-        let failing = ErrorExport.failing(status).count
-        guard failing > 0 else {
-            exportNote = "No errors to copy"
-            return
-        }
-        let report = ErrorExport.markdown(from: status, now: Date())
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(report, forType: .string)
-        exportNote = "Copied \(failing) error\(failing == 1 ? "" : "s")"
     }
 
     /// Save a report of every failing server to a Markdown or JSON file (chosen by

@@ -1,7 +1,7 @@
 import Foundation
 
-/// What the server menu's "Copy Details" and "Ask an Agent" put on the
-/// clipboard (1.5.3). Both start from the status file's entry for the row
+/// The details ⌘C copies for a fine row and the "Ask an Agent" prompt (1.5.3).
+/// Both start from the status file's entry for the row
 /// (`StatusSnapshot.server`), so they carry exactly the status file's masking:
 /// env and header names only, secret-looking arguments, URL secrets and echoed
 /// keys replaced with dots. Pure, so `ServerReportTests` pins the texts down.
@@ -12,9 +12,9 @@ enum ServerReport {
         return StatusSnapshot.server(group, byID: byID, hidden: false, pinned: false)
     }
 
-    // MARK: - Copy Details
+    // MARK: - Details
 
-    /// "Copy Details": name, state, every agent with its config path,
+    /// Name, state, every agent with its config path,
     /// transport and masked command or URL, the tool count, when it was last
     /// checked. The same for every state; errors are "Copy Errors"' job.
     static func detailsText(_ server: MCPockStatus.Server, now: Date) -> String {

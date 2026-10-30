@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import mcpock
 
@@ -191,6 +192,18 @@ final class ReviewOct30MonitorTests: XCTestCase {
         monitor.readSessionDrops = { [:] }
         await monitor.refresh(groupName: "xapi")
         XCTAssertFalse(monitor.groups.first?.droppedInSession == true)
+    }
+
+    /// Merge 1: the footer's Copy All Problems.
+    func testCopyAllProblemsCountsWhatItCopies() async {
+        let monitor = monitor([config("alpha")])
+        await monitor.refreshAll()
+        let panel = PanelState(monitor: monitor, defaults: defaults)
+        XCTAssertEqual(panel.copyAllProblems(), 0, "nothing to copy, and the clipboard is left alone")
+        monitor.probe = { _, _ in ProbeResult(state: .broken, failureReason: "Non-zero exit (1)", tools: nil) }
+        await monitor.refreshAll()
+        XCTAssertEqual(panel.copyAllProblems(), 1)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasPrefix("# mcpock error report"), true)
     }
 
     /// 462c: a search or the toggle closes the card of a row they took away.

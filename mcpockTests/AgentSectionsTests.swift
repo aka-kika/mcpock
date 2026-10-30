@@ -222,8 +222,6 @@ final class AgentSectionsTests: XCTestCase {
             group("c", [src("Code")]),
             group("d", [src("Grok")]),
         ])
-        XCTAssertEqual(AgentSections.summary(sections), "2 agents \u{00B7} sorted by what needs you")
-        XCTAssertEqual(AgentSections.summary([]), "No agents found")
         XCTAssertEqual(AgentSections.problemText(sections[0]), "1 needs you")
         XCTAssertEqual(AgentSections.restText(sections[0]), "2 more, all fine")
         XCTAssertEqual(AgentSections.problemText(sections[1]), "All fine")

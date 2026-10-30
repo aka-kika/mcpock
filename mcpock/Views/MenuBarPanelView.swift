@@ -12,6 +12,8 @@ struct MenuBarPanelView: View {
     @Environment(\.inGlassPanel) private var inGlassPanel
     @Environment(\.colorScheme) private var systemColorScheme
     @FocusState private var searchFocused: Bool
+    /// "Copied 3 problems", in the footer's place for a moment.
+    @State private var copiedNote: String?
 
     private var appTheme: AppTheme { AppTheme(rawValue: themeRaw) ?? .system }
     private var theme: ThemeColors {
@@ -375,12 +377,17 @@ struct MenuBarPanelView: View {
                 FooterTextButton(title: "Undo hide", theme: theme) { panel.undoHide() }
             } else {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(footerSummary)
+                    Text(copiedNote ?? footerSummary)
                         .font(Theme.caption)
                         .foregroundStyle(theme.textTertiary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .help(footerTooltip(now: context.date))
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button(MenuText.copyAllProblemsTitle, action: copyAllProblems)
+                                .disabled(StatusReport.problems(in: monitor.statusSnapshot()).isEmpty)
+                        }
                 }
             }
             Spacer(minLength: 6)
@@ -446,6 +453,18 @@ struct MenuBarPanelView: View {
         case 0: return theme.statusBroken
         case 1, 2: return theme.statusDegraded
         default: return nil
+        }
+    }
+
+    /// Right-click on the footer's summary: the whole setup's report, as Settings
+    /// used to offer it. The summary says it worked, for a moment.
+    private func copyAllProblems() {
+        let count = panel.copyAllProblems()
+        guard count > 0 else { return }
+        copiedNote = "Copied \(count) problem\(count == 1 ? "" : "s")"
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            copiedNote = nil
         }
     }
 

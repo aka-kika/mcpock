@@ -256,8 +256,8 @@ struct DetailCardView: View {
                 .foregroundStyle(theme.statusDegraded)
                 .fixedSize(horizontal: false, vertical: true)
             nextStepLine
-            // Layout B (1.5.3): two by two, every button the same width and
-            // height, nothing wraps.
+            // Every button the same height, nothing wraps; Ask an agent alone
+            // carries the details and the errors (1.13: Copy details is gone).
             VStack(spacing: Self.buttonGap) {
                 HStack(spacing: Self.buttonGap) {
                     CardButton(
@@ -266,14 +266,6 @@ struct DetailCardView: View {
                         help: "Compare each agent's setup side by side",
                         theme: theme
                     ) { state.isComparing = true }
-                    askAgentButton
-                }
-                HStack(spacing: Self.buttonGap) {
-                    CopyFlashButton(
-                        title: CardText.copyDetailsButton,
-                        help: "Copy this server's details (secret values hidden)",
-                        theme: theme
-                    ) { state.copyServerDetails(group.name) }
                     CardButton(
                         title: CardText.markAsIntendedButton,
                         fillsWidth: true,
@@ -281,6 +273,7 @@ struct DetailCardView: View {
                         theme: theme
                     ) { state.setMarkedAsIntended(true, name: group.name) }
                 }
+                askAgentButton
             }
         }
         .modifier(ToneBox(tone: theme.statusDegraded))
@@ -606,7 +599,7 @@ private struct QuietLinkButton: View {
 }
 
 /// A problem box button that copies something ("Ask an agent", "Copy
-/// details", "Copy errors"; 1.5.3), then shows a short Claude-orange "Copied",
+/// errors"; 1.5.3), then shows a short Claude-orange "Copied",
 /// like Copy for Claude in Settings > Connect. An overlay, so the button keeps
 /// its width and nothing shifts. Always fills its share of the row.
 private struct CopyFlashButton: View {

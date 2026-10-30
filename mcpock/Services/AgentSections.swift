@@ -221,13 +221,6 @@ enum AgentSections {
         }
     }
 
-    /// "5 agents · sorted by what needs you".
-    static func summary(_ sections: [AgentSection]) -> String {
-        guard !sections.isEmpty else { return "No agents found" }
-        let count = sections.count
-        return "\(count) agent\(count == 1 ? "" : "s") \u{00B7} sorted by what needs you"
-    }
-
     /// The footer on the Agents tab (round 2; two numbers since 1.13): "13
     /// agents · 3 need you · 2 not checked", "13 agents, all fine"; "Checking…"
     /// while a check runs. Not checked: nothing wrong, but a server mcpock has

@@ -582,7 +582,6 @@ final class PanelState {
             allowFile: { [weak self] in self?.allowFile(name) },
             togglePin: { [weak self] in self?.togglePin(name) },
             setIntended: { [weak self] marked in self?.setMarkedAsIntended(marked, name: name) },
-            copyDetails: { [weak self] in self?.copyServerDetails(name) },
             askAgent: { [weak self] in self?.askAgent(name) }
         )
     }
@@ -653,28 +652,13 @@ final class PanelState {
     }
 
     /// ⌘C: the error report for a failing row (the menu's Copy Errors), the
-    /// masked server details for anything else (Copy Details).
+    /// masked server details for anything else.
     static func copyText(for group: ServerGroup, servers: [ServerSnapshot] = [], now: Date = Date()) -> String {
         if let errors = MenuText.copyError(for: group) { return errors }
         return ServerReport.detailsText(ServerReport.entry(for: group, servers: servers), now: now)
     }
 
-    // MARK: - Copy Details and Ask an Agent (1.5.3)
-
-    /// "Copy Details" for a row, masked like the status file; nil when
-    /// the row is gone.
-    func serverDetailsText(_ name: String, now: Date = Date()) -> String? {
-        guard let group = monitor.groups.first(where: { $0.name == name }) else { return nil }
-        return ServerReport.detailsText(ServerReport.entry(for: group, servers: monitor.servers), now: now)
-    }
-
-    /// Copies the details; false when the row is gone.
-    @discardableResult
-    func copyServerDetails(_ name: String) -> Bool {
-        guard let text = serverDetailsText(name) else { return false }
-        Self.copyToPasteboard(text)
-        return true
-    }
+    // MARK: - Ask an Agent (1.5.3) and Copy All Problems
 
     /// The "Ask an Agent" prompt for a row; nil when the row is gone or has nothing
     /// to ask about.
@@ -694,6 +678,18 @@ final class PanelState {
         guard let text = askAgentText(name) else { return false }
         Self.copyToPasteboard(text)
         return true
+    }
+
+    /// Copy All Problems (the footer's right-click, 1.13): every server that
+    /// needs her, in the report agents read. How many went on the clipboard; 0
+    /// copies nothing.
+    @discardableResult
+    func copyAllProblems(now: Date = Date()) -> Int {
+        let status = monitor.statusSnapshot(now: now)
+        let count = ErrorExport.failing(status).count
+        guard count > 0 else { return 0 }
+        Self.copyToPasteboard(ErrorExport.markdown(from: status, now: now))
+        return count
     }
 
     static func copyToPasteboard(_ text: String) {
