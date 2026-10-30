@@ -167,8 +167,10 @@ final class PanelState {
     /// where mcpock lives (r3 ad7a): before, nothing showed and nothing said so.
     var showsWelcome = false
     nonisolated static let welcomeShownKey = "welcomeShown"
-    nonisolated static let welcomeText = "mcpock lives in the menu bar. Click its icon to open this panel; "
-        + "right-click it, or use the gear below, for Settings and Quit."
+    nonisolated static let welcomeText = "mcpock checks the MCP servers your agents use. A red diamond is broken, "
+        + "an amber ring needs a look. Click the row to see why and what to do.\n"
+        + "It lives in the menu bar: click its icon to open this panel; right-click it, or use the gear below, "
+        + "for Settings and Quit."
 
     /// True once per Mac: never shown before, and no earlier mcpock ran here.
     nonisolated static func shouldWelcome(defaults: UserDefaults, ranBefore: Bool) -> Bool {
