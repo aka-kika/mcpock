@@ -98,9 +98,10 @@ struct MenuBarPanelView: View {
         .onChange(of: panel.searchFocusRequest) { _, _ in
             searchFocused = true
         }
-        .onChange(of: hasBroken) { _, broken in
-            if broken { panel.resultsChanged() }
-        }
+        // Both ways, and on the count too: the jump to Needs you is undone when
+        // the last problem clears, broken or not (review 2026-10-30, bc39).
+        .onChange(of: hasBroken) { _, _ in panel.resultsChanged() }
+        .onChange(of: panel.needsYouCount) { _, _ in panel.resultsChanged() }
         .onAppear { panel.panelOpened() }
         .onDisappear { panel.panelClosed() }
         // Rebuild when preference changes so MenuBarExtra cannot cache old colors.
