@@ -333,6 +333,7 @@ final class UsageStoreTests: XCTestCase {
             .appendingPathComponent("mcpock.tests.usagestore.\(UUID().uuidString)", isDirectory: true)
         suite = "mcpock.tests.usagestore.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
+        AppPreferences.saveUsageWindow(.thirtyDays, to: defaults)   // on, what these tests read
     }
 
     override func tearDown() {

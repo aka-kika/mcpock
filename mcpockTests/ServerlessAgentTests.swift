@@ -35,7 +35,7 @@ final class ServerlessAgentTests: XCTestCase {
         XCTAssertNotNil(grokBot)
         XCTAssertEqual(grokBot?.servers.count, 0)
         XCTAssertEqual(grokBot.map(AgentSections.problemText), "Not visible here")
-        XCTAssertEqual(grokBot?.emptyLine, "Grok Bot's servers live in your xAI account and run in xAI's cloud.")
+        XCTAssertEqual(grokBot?.emptyLine, "Grok Bot keeps its connectors in your Grok account. mcpock can't see them from this Mac; check them in Grok Bot's own settings.")
         XCTAssertEqual(AgentSections.compactSummary(sections), "2 agents, all fine")
     }
 
