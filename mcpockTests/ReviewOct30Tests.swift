@@ -180,3 +180,25 @@ final class ReviewOct30MonitorTests: XCTestCase {
                        ["a": "A", "b": "old"])
     }
 }
+
+final class ReviewOct30WordingTests: XCTestCase {
+    private func group(state: HealthState, reason: String) -> ServerGroup {
+        ServerGroup(name: "x", state: state, sourceLabels: ["Cursor"], tools: [],
+                    issues: [ServerIssue(label: "Cursor", reason: reason, command: "")], variantCount: 1,
+                    sources: [GroupSource(configID: "c", label: "Cursor", agent: "Cursor", path: "/k/mcp.json", transport: .stdio,
+                                          target: "", envKeys: [], headerKeys: [], state: state, failureReason: reason)])
+    }
+
+    /// c853: an entry with no command or url needs a fix, and is not slow.
+    func testEntryWithNoEndpointIsBadConfigNotSlow() {
+        let row = group(state: .degraded, reason: HealthMonitor.noEndpointReason)
+        XCTAssertTrue(PanelSections.needsYou(row))
+        XCTAssertEqual(HealthMark.word(for: row), "Bad config")
+        XCTAssertEqual(StatusSnapshot.statusWords(row), "bad config")
+        XCTAssertEqual(CardText.whyTitle(for: row), "Why it is not checked")
+        XCTAssertEqual(PanelText.compactSummary([row]), "1 \u{00B7} 1 bad config")
+        XCTAssertFalse(PanelText.summary([row]).contains("slow"))
+        let entry = StatusSnapshot.server(row, byID: [:], hidden: false, pinned: false)
+        XCTAssertTrue(entry.needsAttention)
+    }
+}

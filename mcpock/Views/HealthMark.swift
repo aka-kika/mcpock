@@ -106,6 +106,7 @@ struct HealthMark: View {
         if group.signedInByAgent { return "Signed in by the agent" }
         if group.needsVariable { return "Not checked" }
         if group.waitsForFileOK { return "Waiting for your OK" }
+        if group.incompleteConfig { return "Bad config" }
         if group.state == .degraded,
            group.issues.contains(where: { $0.reason.hasPrefix("Needs authentication") }) {
             return "Needs sign-in"

@@ -79,6 +79,9 @@ enum StatusSnapshot {
     /// panel, so never a problem here (review 2026-10-30, fe94); only counted.
     static let notCheckedStatus = "not checked"
 
+    /// A config entry with no command or url.
+    static let badConfigStatus = "bad config"
+
     /// A server an open Claude Code session lost: it needs /mcp there (1.12).
     static let lostStatus = "lost in an open Claude Code session"
 
@@ -87,7 +90,10 @@ enum StatusSnapshot {
     static func statusWords(_ group: ServerGroup) -> String {
         switch group.state {
         case .broken: return "broken"
-        case .degraded: return group.needsSignIn ? "needs sign-in" : group.notCheckedHere ? notCheckedStatus : "slow"
+        case .degraded:
+            if group.needsSignIn { return "needs sign-in" }
+            if group.notCheckedHere { return notCheckedStatus }
+            return group.incompleteConfig ? badConfigStatus : "slow"
         case .healthy:
             if group.droppedInSession { return lostStatus }
             return group.differsNeedsAttention ? "set up differently" : "fine"
@@ -143,7 +149,7 @@ enum StatusSnapshot {
             name: group.name,
             state: group.state.rawValue,
             status: status,
-            needsAttention: ["broken", "slow", "needs sign-in", "set up differently", lostStatus].contains(status),
+            needsAttention: ["broken", "slow", "needs sign-in", "set up differently", badConfigStatus, lostStatus].contains(status),
             reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
             hidden: hidden,
             pinned: pinned,

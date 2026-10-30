@@ -66,6 +66,7 @@ enum ServerReport {
         case HealthState.degraded.rawValue:
             let failure = source.failure ?? ""
             if failure.hasPrefix("Needs authentication") { return "needs sign-in" }
+            if failure.hasPrefix(HealthMonitor.noEndpointReason) { return StatusSnapshot.badConfigStatus }
             return failure.hasPrefix(ConfigVariables.reasonPrefix) ? "not checked" : "slow"
         case HealthState.broken.rawValue: return "broken"
         case HealthState.unknown.rawValue: return "not checked yet"
@@ -108,6 +109,7 @@ enum ServerReport {
         case "slow": return "is slow to answer" + (reason.map { " (\($0))" } ?? "")
         case "needs sign-in": return "needs sign-in" + (reason.map { " (\($0))" } ?? "")
         case "not checked": return "was not checked" + (reason.map { " (\($0))" } ?? "")
+        case StatusSnapshot.badConfigStatus: return "has a config entry with no command or url"
         case "set up differently":
             return "is set up differently across my agents" + (server.differs.map { ": \($0)" } ?? "")
         default: return "needs a look (status: \(server.status))"

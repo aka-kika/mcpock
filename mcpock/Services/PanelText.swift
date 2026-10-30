@@ -21,6 +21,7 @@ enum PanelText {
         var parts: [String] = []
         if counts.broken > 0 { parts.append("\(counts.broken) broken") }
         if counts.slow > 0 { parts.append("\(counts.slow) slow") }
+        if counts.incomplete > 0 { parts.append("\(counts.incomplete) bad config") }
         if counts.signIn > 0 { parts.append("\(counts.signIn) sign-in") }
         // r3 6eef: Not checked and waiting rows were left out, so the footer
         // read "all fine" beside them.
@@ -61,6 +62,7 @@ enum PanelText {
         let c = Counts(groups)
         if c.broken > 0 { parts.append("\(c.broken) broken") }
         if c.slow > 0 { parts.append("\(c.slow) slow") }
+        if c.incomplete > 0 { parts.append("\(c.incomplete) bad config") }
         if c.signIn > 0 { parts.append("\(c.signIn) \(c.signIn == 1 ? "needs" : "need") sign-in") }
         if c.notChecked > 0 { parts.append("\(c.notChecked) not checked") }
         if c.waiting > 0 { parts.append("\(c.waiting) waiting for your OK") }
@@ -106,12 +108,14 @@ enum PanelText {
         let checking: Int
         let waiting: Int
         let lost: Int
+        let incomplete: Int
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
             signIn = groups.filter(\.needsSignIn).count
             notChecked = groups.filter(\.notCheckedHere).count
-            slow = groups.filter { $0.state == .degraded }.count - signIn - notChecked
+            incomplete = groups.filter(\.incompleteConfig).count
+            slow = groups.filter { $0.state == .degraded }.count - signIn - notChecked - incomplete
             needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count
@@ -142,6 +146,13 @@ extension ServerGroup {
     /// the config has no headers, so nothing here is wrong (r3 5f42).
     var signedInByAgent: Bool {
         state == .degraded && issues.contains { $0.reason.hasPrefix(HealthMonitor.agentSignInPrefix) }
+    }
+
+    /// A config entry with neither a command nor a url (r3 e412): the config
+    /// needs a fix, so it stays in Needs you, but it is not slow (review
+    /// 2026-10-30, c853).
+    var incompleteConfig: Bool {
+        state == .degraded && issues.contains { $0.reason.hasPrefix(HealthMonitor.noEndpointReason) }
     }
 
     /// Not checked by mcpock for a reason that is nobody's fault here: a
