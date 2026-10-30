@@ -13,7 +13,6 @@ struct SettingsGeneralPane: View {
 
     @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
     @AppStorage(AppPreferences.probeIntervalKey, store: AppPreferences.store) private var probeIntervalRaw = ProbeInterval.default.rawValue
-    @AppStorage(AppPreferences.hideScrollBarsKey, store: AppPreferences.store) private var hideScrollBars = AppPreferences.defaultHideScrollBars
     @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
     @AppStorage(AppPreferences.openPanelHotKeyKey, store: AppPreferences.store) private var openPanelHotKey = AppPreferences.defaultOpenPanelHotKey
     /// The saved shortcut's data; empty means ⌃⌥M (`PanelShortcut.standard`).
@@ -30,8 +29,6 @@ struct SettingsGeneralPane: View {
     /// The short snap to the nearest stop after a drag.
     @State private var snapTask: Task<Void, Never>?
 
-    static let hideScrollBarsTitle = "Hide scroll bars"
-    static let hideScrollBarsHelp = "Lists still scroll with the trackpad or mouse wheel."
     static let hotKeyTitle = "Open with a shortcut"
     static func hotKeyHelp(_ shortcut: PanelShortcut) -> String {
         "\(shortcut.spokenText) opens and closes the panel from any app. "
@@ -91,8 +88,6 @@ struct SettingsGeneralPane: View {
                     // the Usage segments below so neither row crowds its text.
                     .frame(width: 240)
                 }
-                Toggle(Self.hideScrollBarsTitle, isOn: $hideScrollBars)
-                    .help(Self.hideScrollBarsHelp)
                 HStack {
                     Text("Usage")
                     Spacer(minLength: 12)

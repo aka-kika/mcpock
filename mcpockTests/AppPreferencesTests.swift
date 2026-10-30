@@ -35,15 +35,6 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(AppPreferences.loadPausedServers(from: defaults), [])
     }
 
-    /// Round 6: "Hide scroll bars" is on until she turns it off.
-    func testHideScrollBarsDefaultsToOn() {
-        // The @AppStorage default every reader uses when nothing is saved.
-        XCTAssertTrue(AppPreferences.defaultHideScrollBars, "on when nothing saved")
-        XCTAssertEqual(PanelScrollIndicators.visibility(hide: true), .never,
-                       ".hidden still shows bars with a mouse connected")
-        XCTAssertEqual(PanelScrollIndicators.visibility(hide: false), .automatic)
-    }
-
     func testTestCallLeftoversAreRemoved() throws {
         let suite = "AppPreferencesTests.testCallLeftovers"
         let defaults = UserDefaults(suiteName: suite)!
@@ -124,14 +115,12 @@ final class SettingsMigrationTests: XCTestCase {
         AppPreferences.saveHiddenServers(["pieces"], to: oldDefaults)
         AppPreferences.savePinnedServers(["wigolo"], to: oldDefaults)
         oldDefaults.set(AppTheme.dark.rawValue, forKey: AppPreferences.themeKey)
-        oldDefaults.set(false, forKey: AppPreferences.hideScrollBarsKey)
 
         SettingsMigration.migrateIfNeeded(oldDomain: oldSuite, newDefaults: newDefaults)
 
         XCTAssertEqual(AppPreferences.loadHiddenServers(from: newDefaults), ["pieces"])
         XCTAssertEqual(AppPreferences.loadPinnedServers(from: newDefaults), ["wigolo"])
         XCTAssertEqual(newDefaults.string(forKey: AppPreferences.themeKey), AppTheme.dark.rawValue)
-        XCTAssertFalse(newDefaults.bool(forKey: AppPreferences.hideScrollBarsKey))
         XCTAssertTrue(newDefaults.bool(forKey: SettingsMigration.migratedFlagKey), "flag set once it has run")
         // The old domain is never touched.
         XCTAssertEqual(AppPreferences.loadHiddenServers(from: oldDefaults), ["pieces"])

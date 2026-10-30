@@ -197,24 +197,12 @@ struct WindowReader: NSViewRepresentable {
 }
 
 /// Scroll indicators for every scroll view mcpock draws (round 6): hidden while
-/// Settings > General "Hide scroll bars" is on (the default), the system's own
-/// behaviour when off. `.never`, not `.hidden`: `.hidden` still shows them on
-/// macOS whenever a mouse is connected. Trackpad and wheel scrolling still work.
-struct PanelScrollIndicators: ViewModifier {
-    @AppStorage(AppPreferences.hideScrollBarsKey, store: AppPreferences.store) private var hide = AppPreferences.defaultHideScrollBars
-
-    func body(content: Content) -> some View {
-        content.scrollIndicators(Self.visibility(hide: hide))
-    }
-
-    static func visibility(hide: Bool) -> ScrollIndicatorVisibility {
-        hide ? .never : .automatic
-    }
-}
-
 extension View {
-    /// See `PanelScrollIndicators`.
+    /// Lists scroll with no bars, in the panel, the card and Settings (round 6;
+    /// the switch for it went in 1.13). `.never`, not `.hidden`: `.hidden` still
+    /// shows them on macOS whenever a mouse is connected. Trackpad and wheel
+    /// scrolling still work.
     func panelScrollIndicators() -> some View {
-        modifier(PanelScrollIndicators())
+        scrollIndicators(.never)
     }
 }

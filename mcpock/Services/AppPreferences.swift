@@ -119,12 +119,6 @@ enum AppPreferences {
     /// opens and launches (v1.5).
     static let panelFilterKey = "panelFilter"
 
-    /// Settings > General "Hide scroll bars" (round 6), on by default: every
-    /// scroll view in the panel, card and Settings hides its
-    /// indicators (`PanelScrollIndicators`); scrolling itself still works.
-    static let hideScrollBarsKey = "hideScrollBars"
-    static let defaultHideScrollBars = true
-
     /// Local port -> the `.app` seen serving it (2026-10-16).
     static let hostAppPortsKey = "hostAppPorts"
 
@@ -308,8 +302,8 @@ enum ProbeInterval: Int, CaseIterable, Identifiable {
 
 /// The rename to mcpock (1.6.0): a one-time copy of every known preference
 /// from the old app's persistent domain, so the user's pins, hidden/paused
-/// servers, marked-as-intended notes, theme, check interval, panel filter
-/// and scroll-bar choice come over on their own. Never touches or deletes the
+/// servers, marked-as-intended notes, theme, check interval and panel filter
+/// come over on their own. Never touches or deletes the
 /// old domain — only the personal-ops-manual-style "read, never write" rule
 /// applies here too.
 enum SettingsMigration {
@@ -326,7 +320,6 @@ enum SettingsMigration {
         AppPreferences.pinnedServersKey,
         AppPreferences.differsAcknowledgedKey,
         AppPreferences.panelFilterKey,
-        AppPreferences.hideScrollBarsKey,
         AppPreferences.probeIntervalKey,
         AppPreferences.usageWindowKey,
     ]
