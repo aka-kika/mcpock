@@ -200,19 +200,23 @@ struct DetailCardView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            // Layout B (1.5.3): one row of two equal-width buttons.
-            HStack(spacing: Self.buttonGap) {
-                askAgentButton
-                CopyFlashButton(
-                    title: CardText.copyErrorsButton,
-                    help: "Copy the error report, ready to paste",
-                    theme: theme
-                ) {
-                    PanelState.copyToPasteboard(group.copyText)
-                    return true
+            // Layout B (1.5.3): one row of two equal-width buttons. Not on a Not
+            // checked row: nothing is failing there, and Ask copied nothing
+            // (review 2026-10-30, f241).
+            if !group.notCheckedHere {
+                HStack(spacing: Self.buttonGap) {
+                    askAgentButton
+                    CopyFlashButton(
+                        title: CardText.copyErrorsButton,
+                        help: "Copy the error report, ready to paste",
+                        theme: theme
+                    ) {
+                        PanelState.copyToPasteboard(group.copyText)
+                        return true
+                    }
+                    // "Open log" would sit here; no probe keeps a log file yet, so it
+                    // is left out rather than shown disabled.
                 }
-                // "Open log" would sit here; no probe keeps a log file yet, so it
-                // is left out rather than shown disabled.
             }
         }
         .modifier(ToneBox(tone: tone))

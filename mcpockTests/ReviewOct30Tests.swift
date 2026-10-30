@@ -201,4 +201,13 @@ final class ReviewOct30WordingTests: XCTestCase {
         let entry = StatusSnapshot.server(row, byID: [:], hidden: false, pinned: false)
         XCTAssertTrue(entry.needsAttention)
     }
+
+    /// f241: nothing to copy or ask about on a Not checked row.
+    func testNotCheckedRowOffersNoErrorCopy() {
+        let row = group(state: .degraded, reason: "Uses ${TOKEN}, which is not set where mcpock runs, so it was not checked.")
+        XCTAssertTrue(row.notCheckedHere)
+        XCTAssertNil(MenuText.copyError(for: row))
+        XCTAssertFalse(ServerReport.canAskAgent(row))
+        XCTAssertNotNil(MenuText.copyError(for: group(state: .broken, reason: "Non-zero exit (1)")))
+    }
 }

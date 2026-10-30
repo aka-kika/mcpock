@@ -13,9 +13,11 @@ enum MenuText {
 
     /// "Copy Errors": the same report as ⌘C and the card's "Copy errors" for a
     /// broken or slow row; nil when the row has no error to copy, so the menu
-    /// leaves the item out.
+    /// leaves the item out. A Not checked row has none: nothing is failing,
+    /// though the report would say it is.
     static func copyError(for group: ServerGroup) -> String? {
-        (group.state == .broken || group.state == .degraded) ? group.copyText : nil
+        guard !group.notCheckedHere else { return nil }
+        return (group.state == .broken || group.state == .degraded) ? group.copyText : nil
     }
 
     /// "Copy All Problems" on an agent row (2026-10-03: errors were copied
