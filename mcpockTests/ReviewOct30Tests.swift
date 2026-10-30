@@ -87,6 +87,19 @@ final class ReviewOct30ProbeTests: XCTestCase {
         XCTAssertEqual(earlyResult.failureReason.map { ShortReason.from($0, state: .broken) }, "Quit on start (exit 3)")
     }
 
+    /// aa31: a login shell past its time takes what it started with it.
+    func testSlowLoginShellLeavesNothingBehind() throws {
+        let pidFile = dir.appendingPathComponent("child.pid")
+        let shell = dir.appendingPathComponent("slow-shell")
+        try "#!/bin/sh\n/bin/sleep 120 &\necho $! > '\(pidFile.path)'\nwait\n".write(to: shell, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
+
+        XCTAssertNil(ShellEnvironment.read(shell: shell.path, timeout: 0.5))
+
+        let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        XCTAssertNil(ProcessRunner.startTime(of: pid), "its sleep is gone")
+    }
+
     /// 1279: a `${VAR}` secret a server echoes is masked, though the config
     /// mcpock keeps only says `${VAR}`.
     func testEchoedVariableSecretIsMasked() async throws {

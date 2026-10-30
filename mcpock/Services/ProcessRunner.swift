@@ -281,7 +281,7 @@ final class ProcessRunner: @unchecked Sendable {
         // unrelated process later is never signalled.
         let rootPIDBeforeClose = process.processIdentifier
         let tree = rootPIDBeforeClose > 0 && process.isRunning
-            ? treeSnapshot(of: rootPIDBeforeClose) : []
+            ? Self.treeSnapshot(of: rootPIDBeforeClose) : []
 
         try? stdinPipe.fileHandleForWriting.close()
 
@@ -396,14 +396,14 @@ final class ProcessRunner: @unchecked Sendable {
     /// snapshot lists the tree, and a member is only signalled while its start
     /// time still matches, so a reused PID is never hit (r3 a557).
     private func signalProcessTree(root: Int32, signal: Int32) {
-        for member in treeSnapshot(of: root) where member.isStillTheSameProcess {
+        for member in Self.treeSnapshot(of: root) where member.isStillTheSameProcess {
             kill(member.pid, signal)
         }
         kill(root, signal)
     }
 
     /// One process of a server's tree, pinned to its start time.
-    private struct TreeMember {
+    struct TreeMember {
         let pid: Int32
         let started: timeval
 
@@ -416,8 +416,8 @@ final class ProcessRunner: @unchecked Sendable {
 
     /// Every descendant of `root` (not the root itself), children before
     /// their parent, from one process-table snapshot.
-    private func treeSnapshot(of root: Int32) -> [TreeMember] {
-        Self.descendants(of: root, in: Self.processTable()).map { TreeMember(pid: $0.pid, started: $0.started) }
+    static func treeSnapshot(of root: Int32) -> [TreeMember] {
+        descendants(of: root, in: processTable()).map { TreeMember(pid: $0.pid, started: $0.started) }
     }
 
     /// One row of the kernel's process table.
@@ -495,7 +495,7 @@ final class ProcessRunner: @unchecked Sendable {
     }
 
     /// A process's start time from the kernel, or nil when it is gone.
-    private static func startTime(of pid: Int32) -> timeval? {
+    static func startTime(of pid: Int32) -> timeval? {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
