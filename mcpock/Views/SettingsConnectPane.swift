@@ -14,8 +14,13 @@ import AppKit
 /// has a row saying whether it already has mcpock (`AgentHost`, the list from
 /// Kartina, read-only here). Nothing here writes another app's config.
 struct SettingsConnectPane: View {
+    /// For the status file's last write error.
+    var monitor: HealthMonitor?
     let theme: ThemeColors
     var helperPath: String = ConnectSnippets.helperPath()
+    /// The file `mcpock-mcp` reads.
+    var statusFilePath: String = MCPockStatus.defaultDirectory()
+        .appendingPathComponent(MCPockStatus.fileName).path
 
     /// Which copy button just ran, for its short "Copied" / checkmark state.
     @State private var copiedID: String?
@@ -35,6 +40,14 @@ struct SettingsConnectPane: View {
         + "time, backs each one up, adds mcpock where it\u{2019}s missing and checks the file still reads. "
         + "The backups sit next to each config and hold the same keys: delete them once all is well."
     static let footerText = "mcpock never edits your agents\u{2019} configs. The server only reads mcpock\u{2019}s own status file."
+    static let statusFileHelp = "The helper answers from this file. mcpock updates it after every check."
+
+    /// Under the status file when its last write failed.
+    static func statusFileErrorText(_ error: String) -> String {
+        let reason = error.hasSuffix(".") ? error : error + "."
+        return "Could not save it: \(reason) Your agents see the last results it saved."
+    }
+
     /// The agents without a status row keep their plain copy rows.
     static var otherTargets: [ConnectSnippets.Target] {
         ConnectSnippets.targets.filter { target in !AgentHost.all.contains { $0.name == target.name } }
@@ -79,6 +92,22 @@ struct SettingsConnectPane: View {
                         Text("Missing from this copy of mcpock")
                             .foregroundStyle(theme.statusBroken)
                     }
+                }
+                // Next to the helper that reads it (1.13, from General).
+                HStack(spacing: 16) {
+                    Text("Status file")
+                        .fixedSize()
+                    Spacer(minLength: 0)
+                    ConfigPathRow(path: statusFilePath, theme: theme, openTitle: MenuText.openFileTitle,
+                                  font: .system(size: 11.5, design: .monospaced))
+                        .padding(.trailing, -5)
+                }
+                .help(Self.statusFileHelp)
+                if let error = monitor?.statusFileError {
+                    Text(Self.statusFileErrorText(error))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(theme.statusBroken)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(AgentHost.all) { host in
                     agentRow(host)

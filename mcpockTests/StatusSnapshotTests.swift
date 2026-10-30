@@ -269,7 +269,7 @@ final class StatusWriteErrorTests: XCTestCase {
         monitor.statusWriter?.schedule { monitor.statusSnapshot() }
         for _ in 0..<100 where monitor.statusFileError == nil { try await Task.sleep(for: .milliseconds(30)) }
         XCTAssertNotNil(monitor.statusFileError)
-        XCTAssertTrue(SettingsGeneralPane.statusFileErrorText("Nope").hasSuffix("Nope. Your agents see the last results it saved."))
+        XCTAssertTrue(SettingsConnectPane.statusFileErrorText("Nope").hasSuffix("Nope. Your agents see the last results it saved."))
 
         monitor.statusWriter = StatusWriter(directory: root.appendingPathComponent("ok"))
         monitor.statusWriter?.schedule { monitor.statusSnapshot() }

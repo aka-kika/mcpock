@@ -63,7 +63,7 @@ struct SettingsAgentsPane: View {
             }
     }
 
-    /// "14 agents · 16 config files", the pane's footer and General's Status.
+    /// "14 agents · 16 config files", the pane's footer.
     nonisolated static func countText(_ entries: [SettingsAgentEntry]) -> String {
         let files = Set(entries.flatMap(\.paths)).count
         return "\(entries.count) agent\(entries.count == 1 ? "" : "s") · \(files) config file\(files == 1 ? "" : "s")"

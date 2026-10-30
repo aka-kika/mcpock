@@ -3,16 +3,13 @@ import AppKit
 import Carbon.HIToolbox
 
 /// The General pane (round 8): a native grouped form, like System Settings.
-/// Look (appearance, scroll bars), checking (interval, Open at Login), a small
-/// Status section (last check, what was found, the status file agents read).
-/// The form scrolls itself inside the fixed window.
+/// Look and checking, nothing else (1.13: the status file moved to Connect, the
+/// counts are the panel footer's tooltip). The form scrolls itself inside the
+/// fixed window.
 struct SettingsGeneralPane: View {
     /// The app's single health monitor.
     var monitor: HealthMonitor?
     let theme: ThemeColors
-    /// The file `mcpock-mcp` reads; shown in Status.
-    var statusFilePath: String = MCPockStatus.defaultDirectory()
-        .appendingPathComponent(MCPockStatus.fileName).path
 
     @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
     @AppStorage(AppPreferences.probeIntervalKey, store: AppPreferences.store) private var probeIntervalRaw = ProbeInterval.default.rawValue
@@ -52,11 +49,6 @@ struct SettingsGeneralPane: View {
         (try? JSONDecoder().decode(PanelShortcut.self, from: panelShortcutData)) ?? .standard
     }
 
-    /// Under the status file when its last write failed.
-    static func statusFileErrorText(_ error: String) -> String {
-        let reason = error.hasSuffix(".") ? error : error + "."
-        return "Could not save it: \(reason) Your agents see the last results it saved."
-    }
     /// Fixed to the widest stop label ("Manual", "15 min"), so the text
     /// beside the slider never changes width or wraps while dragging and the
     /// row never reflows (round 9: "Every 15 min" wrapped to two lines).
@@ -71,7 +63,6 @@ struct SettingsGeneralPane: View {
     static func valueTextWidth(_ text: String) -> CGFloat {
         (text as NSString).size(withAttributes: [.font: valueFont]).width
     }
-    static let statusFooter = "Agents you connect in the Connect tab read this file. mcpock updates it after every check."
 
     private var storedInterval: ProbeInterval { ProbeInterval.fromStored(probeIntervalRaw) }
 
@@ -161,58 +152,17 @@ struct SettingsGeneralPane: View {
                     Text(Self.hotKeyTakenText(panelShortcut))
                         .font(Theme.caption)
                         .foregroundStyle(theme.statusDegraded)
+                } else if AppGroup.containerURL == nil {
+                    // (r3 7183) An unsigned or ad-hoc build has no App Group: the
+                    // widgets would show nothing, and nothing said why.
+                    Text(Self.widgetsUnavailableText)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.statusDegraded)
                 } else {
                     footerText(shownInterval == .manual
                         ? "Checks only when you press Refresh in the panel."
-                        : "Refresh in the panel checks right away, too.")
+                        : "Refresh in the panel checks right away, and a changed config is checked by itself.")
                 }
-            }
-
-            Section {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    LabeledContent("Last check") {
-                        Text(lastCheckText(now: context.date))
-                            .foregroundStyle(theme.textSecondary)
-                    }
-                }
-                LabeledContent("Servers") {
-                    Text(serversText)
-                        .foregroundStyle(theme.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                LabeledContent("Agents") {
-                    Text(agentsText)
-                        .foregroundStyle(theme.textSecondary)
-                }
-                // Last, right above the footer that talks about it. An HStack
-                // so a long path truncates instead of dropping under the label.
-                HStack(spacing: 16) {
-                    Text("Status file")
-                        .fixedSize()
-                    Spacer(minLength: 0)
-                    ConfigPathRow(path: statusFilePath, theme: theme, openTitle: MenuText.openFileTitle,
-                                  font: .system(size: 11.5, design: .monospaced))
-                        .padding(.trailing, -5)
-                }
-                if let error = monitor?.statusFileError {
-                    Text(Self.statusFileErrorText(error))
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(theme.statusBroken)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                // (r3 7183) An unsigned or ad-hoc build has no App Group: the
-                // widgets would show nothing, and nothing said why.
-                if AppGroup.containerURL == nil {
-                    Text(Self.widgetsUnavailableText)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(theme.statusDegraded)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } header: {
-                Text("Status")
-            } footer: {
-                footerText(Self.statusFooter)
             }
         }
         .formStyle(.grouped)
@@ -229,31 +179,6 @@ struct SettingsGeneralPane: View {
             guard let monitor else { return }
             SettingsLauncher.usageStore?.usageWindowChanged(knownServers: MCPockApp.knownServerNames(monitor))
         }
-    }
-
-    // MARK: - Status texts
-
-    private func lastCheckText(now: Date) -> String {
-        guard let monitor else { return "Not checked yet" }
-        if monitor.isRefreshing { return "Checking\u{2026}" }
-        guard let date = ServerGroup.newestCheck(monitor.groups) else { return "Not checked yet" }
-        return Self.lastCheckText(date, now: now)
-    }
-
-    /// "3 min ago, at 14:05". Pure.
-    nonisolated static func lastCheckText(_ date: Date, now: Date) -> String {
-        let clock = date.formatted(date: .omitted, time: .shortened)
-        return PanelText.ago(date, now: now) + ", at " + clock
-    }
-
-    private var serversText: String {
-        guard let monitor else { return "None yet" }
-        return PanelText.summary(monitor.groups)
-    }
-
-    private var agentsText: String {
-        let entries = SettingsAgentsPane.entries(from: monitor?.groups ?? [], emptyAgents: monitor?.serverlessAgents ?? [])
-        return SettingsAgentsPane.countText(entries)
     }
 
     // MARK: - Pieces

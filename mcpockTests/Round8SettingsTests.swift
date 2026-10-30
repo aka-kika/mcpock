@@ -111,18 +111,15 @@ final class Round8SettingsTests: XCTestCase {
         }
     }
 
-    // MARK: - General > Status
+    // MARK: - Counts, and the status file (in Connect since 1.13)
 
     func testStatusTexts() {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let text = SettingsGeneralPane.lastCheckText(now.addingTimeInterval(-180), now: now)
-        XCTAssertTrue(text.hasPrefix("3 min ago, at "), text)
         let entries = [
             SettingsAgentEntry(agent: "Cursor", paths: ["/a/mcp.json"], serverCount: 3),
             SettingsAgentEntry(agent: "MiniMax", paths: ["/b/1.json", "/b/2.json"], serverCount: 1),
         ]
         XCTAssertEqual(SettingsAgentsPane.countText(entries), "2 agents · 3 config files")
         XCTAssertEqual(SettingsAgentsPane.countText([]), "0 agents · 0 config files")
-        XCTAssertTrue(SettingsGeneralPane(theme: ThemeColors.resolve(.dark)).statusFilePath.hasSuffix("Library/Application Support/mcpock/status.json"))
+        XCTAssertTrue(SettingsConnectPane(theme: ThemeColors.resolve(.dark)).statusFilePath.hasSuffix("Library/Application Support/mcpock/status.json"))
     }
 }

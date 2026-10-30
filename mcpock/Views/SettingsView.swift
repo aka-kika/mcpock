@@ -51,7 +51,7 @@ struct SettingsView: View {
         case .agents:
             SettingsAgentsPane(monitor: monitor, theme: theme)
         case .connect:
-            SettingsConnectPane(theme: theme)
+            SettingsConnectPane(monitor: monitor, theme: theme)
         case .about:
             SettingsAboutPane(theme: theme, updateController: updateController)
         }
