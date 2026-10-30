@@ -1,7 +1,7 @@
 import XCTest
 @testable import mcpock
 
-/// Settings "Copy All" / "Export…": the report the agents read, from the
+/// The footer's Copy All Problems: the report the agents read, from the
 /// same snapshot as `status.json` (Argon 2026-10-17 #12).
 final class ErrorExportTests: XCTestCase {
     private let now = MCPockStatus.decoderDate("2027-01-15T08:02:00Z")
@@ -42,30 +42,5 @@ final class ErrorExportTests: XCTestCase {
     func testMarkdownIncludesFramingExplainer() {
         let md = ErrorExport.markdown(from: sample, now: now)
         XCTAssertTrue(md.contains(ServerGroup.reportPreamble(plural: true)), md)
-    }
-
-    func testJSONCarriesConfigPathsAndDiffers() throws {
-        let jsonString = ErrorExport.json(from: sample, now: now)
-        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(jsonString.utf8)) as? [String: Any])
-        XCTAssertEqual(obj["failingCount"] as? Int, 3)
-        XCTAssertEqual(obj["totalCount"] as? Int, 5)
-        let servers = try XCTUnwrap(obj["servers"] as? [[String: Any]])
-        XCTAssertEqual(servers.map { $0["name"] as? String }, ["firecrawl", "figma", "wake"])
-        XCTAssertEqual(servers[0]["configPaths"] as? [String], ["/Users/k/.cursor/mcp.json", "/Users/k/.claude.json"])
-        XCTAssertEqual(servers[2]["differs"] as? String, "Grok points at a different command than Cursor.")
-    }
-
-    func testFormatFromExtension() {
-        XCTAssertEqual(ErrorExport.format(forExtension: "json"), .json)
-        XCTAssertEqual(ErrorExport.format(forExtension: "JSON"), .json)
-        XCTAssertEqual(ErrorExport.format(forExtension: "md"), .markdown)
-        XCTAssertEqual(ErrorExport.format(forExtension: "txt"), .markdown)
-    }
-
-    func testFileStampIsFilesystemSafe() {
-        let stamp = ErrorExport.fileStamp(now)
-        XCTAssertFalse(stamp.contains(":"))
-        XCTAssertFalse(stamp.contains(" "))
-        XCTAssertFalse(stamp.contains("/"))
     }
 }

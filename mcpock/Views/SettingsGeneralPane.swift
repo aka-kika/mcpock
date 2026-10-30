@@ -1,14 +1,13 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 import Carbon.HIToolbox
 
 /// The General pane (round 8): a native grouped form, like System Settings.
 /// Look (appearance, scroll bars), checking (interval, Open at Login), a small
-/// Status section (last check, what was found, the status file agents read),
-/// errors. The form scrolls itself inside the fixed window.
+/// Status section (last check, what was found, the status file agents read).
+/// The form scrolls itself inside the fixed window.
 struct SettingsGeneralPane: View {
-    /// The app's single health monitor, so Export can read the current errors.
+    /// The app's single health monitor.
     var monitor: HealthMonitor?
     let theme: ThemeColors
     /// The file `mcpock-mcp` reads; shown in Status.
@@ -25,7 +24,6 @@ struct SettingsGeneralPane: View {
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var launchError: String?
     @State private var launchNeedsApproval = LaunchAtLogin.needsApproval
-    @State private var exportNote: String?
     /// The slider's live position while dragging (and while it snaps); nil
     /// at rest. The stored interval changes only when the knob is let go, so
     /// a drag across the track doesn't restart the timer seven times.
@@ -187,22 +185,6 @@ struct SettingsGeneralPane: View {
                     Text(agentsText)
                         .foregroundStyle(theme.textSecondary)
                 }
-                // Errors live with the status (round 8): the same report the
-                // agents read, for pasting by hand.
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Errors")
-                        if let exportNote {
-                            Text(exportNote)
-                                .font(Theme.caption)
-                                .foregroundStyle(theme.textTertiary)
-                                .lineLimit(1)
-                        }
-                    }
-                    Spacer(minLength: 12)
-                    Button("Export\u{2026}") { exportErrors() }
-                        .help("Save the same report as Markdown or JSON")
-                }
                 // Last, right above the footer that talks about it. An HStack
                 // so a long path truncates instead of dropping under the label.
                 HStack(spacing: 16) {
@@ -359,34 +341,6 @@ struct SettingsGeneralPane: View {
 
     private func save(_ stop: ProbeInterval) {
         if stop.rawValue != probeIntervalRaw { probeIntervalRaw = stop.rawValue }
-    }
-
-    /// Save a report of every failing server to a Markdown or JSON file (chosen by
-    /// the save panel's file type). Writes the whole current error set, not just one.
-    private func exportErrors() {
-        guard let status = monitor?.statusSnapshot() else { return }
-        let now = Date()
-
-        NSApp.activate(ignoringOtherApps: true)
-        let panel = NSSavePanel()
-        panel.title = "Export MCP errors"
-        panel.nameFieldStringValue = "mcpock-errors-\(ErrorExport.fileStamp(now)).md"
-        panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
-        let markdownType = UTType(filenameExtension: "md") ?? .plainText
-        panel.allowedContentTypes = [markdownType, .json]
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        let format = ErrorExport.format(forExtension: url.pathExtension)
-        let contents = ErrorExport.string(format, from: status, now: now)
-        do {
-            try contents.write(to: url, atomically: true, encoding: .utf8)
-            let failing = ErrorExport.failing(status).count
-            exportNote = "Exported \(failing) error\(failing == 1 ? "" : "s") → \(url.lastPathComponent)"
-        } catch {
-            exportNote = "Export failed: \(error.localizedDescription)"
-        }
     }
 }
 

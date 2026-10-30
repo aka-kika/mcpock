@@ -110,7 +110,7 @@ card is open).
 | `Services/Differs.swift` | "Set up differently": a source whose launch target differs from the majority (aka never counts). 1.5.2: `fingerprints` (SHA-256 of each launch target, deduped) for "Mark as intended" |
 | `Services/ShortReason.swift`, `PanelText.swift`, `CardText.swift`, `MenuText.swift` | Every short line, footer summary, card sentence and menu text |
 | `Services/ServerVisibility.swift` | Pinned / Shown / Hidden |
-| `Services/ErrorExport.swift` | Markdown/JSON report of failing servers (Settings > General > Errors) |
+| `Services/ErrorExport.swift` | The report of failing servers behind Copy All Problems on the panel's footer |
 | `Services/ServerReport.swift` | 1.5.3: the details ⌘C copies for a fine row and the Ask an Agent prompt, built on `StatusSnapshot.server` so they carry the status file's masking |
 | `Services/StatusSnapshot.swift`, `SecretMask.swift` | Builds the status file; masks tokens, URL secrets and every env/header value |
 | `Services/ConnectSnippets.swift` | What Settings > Connect copies: per-agent snippets and the Copy for Claude prompt |
