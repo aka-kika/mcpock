@@ -1215,12 +1215,16 @@ final class HealthMonitor {
                                tools: nil, needsAttention: true)
         }
         let config = expanded.config
+        let result: ProbeResult
         switch config.transport {
         case .stdio:
-            return await StdioProbe.probe(config: config, fetchTools: fetchTools)
+            result = await StdioProbe.probe(config: config, fetchTools: fetchTools)
         case .http, .sse:
-            return agentSignIn(await HTTPProbe.probe(config: config, fetchTools: fetchTools), config: config)
+            result = agentSignIn(await HTTPProbe.probe(config: config, fetchTools: fetchTools), config: config)
         }
+        // Only here are the filled-in values known: a `${VAR}` secret a server
+        // echoes in its error must not reach the panel (review 2026-10-30, 1279).
+        return result.scrubbingFailure(known: SecretMask.knownSecrets(of: config))
     }
 
     /// A config entry with neither a command nor a url (r3 e412).

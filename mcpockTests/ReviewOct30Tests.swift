@@ -54,6 +54,20 @@ final class ReviewOct30ProbeTests: XCTestCase {
                             command: "/usr/bin/python3", args: ["-u", url.path], env: env, url: nil, headers: [:])
     }
 
+    /// 1279: a `${VAR}` secret a server echoes is masked, though the config
+    /// mcpock keeps only says `${VAR}`.
+    func testEchoedVariableSecretIsMasked() async throws {
+        let secret = "short-Secret-1"
+        setenv("MCPOCK_TEST_SECRET", secret, 1)
+        defer { unsetenv("MCPOCK_TEST_SECRET") }
+        let echo = "sys.stderr.write('bad key ' + os.environ['API_KEY'] + '\\n'); sys.stderr.flush(); sys.exit(1)"
+        let config = try server(onInitialize: echo, onTools: "pass", env: ["API_KEY": "${MCPOCK_TEST_SECRET}"])
+        let result = await HealthMonitor.probeServer(config: config, fetchTools: false)
+        let reason = try XCTUnwrap(result.failureReason)
+        XCTAssertTrue(reason.contains("bad key"), reason)
+        XCTAssertFalse(reason.contains(secret), reason)
+    }
+
     private static let answerInitialize = "send({'jsonrpc': '2.0', 'id': msg['id'], 'result': ok})"
 
     /// 2cbb: the time waited, not the time left, after a slow initialize.

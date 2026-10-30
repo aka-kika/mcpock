@@ -358,6 +358,14 @@ struct ProbeResult: Sendable {
     /// Set on a healthy result that only answered on the second try: how long
     /// the first attempt waited, in seconds. An info note, never a problem.
     var slowStartSeconds: Double? = nil
+
+    /// The same result with these values masked out of its failure text.
+    func scrubbingFailure(known: [String]) -> ProbeResult {
+        var copy = ProbeResult(state: state, failureReason: failureReason.map { SecretMask.scrub($0, known: known) },
+                               tools: tools, transientFailure: transientFailure, needsAttention: needsAttention)
+        copy.slowStartSeconds = slowStartSeconds
+        return copy
+    }
 }
 
 enum ProbeError: Error, LocalizedError, Sendable {
