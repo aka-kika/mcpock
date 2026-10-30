@@ -101,6 +101,37 @@ final class ReviewOct30ProbeTests: XCTestCase {
         XCTAssertNil(ProcessRunner.startTime(of: pid), "its sleep is gone")
     }
 
+    /// A shell that keeps starting children right up to the moment it is stopped:
+    /// listed while still running, the last one was never found and lived on.
+    func testAShellStillStartingChildrenLeavesNoneBehind() throws {
+        let pidFile = dir.appendingPathComponent("children.pid")
+        let shell = dir.appendingPathComponent("busy-shell")
+        try "#!/bin/sh\nwhile :; do /bin/sleep 120 & echo $! >> '\(pidFile.path)'; /bin/sleep 0.01; done\n"
+            .write(to: shell, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
+        for _ in 0..<3 { XCTAssertNil(ShellEnvironment.read(shell: shell.path, timeout: 1)) }
+
+        let text = try String(contentsOf: pidFile, encoding: .utf8)
+        let pids = text.split(separator: "\n").compactMap { Int32($0) }
+        XCTAssertFalse(pids.isEmpty)
+        let alive = pids.filter { ProcessRunner.startTime(of: $0) != nil }
+        alive.forEach { kill($0, SIGKILL) }
+        XCTAssertEqual(alive, [])
+    }
+
+    /// One that ignores SIGTERM goes too, a little later.
+    func testAChildThatIgnoresTermIsKilled() throws {
+        let pidFile = dir.appendingPathComponent("child.pid")
+        let shell = dir.appendingPathComponent("stubborn-shell")
+        try "#!/bin/sh\ntrap '' TERM\n/bin/sleep 120 &\necho $! > '\(pidFile.path)'\nwait\n".write(to: shell, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
+
+        XCTAssertNil(ShellEnvironment.read(shell: shell.path, timeout: 3))
+
+        let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        XCTAssertNil(ProcessRunner.startTime(of: pid))
+    }
+
     /// d983: quitting during a teardown still stops a child that ignores SIGTERM.
     func testQuittingDuringTeardownForceKills() async throws {
         let runner = try ProcessRunner(command: "/bin/sh", args: ["-c", "trap '' TERM; /bin/sleep 120 & wait; /bin/sleep 120"], env: [:])

@@ -497,7 +497,12 @@ final class ProcessRunner: @unchecked Sendable {
     /// this runner's root, never mcpock itself. The start-time floor keeps a
     /// later, unrelated group that reused the ID out.
     private func groupMembers(of pgid: Int32) -> [TreeMember] {
-        guard pgid > 0, let floor = rootStarted else { return [] }
+        guard let floor = rootStarted else { return [] }
+        return Self.groupMembers(of: pgid, notBefore: floor)
+    }
+
+    private static func groupMembers(of pgid: Int32, notBefore floor: timeval) -> [TreeMember] {
+        guard pgid > 0 else { return [] }
         let stride = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PGRP, pgid]
         var size = 0
@@ -514,6 +519,43 @@ final class ProcessRunner: @unchecked Sendable {
                 || (started.tv_sec == floor.tv_sec && started.tv_usec >= floor.tv_usec)
             return afterRoot ? TreeMember(pid: pid, started: started) : nil
         }
+    }
+
+    /// Stops a process that overran and everything it started, and returns once
+    /// they are gone (a short bounded wait). For a one-shot command, not a server
+    /// probe. The tree is frozen first and listed until a look finds nothing new:
+    /// listed while still running, a child started a moment later was never found
+    /// and outlived mcpock. The group catches one whose parent is already gone.
+    /// `started`: taken before the spawn, so a later group that reused the ID stays out.
+    static func stopTree(root: Int32, started: timeval, grace: TimeInterval = 1) {
+        guard root > 0 else { return }
+        var tree: [TreeMember] = []
+        func look() -> [TreeMember] {
+            let rootItself = startTime(of: root).map { [TreeMember(pid: root, started: $0)] } ?? []
+            return merged(merged(rootItself, treeSnapshot(of: root)), groupMembers(of: root, notBefore: started))
+        }
+        // Up to five looks; each new member is frozen before the next one.
+        for _ in 0..<5 {
+            let known = Set(tree.map(\.pid))
+            let new = look().filter { !known.contains($0.pid) }
+            if new.isEmpty, !tree.isEmpty { break }
+            new.filter(\.isStillTheSameProcess).forEach { kill($0.pid, SIGSTOP) }
+            tree += new
+            usleep(2_000)
+        }
+        func alive() -> [TreeMember] { tree.filter(\.isStillTheSameProcess) }
+        func wait(_ seconds: TimeInterval) {
+            let deadline = Date().addingTimeInterval(seconds)
+            while !alive().isEmpty, Date() < deadline { usleep(5_000) }
+        }
+        // SIGTERM stays pending on a stopped process until SIGCONT wakes it.
+        alive().forEach {
+            kill($0.pid, SIGTERM)
+            kill($0.pid, SIGCONT)
+        }
+        wait(grace)
+        alive().forEach { kill($0.pid, SIGKILL) }
+        wait(0.2)
     }
 
     /// `a` then the members of `b` not already in it (by PID).

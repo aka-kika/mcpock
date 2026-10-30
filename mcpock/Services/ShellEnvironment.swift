@@ -100,16 +100,13 @@ enum ShellEnvironment {
         process.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
         let done = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in done.signal() }
+        var spawned = timeval()
+        gettimeofday(&spawned, nil)
         do { try process.run() } catch { return nil }
         if done.wait(timeout: .now() + timeout) == .timedOut {
             // What the shell's rc started too, or it outlives the check
-            // (review 2026-10-30, aa31). Listed first: after the shell goes,
-            // its children can't be found from its PID any more.
-            let tree = ProcessRunner.treeSnapshot(of: process.processIdentifier)
-            process.terminate()
-            tree.filter(\.isStillTheSameProcess).forEach { kill($0.pid, SIGTERM) }
-            if done.wait(timeout: .now() + 1) == .timedOut { kill(process.processIdentifier, SIGKILL) }
-            tree.filter(\.isStillTheSameProcess).forEach { kill($0.pid, SIGKILL) }
+            // (review 2026-10-30, aa31).
+            ProcessRunner.stopTree(root: process.processIdentifier, started: spawned)
             return nil
         }
         guard let data = try? Data(contentsOf: outURL) else { return nil }
