@@ -54,6 +54,7 @@
 		3A8F78D57A9D4BBE65F3DAA4 /* CursorUsageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 312B5B2A56B0D489AF4D2B3D /* CursorUsageReader.swift */; };
 		3B6C03E564744FDCE503DD81 /* ListeningPortsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB8D8C1AA5DBFDBF7064BC3 /* ListeningPortsTests.swift */; };
 		3BE9C7DC1662E3BDD3512A09 /* HeadersHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354114E69A4A0C84DE5B5F31 /* HeadersHelperTests.swift */; };
+		3D22AAFDF6397CB3F96B87EF /* ConfigWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509359A528B9B8170C6E7A13 /* ConfigWatcherTests.swift */; };
 		3FB25A4BE17E4A9532FEE028 /* SettingsLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C66CF8F6F69F4C1BE60286 /* SettingsLauncher.swift */; };
 		409DA0DD72CDD8BB6FFB9148 /* WidgetReloadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA0422E4328AA172827BBD6 /* WidgetReloadPolicy.swift */; };
 		430DACDEC25AE3A3323A3513 /* PanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */; };
@@ -131,6 +132,7 @@
 		8F3F1CA7E4536743A3157F96 /* ConnectSnippets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F393572D1E0AD89065FD2171 /* ConnectSnippets.swift */; };
 		8F85CF7DA3F531F31DD6DB76 /* HealthSmoothingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F1D63302811307369E428E /* HealthSmoothingTests.swift */; };
 		92F4F792AE5D8B8E05ACBC62 /* Round9SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DB12EF59D0AE5F5B1262DD /* Round9SettingsTests.swift */; };
+		947EC490172F5603D85A4178 /* ConfigWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A30C025B65665BAEAEB543E /* ConfigWatcher.swift */; };
 		94BFB6E296214F3B7EACE10B /* MCPStatusServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFA50062B8689AE0474AA0F /* MCPStatusServerTests.swift */; };
 		95BCBEBB0F6B10A4F42A5976 /* MCPockWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1D0D8FD21E2ACA5ABF851C /* MCPockWidgetsBundle.swift */; };
 		96756244392D0F55E146DB62 /* TestProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC8B41723C99A1672DD754DD /* TestProcess.swift */; };
@@ -284,6 +286,7 @@
 		14F98A52F49ACD8C24EA7164 /* MCPServersYAML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServersYAML.swift; sourceTree = "<group>"; };
 		1525200D17A26421B74345A5 /* StatusWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusWidgetView.swift; sourceTree = "<group>"; };
 		1803A1ACE989D529368A2497 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
+		1A30C025B65665BAEAEB543E /* ConfigWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigWatcher.swift; sourceTree = "<group>"; };
 		1B2A8919A33142FF4FB5B79F /* MonitorStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorStartTests.swift; sourceTree = "<group>"; };
 		1C92735F41064BC566077D27 /* AppPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesTests.swift; sourceTree = "<group>"; };
 		1F23CF9DDB92A0D16DA16631 /* ShellEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellEnvironment.swift; sourceTree = "<group>"; };
@@ -326,6 +329,7 @@
 		4F9B021523BE81248DFED584 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4FE6071A232F85D26C4B020D /* RefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshTests.swift; sourceTree = "<group>"; };
 		505DD24534DFE53DD2328BA4 /* SettingsGeneralPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGeneralPane.swift; sourceTree = "<group>"; };
+		509359A528B9B8170C6E7A13 /* ConfigWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigWatcherTests.swift; sourceTree = "<group>"; };
 		51409B6B9CE54C86326ADFCF /* SettingsAboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPane.swift; sourceTree = "<group>"; };
 		5438F99ACA7A977FF18633C8 /* ShortReasonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortReasonTests.swift; sourceTree = "<group>"; };
 		544B1BF285AA02F3C3C009DE /* ProbeR3Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProbeR3Tests.swift; sourceTree = "<group>"; };
@@ -535,6 +539,7 @@
 				993AE91EA80E26124D06DCA1 /* ConfigScannerTests.swift */,
 				4D303B7FC33C862D2B776D42 /* ConfigShapeTests.swift */,
 				8FACD9F75F069F1D5FC8EBFA /* ConfigVariablesTests.swift */,
+				509359A528B9B8170C6E7A13 /* ConfigWatcherTests.swift */,
 				D1AFF3CBAE84B6EE7809EA0D /* CursorUsageReaderTests.swift */,
 				BF5F772519B829DA2EB17D47 /* DemoDataTests.swift */,
 				D1A72664DD7C4DA9F68F0B7D /* DifferentOnPurposeTests.swift */,
@@ -634,6 +639,7 @@
 				72EEB5C009333D0DA35F9B7F /* ConfigScanner.swift */,
 				83EAE760B3AD36CAEFF67C0D /* ConfigShape.swift */,
 				78FCC72828BAD8AA159BC1E3 /* ConfigVariables.swift */,
+				1A30C025B65665BAEAEB543E /* ConfigWatcher.swift */,
 				F393572D1E0AD89065FD2171 /* ConnectSnippets.swift */,
 				CA59574B047CB376A17C6816 /* DemoData.swift */,
 				04B7D28F4D12D112B292503D /* Differs.swift */,
@@ -976,6 +982,7 @@
 				379B7A459438D1C36D4461CE /* ConfigScanner.swift in Sources */,
 				108E6B24D1F8D8B638DD8A21 /* ConfigShape.swift in Sources */,
 				0F92F5D2FAFE7066F8DD8CEF /* ConfigVariables.swift in Sources */,
+				947EC490172F5603D85A4178 /* ConfigWatcher.swift in Sources */,
 				8F3F1CA7E4536743A3157F96 /* ConnectSnippets.swift in Sources */,
 				3A8F78D57A9D4BBE65F3DAA4 /* CursorUsageReader.swift in Sources */,
 				8B3B60EDEA7E5E2CB68317EA /* DemoData.swift in Sources */,
@@ -1092,6 +1099,7 @@
 				C8EB937B81DECA1FAB1F5DA1 /* ConfigScannerTests.swift in Sources */,
 				CFDF45655363574E1378E984 /* ConfigShapeTests.swift in Sources */,
 				524B0DD17BE7DD409B1F3D35 /* ConfigVariablesTests.swift in Sources */,
+				3D22AAFDF6397CB3F96B87EF /* ConfigWatcherTests.swift in Sources */,
 				1F082D9E4EAB77815C2C097D /* CursorUsageReaderTests.swift in Sources */,
 				0E776620CA6DA492EE8BAE52 /* DemoDataTests.swift in Sources */,
 				D62BA5BF8362F08EC591621A /* DifferentOnPurposeTests.swift in Sources */,

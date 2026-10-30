@@ -68,6 +68,17 @@ struct MCPockApp: App {
                 return configs + (await aka)
             }
         }
+        // A changed config file is read and its changed servers checked within
+        // seconds, so a fix turns green by itself (1.13). Reads only.
+        if !isHostingTests && !isDemo {
+            let watcher = ConfigWatcher { [weak monitor] in
+                Task { @MainActor in await monitor?.configFilesChanged() }
+            }
+            monitor.readWatchedFiles = { files in
+                await Task.detached(priority: .utility) { ConfigDiscovery.discover(knownScanFiles: files) }.value
+            }
+            monitor.onWatchedFilesChange = { watcher.watch($0) }
+        }
         // Servers open Claude Code sessions lost, from their own logs (1.12).
         if !isHostingTests && !isDemo {
             monitor.readSessionDrops = {

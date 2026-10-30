@@ -325,3 +325,114 @@ final class ReviewOct30RuleTests: XCTestCase {
         XCTAssertEqual(alert.buttons[1].keyEquivalent, "")
     }
 }
+
+/// 1.13 (product Add 2): a changed config checks only what changed.
+@MainActor
+final class WatchedFilesMonitorTests: XCTestCase {
+    private final class Probes: @unchecked Sendable {
+        private let lock = NSLock()
+        private var names: [String] = []
+        var seen: [String] { lock.withLock { names } }
+        func add(_ name: String) { lock.withLock { names.append(name) } }
+    }
+
+    private var suite: String!
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        suite = "mcpock.tests.watch.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)
+    }
+
+    override func tearDown() {
+        defaults.retireSuite(named: suite)
+        super.tearDown()
+    }
+
+    private func config(_ name: String, command: String = "/bin/echo", label: String = "Cursor") -> ServerConfig {
+        ServerConfig(id: "\(label):\(name)", name: name, source: ServerSource(label: label, path: "/k/mcp.json"), projectPath: nil,
+                     transport: .stdio, command: command, args: [], env: [:], url: nil, headers: [:])
+    }
+
+    private func started(_ configs: [ServerConfig], probes: Probes) async -> HealthMonitor {
+        let monitor = HealthMonitor(defaults: defaults, isUpdate: false)
+        monitor.discover = { configs }
+        monitor.probe = { config, _ in
+            probes.add(config.name)
+            return ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        monitor.start()
+        for _ in 0..<300 where !monitor.hasCompletedFirstPass { try? await Task.sleep(for: .milliseconds(10)) }
+        return monitor
+    }
+
+    func testAFixChecksOnlyTheServerThatChanged() async {
+        let probes = Probes()
+        let monitor = await started([config("a"), config("b", command: "/no/such")], probes: probes)
+        defer { monitor.stop() }
+        let before = probes.seen.count
+        let fixed = [config("a"), config("b", command: "/bin/echo")]
+        monitor.readWatchedFiles = { _ in fixed }
+        await monitor.configFilesChanged()
+        XCTAssertEqual(Array(probes.seen.dropFirst(before)), ["b"])
+    }
+
+    func testARewriteWithNoChangeStartsNothing() async {
+        let probes = Probes()
+        let configs = [config("a")]
+        let monitor = await started(configs, probes: probes)
+        defer { monitor.stop() }
+        let before = probes.seen.count
+        var cycles = 0
+        monitor.onCycleFinished = { cycles += 1 }
+        monitor.readWatchedFiles = { _ in configs }
+        await monitor.configFilesChanged()
+        XCTAssertEqual(probes.seen.count, before)
+        XCTAssertEqual(cycles, 0, "no spinning footer for a file that only moved")
+    }
+
+    func testManualModeWaitsForRefresh() async {
+        AppPreferences.saveProbeInterval(.manual, to: defaults)
+        let probes = Probes()
+        let monitor = await started([config("a")], probes: probes)
+        defer { monitor.stop() }
+        let before = probes.seen.count
+        let added = [config("a"), config("new")]
+        monitor.readWatchedFiles = { _ in added }
+        await monitor.configFilesChanged()
+        XCTAssertEqual(probes.seen.count, before)
+        XCTAssertEqual(monitor.servers.count, 1)
+    }
+
+    /// aka has no file: its rows stay through a watcher read, which never asks aka.
+    func testAkaRowsSurviveAWatcherRead() async {
+        let probes = Probes()
+        let monitor = await started([config("a"), config("k", label: AkaSource.label)], probes: probes)
+        defer { monitor.stop() }
+        let fileOnly = [config("a")]
+        monitor.readWatchedFiles = { _ in fileOnly }
+        await monitor.configFilesChanged()
+        XCTAssertEqual(Set(monitor.servers.map(\.config.name)), ["a", "k"])
+    }
+
+    /// What is watched: known agents' files and allowed scan files, nothing else.
+    func testWatchedFilesAreKnownAndAllowedOnly() async {
+        let allowed = "/k/.x/allowed.json", other = "/k/.x/other.json"
+        func scan(_ path: String) -> ServerConfig {
+            ServerConfig(id: "scan:\(path):s", name: path, source: ServerSource(label: "x", path: path), projectPath: nil,
+                         transport: .stdio, command: "/bin/echo", args: [], env: [:], url: nil, headers: [:])
+        }
+        let configs = [scan(allowed), scan(other)]
+        AppPreferences.saveAllowedScanFiles([allowed], to: defaults)
+        defaults.set(true, forKey: AppPreferences.scanFilesSeededKey)
+        let monitor = HealthMonitor(defaults: defaults, isUpdate: false)
+        monitor.discover = { configs }
+        var watched: [String] = []
+        monitor.onWatchedFilesChange = { watched = $0 }
+        await monitor.reloadConfigs()
+        XCTAssertTrue(watched.contains(allowed))
+        XCTAssertFalse(watched.contains(other))
+        XCTAssertTrue(watched.contains(AgentRegistry.known[0].path))
+    }
+}

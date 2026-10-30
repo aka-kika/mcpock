@@ -487,6 +487,11 @@ final class HealthMonitor {
             found = await discover()
             knownScanFiles = ConfigDiscovery.scanFiles(in: found)
         }
+        await take(found)
+    }
+
+    /// Fold what a read found into `servers`.
+    private func take(_ found: [ServerConfig]) async {
         let configs = found + Self.midWriteSurvivors(previous: servers.map(\.config), found: found)
         if seedsScanFiles {
             allowedScanFiles.formUnion(configs.compactMap(Self.scanOnlyFile))
@@ -513,9 +518,56 @@ final class HealthMonitor {
             let installed = await findInstalledEmptyAgents()
             if installed != installedEmptyAgents { installedEmptyAgents = installed }
         }
-        servers = Self.merged(configs, into: servers, pausedNames: pausedNames,
-                              allowedScanFiles: Self.stillAllowed(allowedScanFiles, prints: allowedScanFingerprints,
-                                                                  now: scanFingerprints))
+        let merged = Self.merged(configs, into: servers, pausedNames: pausedNames,
+                                 allowedScanFiles: Self.stillAllowed(allowedScanFiles, prints: allowedScanFingerprints,
+                                                                     now: scanFingerprints))
+        // Same servers: no redraw and no status write. `~/.claude.json` is
+        // rewritten every few seconds in a busy session, and the watcher reads it.
+        if merged != servers { servers = merged }
+        updateWatchedFiles()
+    }
+
+    // MARK: - Watching the config files (1.13)
+
+    /// Reads the known files and the scan-found ones for the watcher: no folder
+    /// walk and no aka (its list has no file to change). Nil (tests, demo mode)
+    /// leaves the watcher's read to `discover`.
+    @ObservationIgnored var readWatchedFiles: (@Sendable ([String]) async -> [ServerConfig])?
+    /// Told when the list of files to watch changes. Nil in tests and demo mode.
+    @ObservationIgnored var onWatchedFilesChange: (([String]) -> Void)?
+    @ObservationIgnored private var watchedFiles: [String] = []
+
+    /// The known agents' files, and the scan-found files she allowed: never a
+    /// file mcpock wouldn't start anything from.
+    private func updateWatchedFiles() {
+        guard let onWatchedFilesChange else { return }
+        let files = AgentRegistry.known.map(\.path) + knownScanFiles.filter { allowedScanFiles.contains($0) }
+        guard files != watchedFiles else { return }
+        watchedFiles = files
+        onWatchedFilesChange(files)
+    }
+
+    /// A watched file changed: read the files again and check only the servers
+    /// that are new or changed (`merged` starts them over as `.unknown`). A
+    /// server untouched by the change is not started again. Manual means only
+    /// when she asks, so the read and the check wait for her Refresh then.
+    func configFilesChanged() async {
+        guard hasStarted, hasCompletedFirstPass, AppPreferences.loadProbeInterval(from: defaults).seconds != nil else { return }
+        await awaitInFlightCycle()
+        let task = Task {
+            let aka = self.servers.map(\.config).filter { $0.source.label == AkaSource.label }
+            if let readWatchedFiles = self.readWatchedFiles {
+                let found = await readWatchedFiles(self.knownScanFiles)
+                await self.take(found + aka)
+            } else {
+                await self.reloadConfigs(fullScan: false)
+            }
+            await self.runProbeCycle(force: false, onlyNew: true)
+        }
+        probeTask = task
+        probeTaskIsFullCycle = false
+        await task.value
+        if probeTask == task { probeTask = nil }
     }
 
     /// The allowed files whose commands are still what she allowed.
@@ -1047,8 +1099,13 @@ final class HealthMonitor {
         await reloadThenProbe(force: false, fullScan: false)
     }
 
-    private func runProbeCycle(force: Bool) async {
+    /// `onlyNew` (the watcher): just the servers waiting for their first check,
+    /// and with none, no cycle at all: nothing spins and nothing is counted.
+    private func runProbeCycle(force: Bool, onlyNew: Bool = false) async {
         if Task.isCancelled { return }
+        if onlyNew, !servers.contains(where: { $0.state == .unknown && Self.shouldProbe($0, pausedNames: pausedNames, force: false, now: Date()) }) {
+            return
+        }
         // Note: discovery (the filesystem scan) is NOT run here — the callers run
         // it first: launch, `refreshAll()` ("Refresh now") and `timerTick()`.
         refreshHolds += 1
@@ -1061,7 +1118,9 @@ final class HealthMonitor {
         // known-bad server are actively harmful. `force` (Refresh now) skips the
         // backoff but never the pause.
         let now = Date()
-        let due = servers.filter { Self.shouldProbe($0, pausedNames: pausedNames, force: force, now: now) }
+        let due = servers.filter {
+            (!onlyNew || $0.state == .unknown) && Self.shouldProbe($0, pausedNames: pausedNames, force: force, now: now)
+        }
 
         // Identical probe targets (same command/args/env/cwd or url/headers) are
         // probed ONCE and the result fanned out to every instance — the same server
