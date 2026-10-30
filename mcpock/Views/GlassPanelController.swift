@@ -73,7 +73,6 @@ final class GlassPanelController: NSObject {
             layer.masksToBounds = true
         }
         panel.onPerformClose = { [weak self] in self?.close() }
-        state.requestClose = { [weak self] in self?.close() }
         PanelToggle.glassToggle = { [weak self] in self?.toggleFromShortcut() ?? false }
         // Follow the theme: the item exists only while it is Glass.
         defaultsObserver = NotificationCenter.default.addObserver(
@@ -153,6 +152,10 @@ final class GlassPanelController: NSObject {
         layout(under: button, onMouseScreen: onMouseScreen)
         generation += 1
         isShown = true
+        // Only while this panel is the one on screen: set for good, it took
+        // Escape from the MenuBarExtra window of every other theme on macOS 27
+        // and closed nothing (review 2026-10-30, 2ca9).
+        state.requestClose = { [weak self] in self?.close() }
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         // Pay the first layout and draw while the panel is still invisible,
@@ -204,6 +207,7 @@ final class GlassPanelController: NSObject {
         removeEventMonitors()
         guard isShown else { return }
         isShown = false
+        state.requestClose = nil
         giveKeyboardBack()
         let generation = generation
         let finish = { [weak self] in
