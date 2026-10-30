@@ -124,6 +124,11 @@ final class HealthMonitor {
         return installedEmptyAgents.filter { !named.contains($0) }
     }
 
+    /// Those the panel's Agents tab lists too; Settings > Agents lists them all.
+    var serverlessAgentsOnPanel: [String] {
+        serverlessAgents.filter { !AgentRegistry.settingsOnlyWhenEmpty.contains($0) }
+    }
+
     /// Finds those agents. Nil (tests, demo mode) finds none.
     @ObservationIgnored var findInstalledEmptyAgents: (@Sendable () async -> [String])?
 

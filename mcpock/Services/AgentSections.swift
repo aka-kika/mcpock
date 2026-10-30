@@ -224,8 +224,8 @@ enum AgentSections {
     /// The footer on the Agents tab (round 2; two numbers since 1.13): "13
     /// agents · 3 need you · 2 not checked", "13 agents, all fine"; "Checking…"
     /// while a check runs. Not checked: nothing wrong, but a server mcpock has
-    /// no answer for. An agent listed with no servers (Grok Bot, 1.12.1) can
-    /// never have one, so it never counts here: that would be a number for good.
+    /// no answer for. An agent listed with no servers (aka asking for access)
+    /// has none to count.
     static func compactSummary(_ sections: [AgentSection], checking: Bool = false) -> String {
         if checking { return "Checking\u{2026}" }
         guard !sections.isEmpty else { return "No agents found" }

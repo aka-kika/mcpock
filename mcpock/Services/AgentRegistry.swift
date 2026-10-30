@@ -49,6 +49,11 @@ enum AgentRegistry {
         AkaSource.label: akaNeedsAccessLine,
     ]
 
+    /// Listed only in Settings > Agents while empty, off the panel's Agents tab:
+    /// the panel exists for problems, and this row can never have one (Kika's
+    /// pick, 1.13). aka stays on the panel: "Needs access" is news.
+    static let settingsOnlyWhenEmpty: Set<String> = [grokBotLabel]
+
     /// What such an agent says beside its name while it has none. Not "No
     /// servers yet": that reads as "wait and they come", and they never will
     /// from this Mac (1.13, inbox 2026-10-30).

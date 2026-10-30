@@ -258,9 +258,10 @@ Tinycast server that needs one shows as managed by its app, the others are
 checked like any other. **Grok Bot** keeps its connectors in your Grok account and runs them on its
 own computers; its settings file holds at most their names, so mcpock lists
 those under Grok Bot and never starts them. Nothing on this Mac lists the rest,
-so Grok Bot is listed once installed (its app or `~/.grokbot`), and with an
-empty list it reads **Not visible here**: check its connectors in Grok Bot's own
-settings. A remote server
+so Grok Bot is listed in Settings > Agents once installed (its app or
+`~/.grokbot`), and with an empty list it reads **Not visible here**: check its
+connectors in Grok Bot's own settings. It joins the panel's Agents tab only
+when it has names to list. A remote server
 written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty-one agents have their real logo in the app (Grok Bot since 1.12.2); others show two
 letters.
 
@@ -339,7 +340,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-853 unit tests at v1.13.0. They cover the
+854 unit tests at v1.13.0. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's

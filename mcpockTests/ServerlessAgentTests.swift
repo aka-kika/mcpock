@@ -70,6 +70,31 @@ final class ServerlessAgentTests: XCTestCase {
         XCTAssertEqual(monitor.serverlessAgents, [])
     }
 
+    /// Kika's pick (1.13): Grok Bot's empty row is in Settings > Agents only. aka
+    /// asking for access stays on the panel, and Grok Bot with servers is listed.
+    @MainActor
+    func testGrokBotsEmptyRowIsInSettingsOnly() async {
+        let suite = "mcpock.tests.serverless.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let monitor = HealthMonitor(defaults: defaults, isUpdate: false)
+        let cursor = cursorRow("docs").config
+        monitor.discover = { [cursor] }
+        monitor.findInstalledEmptyAgents = { [AgentRegistry.grokBotLabel, AkaSource.label] }
+        await monitor.reloadConfigs()
+
+        let panel = PanelState(monitor: monitor, defaults: defaults)
+        XCTAssertEqual(Set(panel.agentSections.map(\.agent)), ["Cursor", AkaSource.label])
+        XCTAssertEqual(Set(panel.allAgentSections.map(\.agent)), ["Cursor", AkaSource.label])
+        let settings = SettingsAgentsPane.entries(from: monitor.groups, emptyAgents: monitor.serverlessAgents)
+        XCTAssertTrue(settings.map(\.agent).contains(AgentRegistry.grokBotLabel))
+
+        let listed = grokBotRow("linear").config
+        monitor.discover = { [cursor, listed] }
+        await monitor.reloadConfigs()
+        XCTAssertTrue(panel.agentSections.map(\.agent).contains(AgentRegistry.grokBotLabel), "with servers it is listed as usual")
+    }
+
     // MARK: - aka asks for access (1.12.2)
 
     func testA401Or403FromAkaMeansNeedsAccessNotNoServers() {
