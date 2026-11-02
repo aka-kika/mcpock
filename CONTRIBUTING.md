@@ -34,7 +34,7 @@ xcodebuild -scheme mcpock -configuration Debug \
   build test
 ```
 
-- The build must stay at **zero warnings**, and every test must pass.
+- Every test must pass. Warnings are not gated.
 - `xcodebuild` prints harmless system noise. To hide it:
   `./scripts/ci.sh 2>&1 | grep -Ev "linkd|synchronousRemoteObject|Process Instance Registry|autoShortcut"`
 - The unit tests run inside the app (it is the test host). Use a throwaway

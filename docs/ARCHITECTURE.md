@@ -1,6 +1,6 @@
 # mcpock — Architecture
 
-How the app is put together (v1.12), how one health check flows end to end, and
+How the app is put together (v1.13), how one health check flows end to end, and
 the rules that must not regress. For what the app does from a user's point of
 view, see the [README](../README.md); for build and test steps, see
 [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -126,13 +126,13 @@ card is open).
 | `Views/GlassPanelController.swift` | Glass theme on macOS 27+ (1.8): its own `NSStatusItem` (expanded-interface session) and a clear borderless `GlassPanelWindow` hosting the same `MenuBarPanelView`; the MenuBarExtra item hides meanwhile (`GlassPanelStyle.usesGlassPanel`) |
 | `Views/ServerRowView.swift`, `HealthMark.swift`, `AgentBadgeView.swift` | A row: health shape, name, agent logos, tool count; right-click menu |
 | `Views/AgentsListView.swift` | The Agents tab (the panel opens on it, 1.5.4). Its `HealthBar` grows in on the tab's first real view each launch and after every full check (`PanelState.healthBarShouldGrow`, `agentsTabAppeared`) |
-| `Views/DetailCardPresenter.swift`, `DetailCardView.swift` | Detail card as a child panel; its problem boxes (1.5.3 layout B: `CardText.problems` picks why / differs / marked; equal-width `CardButton(fillsWidth:)` rows, `CopyFlashButton` for the orange "Copied"); its tools list (first 5, Show more in place; 1.5.3 dropped the separate tools window) |
+| `Views/DetailCardPresenter.swift`, `DetailCardView.swift` | Detail card as a child panel; its problem boxes (1.5.3 layout B: `CardText.problems` picks why / differs / marked; equal-width `CardButton(fillsWidth:)` rows, `CopyFlashButton` for the orange "Copied"); its tools list (first 5, "+N more" in place (tooltip "Show N more tools"); 1.5.3 dropped the separate tools window) |
 | `Views/ConfigPathMenu.swift` | One right-click menu for every config path (Show in Finder, Copy Path, Open Config… with a confirmation) |
 | `Views/StatusIconView.swift`, `SpinnableIcon.swift` | Menu-bar icon; the refresh glyph's spin |
 | `Views/Settings*.swift`, `Services/SettingsLauncher.swift` | Settings window: General, Servers, Agents, Connect, About |
 | `Services/WhatsNew.swift`, `Services/WhatsNewLauncher.swift` | What's new: `docs/release-notes/<version>.md` (bundled) in a small window, once after an update and from the right-click menu |
 | `Services/AppPreferences.swift` (`TestCallLeftovers`) | Removes, at every launch, what the 1.10.7 test builds' test calls left: four settings and `test-requests/` |
-| `Services/StatusItemRightClick.swift` | Right-click on the menu-bar icon: Settings, Quit |
+| `Services/StatusItemRightClick.swift` | Right-click on the menu-bar icon, and the footer's gear: Settings, Check for Updates, What's New, Quit |
 | `Services/GlobalHotKey.swift` | The panel shortcut from any app (1.10; her own keys since 1.12, `PanelShortcut`, default Control-Option-M): a Carbon `RegisterEventHotKey` (no permission prompt), on/off and the recorder in Settings > General, let go while recording; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
 | `Theme/Theme.swift` | Colour tokens (Light semantic, Dark soft dark), fonts, `AppearanceApplier` |
 

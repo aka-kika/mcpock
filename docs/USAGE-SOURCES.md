@@ -8,7 +8,7 @@ chat content, arguments, results, keys or tokens.
 Covers every agent mcpock can discover a config for or show a logo for (from
 `AgentRegistry.swift`, `ConfigScanner.swift`, `AkaSource.swift`, and the
 `agent-*.imageset` names), not just the ones on this Mac — public users run other
-agents.
+agents. It does not cover Antigravity, Grok Bot, or Tinycast yet (no paths checked for them).
 
 Checked 2026-09-26.
 
@@ -39,9 +39,9 @@ confirmed.
 | Agent | Countable | Where (macOS) | Format | MCP call name pattern | Timestamp? | How sure | Notes |
 |---|---|---|---|---|---|---|---|
 | Claude Code | yes | `~/.claude/projects/**/*.jsonl` | JSONL, one line per event | `mcp__<server>__<tool>` | yes, per line | checked on this Mac | Already built. Files go back to at least June 2026 with no sign of rotation. |
-| Grok | yes | `~/.grok/sessions/<url-encoded-project-path>/<session-uuid>/chat_history.jsonl` and `events.jsonl` | JSONL | wrapped in a `use_tool` call; its `tool_name` argument is `<server>__<tool>` | yes | checked on this Mac | Already built. Session folders are keyed by URL-encoded project path, one level deeper than it looks at first glance. |
-| Cursor | yes | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, table `cursorDiskKV` | SQLite key-value store; each `bubbleId:*` row's value is a JSON blob | `toolFormerData.name` = `mcp-<server>-<tool>` | conversation-level yes (`composerData:*` rows carry `createdAt`/`lastUpdatedAt` epoch-ms); a timestamp on the individual bubble/call itself was not found | checked on this Mac | Already built. 66k+ bubble rows on this Mac alone — no visible pruning. |
-| Hermes | yes | `~/.hermes/sessions/*.jsonl` and `~/.hermes/state.db` | JSONL + SQLite | `mcp_<server>_<tool>` | yes | checked on this Mac | Already built. Sessions go back to April 2026, no rotation seen. |
+| Grok | yes | `~/.grok/sessions/<url-encoded-project-path>/<session-uuid>/events.jsonl` (the built reader reads only this file) | JSONL | event `mcp_tool_call_started`, with `server_name` and `tool_name` already split (`chat_history.jsonl` wraps calls in `use_tool` as `<server>__<tool>`, not used) | yes | checked on this Mac | Already built. Session folders are keyed by URL-encoded project path, one level deeper than it looks at first glance. |
+| Cursor | yes | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, table `cursorDiskKV` | SQLite key-value store; each `bubbleId:*` row's value is a JSON blob | `toolFormerData.name` = `mcp-<server>-<tool>` | conversation-level yes (`composerData:*` rows carry `createdAt`/`lastUpdatedAt` epoch-ms); the bubble's own `createdAt` is the call time | checked on this Mac | Already built. 66k+ bubble rows on this Mac alone — no visible pruning. |
+| Hermes | yes | `~/.hermes/state.db` and each profile's `state.db` (the built reader does not read the `sessions/*.jsonl` transcripts) | SQLite | `mcp_<server>_<tool>` or `mcp__<server>__<tool>` | yes | checked on this Mac | Already built. Sessions go back to April 2026, no rotation seen. |
 | Goose | yes | `~/.local/share/goose/sessions/sessions.db`, table `messages`, column `content_json` | SQLite, JSON blob per message | `<extension>__<tool>` | yes | checked on this Mac | Not yet built — next in line. Calls made *inside* `execute_typescript` are invisible (Goose doesn't log what runs inside that sandboxed script). |
 | OpenCode | yes | `~/.local/share/opencode/opencode.db`, table `part`, columns `data` (JSON), `time_created`/`time_updated` | SQLite, JSON blob per part | tool name sits in the `data` blob's `tool` key; on this Mac's data the only calls logged so far are OpenCode's own built-ins (`bash`, `read`, `write`, …) — no MCP call has actually gone through yet to confirm the exact server-prefixed spelling. Sibling entries like `complete-task_complete_task` suggest a single-underscore `<server>_<tool>` shape, but that's inference, not a confirmed MCP example | yes, per row | checked on this Mac (structure); call-name pattern for an actual MCP call is unconfirmed — needs one real MCP call from OpenCode to nail down | Not yet built. Table/column structure is solid; just needs a live example to lock the regex. |
 | Claude Desktop | no | — | — | — | — | checked on this Mac | Chats live in Anthropic's cloud, not on disk. Nothing to count locally. |

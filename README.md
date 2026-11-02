@@ -59,7 +59,7 @@ Full notes: [1.13.0](docs/release-notes/1.13.0.md). Earlier: [1.12.2](docs/relea
   | Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
   | Ring (grey) | Still checking |
   | Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
-  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens) |
+  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or signed in by the agent, or **Not checked** (a `${VAR}` it cannot fill), or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens) |
 
 - **Spots servers set up differently.** When one agent launches a different
   command or address than the others (often an old path), the row says so, and
@@ -105,8 +105,7 @@ Full notes: [1.13.0](docs/release-notes/1.13.0.md). Earlier: [1.12.2](docs/relea
   following light/dark and your Clear/Tinted setting. On macOS 27 the panel is
   its own see-through window, so the glass shows your real desktop.
 - **Settings:** appearance (System, Dark, Light, Glass), how often to check, Open at
-  Login, pin / show / hide each server, the list of agents found, export of all
-  errors (Markdown or JSON), and **Connect** for your agents.
+  Login, pin / show / hide each server, the list of agents found, and **Connect** for your agents.
 - **Lets your agents ask it.** A small read-only MCP server ships inside the
   app, so you can say "check my mcpock" to an agent instead of pasting errors.
 
@@ -144,7 +143,7 @@ Needs **macOS 26 or later** on Apple Silicon.
 4. Save the fix. mcpock sees the changed config within seconds and checks that
    server again, so the row turns green by itself. **Check again** on the card
    (or Cmd-R) does it at once; with checks set to Manual, it waits for you.
-5. Right-click any server for Pause, Pin, Hide, **Copy Errors** and **Ask an
+5. Right-click any server for Pause checks, Pin, Hide, **Copy Errors** and **Ask an
    Agent** (a prompt that asks an agent to look into the problem and advise you
    before it changes anything). Pause a server that opens a login page or an
    app each time it starts. Right-click the summary at the bottom of the panel
@@ -340,7 +339,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-856 unit tests at v1.13.0. They cover the
+857 unit tests at v1.13.0. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
@@ -361,8 +360,8 @@ answers, and the panel's wording and layout.
 - **Grouping:** instances with the same name (case and separators ignored)
   become one row; the worst state wins, and a launch target that differs from
   the majority becomes a "set up differently" note.
-- **UI:** a `MenuBarExtra` panel of fixed size, with the detail card and tools
-  window as child panels beside it that never take focus.
+- **UI:** a `MenuBarExtra` panel of fixed size, with the detail card as a child
+  panel beside it that never takes focus. The tools list is on the card.
 - **Agents:** after each change the app writes `status.json` and `status.md`;
   the bundled `mcpock-mcp` (stdio, read-only) answers from that file.
 
@@ -380,6 +379,7 @@ mcpock/                 The app
   Views/                Panel, rows, detail card, Agents tab, Settings
   Assets.xcassets/      App icon, agent logos, About links
 mcpock-mcp/             The read-only MCP helper (main.swift)
+mcpockWidgets/          The desktop widgets (Status, Problems, Agents)
 Shared/                 Code compiled into both app and helper
 mcpockTests/            Unit tests
 project.yml             XcodeGen spec (source of truth for the Xcode project)
@@ -441,7 +441,7 @@ those folders.
 Click it. The card shows the real error: "command not found" (the program isn't
 installed, or isn't on the PATH mcpock uses: it adds `/opt/homebrew/bin`,
 `/usr/local/bin` and `~/.local/bin`; use a full path in the config if needed),
-"quit on start" with the server's own error text (often a missing API key), or
+"Quit on start (exit …)" when the process never answered initialize, or "Quit after starting (exit …)" when it dies after a good start (often a missing API key; the card shows the server's own error text), or
 no answer in time (20 seconds for a local server, tried twice; 10 seconds for
 a remote one). Copy the error, fix it in the agent's config, then
 Check again.
@@ -474,18 +474,18 @@ its own for that agent; an agent you remove keeps the mark quiet. The card then 
 back.
 
 **A login page or an app opens every time mcpock checks.**
-Starting that server has a side effect. Right-click it and choose **Pause**:
+Starting that server has a side effect. Right-click it and choose **Pause checks**:
 mcpock won't start it again until you resume it.
 
 **The grey dash?**
 Either you paused the server, or it runs inside its own app (marked
-`"builtin": true`) and can't be checked from outside. Neither
+`"builtin": true`) and can't be checked from outside, or the agent signed in to it,
+or it is Not checked because a `${VAR}` in its config cannot be filled. None of these
 counts as a problem.
 
 **I added a server and it doesn't show.**
 Click **Refresh** in the footer: it looks for configs again and checks
-everything. The timer reads the configs again every round too, so the new
-server also shows up on its own at the next round.
+everything. A save in a config mcpock already knows (or a scan file it is allowed to read) is checked within seconds, unless checks are Manual. A file in a new place is found at launch or on Refresh; the timer re-reads only the files it already knows.
 
 **My agent says mcpock isn't running or hasn't checked yet.**
 Make sure mcpock is running (start it from Applications if its icon isn't in
