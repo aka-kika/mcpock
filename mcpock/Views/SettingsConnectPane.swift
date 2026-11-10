@@ -70,7 +70,7 @@ struct SettingsConnectPane: View {
             if ConnectSnippets.isTemporaryLocation(helperPath) {
                 Section {
                     Text(ConnectSnippets.moveText)
-                        .foregroundStyle(theme.statusBroken)
+                        .foregroundStyle(theme.badText)
                         .fixedSize(horizontal: false, vertical: true)
                 } header: {
                     Text(ConnectSnippets.moveTitle)
@@ -90,7 +90,7 @@ struct SettingsConnectPane: View {
                             .padding(.trailing, -5)
                     } else {
                         Text("Missing from this copy of mcpock")
-                            .foregroundStyle(theme.statusBroken)
+                            .foregroundStyle(theme.badText)
                     }
                 }
                 // Next to the helper that reads it (1.13, from General).
@@ -106,7 +106,7 @@ struct SettingsConnectPane: View {
                 if let error = monitor?.statusFileError {
                     Text(Self.statusFileErrorText(error))
                         .font(.system(size: 11.5))
-                        .foregroundStyle(theme.statusBroken)
+                        .foregroundStyle(theme.badText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(AgentHost.all) { host in

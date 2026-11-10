@@ -133,7 +133,7 @@ struct DetailCardView: View {
             if let warning = CardText.plainHTTPWarning(for: group) {
                 Text(warning)
                     .font(Theme.caption)
-                    .foregroundStyle(theme.statusDegraded)
+                    .foregroundStyle(theme.warnText)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
@@ -171,6 +171,16 @@ struct DetailCardView: View {
         }
     }
 
+    /// The same, for words (1.16.1): readable on light glass.
+    private var toneText: Color {
+        switch group.state {
+        case .broken: return theme.badText
+        case .degraded: return theme.warnText
+        case .healthy: return group.attentionWhileHealthy ? theme.warnText : theme.goodText
+        case .unknown, .selfManaged, .paused, .needsApp, .off: return theme.textSecondary
+        }
+    }
+
     private var titleRow: some View {
         HStack(spacing: 10) {
             HealthMark(state: HealthMark.markState(for: group), theme: theme, checking: state.isChecking(group.name),
@@ -183,7 +193,7 @@ struct DetailCardView: View {
             Spacer(minLength: 8)
             Text(HealthMark.word(for: group))
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(tone)
+                .foregroundStyle(toneText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 3)
                 .background(Capsule().fill(tone.opacity(0.12)))
@@ -227,7 +237,7 @@ struct DetailCardView: View {
                 ForEach(CardText.whyLines(for: group), id: \.self) { line in
                     Text(line)
                         .font(.system(size: 11.5, design: .monospaced))
-                        .foregroundStyle(tone)
+                        .foregroundStyle(toneText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -293,7 +303,7 @@ struct DetailCardView: View {
                 .foregroundStyle(theme.textPrimary)
             Text(CardText.differsSentence(for: group))
                 .font(.system(size: 12))
-                .foregroundStyle(theme.statusDegraded)
+                .foregroundStyle(theme.warnText)
                 .fixedSize(horizontal: false, vertical: true)
             nextStepLine
             // Every button the same height, nothing wraps; Ask an agent alone
@@ -606,12 +616,12 @@ struct DetailCardView: View {
                 if differs {
                     Text("differs")
                         .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(theme.statusDegraded)
+                        .foregroundStyle(theme.warnText)
                 }
             }
             Text(source.target.isEmpty ? "(nothing set)" : CardText.shortTarget(source.target))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(differs ? theme.statusDegraded : theme.textPrimary)
+                .foregroundStyle(differs ? theme.warnText : theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             let secrets = CardText.maskedEnv(source.envKeys) + CardText.maskedHeaders(source.headerKeys)
             if !secrets.isEmpty {
@@ -868,7 +878,7 @@ private struct UsedByRow: View {
             if differs {
                 Text("differs")
                     .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(theme.statusDegraded)
+                    .foregroundStyle(theme.warnText)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(theme.statusDegraded.opacity(0.12)))
@@ -1080,7 +1090,7 @@ struct SwitchSheet: View {
             if let error = state.switchError {
                 Text(error)
                     .font(Theme.caption)
-                    .foregroundStyle(theme.statusBroken)
+                    .foregroundStyle(theme.badText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !plan.isEmpty {
@@ -1140,8 +1150,8 @@ struct SwitchSheet: View {
                             .foregroundStyle(theme.textTertiary)
                         ForEach(Array(change.diff.enumerated()), id: \.offset) { _, line in
                             Text(line)
-                                .foregroundStyle(line.hasPrefix("+") ? theme.statusHealthy
-                                    : line.hasPrefix("-") ? theme.statusBroken : theme.textSecondary)
+                                .foregroundStyle(line.hasPrefix("+") ? theme.goodText
+                                    : line.hasPrefix("-") ? theme.badText : theme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }

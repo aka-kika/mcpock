@@ -38,7 +38,10 @@ change first and keeps a backup.
 - **Agents see which tools you use:** each tool's calls and last use, the same
   numbers the card shows (with Usage counts on).
 
-Full notes: [1.16.0](docs/release-notes/1.16.0.md).
+- **1.16.1:** easier to read in light mode: warning words in a calm dark grey
+  (the dots and bars keep their colour), every grey darker.
+
+Full notes: [1.16.1](docs/release-notes/1.16.1.md), [1.16.0](docs/release-notes/1.16.0.md).
 
 ## What's new in 1.15
 

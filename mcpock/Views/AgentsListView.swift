@@ -175,8 +175,8 @@ private struct AgentRowView: View {
     }
 
     private var problemColor: Color {
-        if section.brokenCount > 0 { return theme.statusBroken }
-        return section.problems.isEmpty ? theme.textTertiary : theme.statusDegraded
+        if section.brokenCount > 0 { return theme.badText }
+        return section.problems.isEmpty ? theme.textTertiary : theme.warnText
     }
 
     /// Right-click on an agent (round 5, round 8): Copy All Problems first when
@@ -402,8 +402,8 @@ private struct AgentServerRow: View {
 
     private var noteColor: Color {
         switch server.state {
-        case .broken: return theme.statusBroken
-        case .degraded, .healthy: return theme.statusDegraded
+        case .broken: return theme.badText
+        case .degraded, .healthy: return theme.warnText
         case .unknown, .selfManaged, .paused, .off: return theme.textTertiary
         case .needsApp: return theme.textSecondary
         }

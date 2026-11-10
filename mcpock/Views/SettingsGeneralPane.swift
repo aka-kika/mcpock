@@ -139,21 +139,21 @@ struct SettingsGeneralPane: View {
                 if let launchError {
                     Text(launchError)
                         .font(Theme.caption)
-                        .foregroundStyle(theme.statusBroken)
+                        .foregroundStyle(theme.badText)
                 } else if launchNeedsApproval {
                     Text(LaunchAtLogin.approvalText)
                         .font(Theme.caption)
-                        .foregroundStyle(theme.statusDegraded)
+                        .foregroundStyle(theme.warnText)
                 } else if openPanelHotKey && GlobalHotKey.shared.isTaken {
                     Text(Self.hotKeyTakenText(panelShortcut))
                         .font(Theme.caption)
-                        .foregroundStyle(theme.statusDegraded)
+                        .foregroundStyle(theme.warnText)
                 } else if AppGroup.containerURL == nil {
                     // (r3 7183) An unsigned or ad-hoc build has no App Group: the
                     // widgets would show nothing, and nothing said why.
                     Text(Self.widgetsUnavailableText)
                         .font(Theme.caption)
-                        .foregroundStyle(theme.statusDegraded)
+                        .foregroundStyle(theme.warnText)
                 } else {
                     footerText(shownInterval == .manual
                         ? "Checks only when you press Refresh in the panel."

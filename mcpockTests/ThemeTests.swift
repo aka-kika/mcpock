@@ -98,4 +98,19 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(glass.selectedFill, Color.white.opacity(0.16))
         XCTAssertEqual(ThemeColors.resolve(.dark).fieldFill, Color(hex: 0x323238))
     }
+
+    /// 1.16.1 (Kika's pick, Mocker 10 Nov): in Light, words that warn are the
+    /// darker grey; the dots and bars keep their colours. Dark keeps pastels.
+    func testStatusWordsAreGreyInLightAndPastelInDark() {
+        let light = ThemeColors.resolve(.light, forGlass: true)
+        XCTAssertEqual(light.warnText, light.textSecondary)
+        XCTAssertEqual(light.badText, light.textSecondary)
+        XCTAssertEqual(light.goodText, light.textSecondary)
+        XCTAssertEqual(light.textSecondary, Color.black.opacity(0.62))
+        XCTAssertEqual(light.statusDegraded, Color(hex: 0xB8860B), "the dot keeps its amber")
+        let dark = ThemeColors.resolve(.dark)
+        XCTAssertEqual(dark.warnText, dark.statusDegraded)
+        XCTAssertEqual(dark.badText, dark.statusBroken)
+        XCTAssertEqual(dark.textTertiary, Color.white.opacity(0.56))
+    }
 }

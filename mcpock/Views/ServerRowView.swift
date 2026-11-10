@@ -129,10 +129,10 @@ struct ServerRowView: View {
         // Not checked here is calm, like its dash (r3 b964, 5f42).
         if group.notCheckedHere { return theme.textSecondary }
         switch group.state {
-        case .broken: return theme.statusBroken
-        case .degraded: return theme.statusDegraded
+        case .broken: return theme.badText
+        case .degraded: return theme.warnText
         // "Off in Cursor" is her choice, not a warning.
-        case .healthy: return group.attentionWhileHealthy ? theme.statusDegraded : theme.textTertiary
+        case .healthy: return group.attentionWhileHealthy ? theme.warnText : theme.textTertiary
         case .unknown, .selfManaged, .paused, .off: return theme.textTertiary
         case .needsApp: return theme.textSecondary
         }

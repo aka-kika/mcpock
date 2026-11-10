@@ -74,6 +74,12 @@ struct ThemeColors: Equatable {
     let statusHealthy: Color
     let statusDegraded: Color
     let statusBroken: Color
+    /// Status words (1.16.1, Kika: "the colors still not good"): the dots,
+    /// badge tints and bars keep `status*`; words use these. Light: grey
+    /// (her pick), at least 4.5:1 on glass. Dark: the pastels.
+    let warnText: Color
+    let badText: Color
+    let goodText: Color
     /// Hover fill for a row. **Neutral, not accent**: an accent-tinted block behind a
     /// two-line row reads as a heavy selection slab rather than a hover hint.
     let rowHighlight: Color
@@ -177,16 +183,32 @@ struct ThemeColors: Equatable {
             controlStroke = Color.white.opacity(0.10)
         }
 
+        // Light: the system's secondary and tertiary greys read 3.8 to 4.0:1
+        // and 1.9:1 on glass (measured on VM pictures, 10 Nov), so mcpock's
+        // own, darker ones (5.7:1 and 4.6:1). Dark: tertiary read 2.1:1 on
+        // dark glass, so it becomes about as strong as secondary (4.9:1).
+        let light = scheme == .light
+        let textSecondary = light ? Color.black.opacity(0.62) : Color(nsColor: .secondaryLabelColor)
+        let textTertiary = light ? Color.black.opacity(0.56) : Color.white.opacity(0.56)
+        // Words that warn are grey in Light (Kika's pick, Mocker 10 Nov): the
+        // dot, the badge's tint and the bar carry the colour. Dark keeps the
+        // pastels, which read 4.7:1 and more there.
+        let warnText = light ? textSecondary : statusDegraded
+        let badText = light ? textSecondary : statusBroken
+        let goodText = light ? textSecondary : statusHealthy
         return ThemeColors(
             background: background,
             elevated: elevated,
             divider: divider,
             textPrimary: Color(nsColor: .labelColor),
-            textSecondary: Color(nsColor: .secondaryLabelColor),
-            textTertiary: Color(nsColor: .tertiaryLabelColor),
+            textSecondary: textSecondary,
+            textTertiary: textTertiary,
             statusHealthy: statusHealthy,
             statusDegraded: statusDegraded,
             statusBroken: statusBroken,
+            warnText: warnText,
+            badText: badText,
+            goodText: goodText,
             rowHighlight: rowHighlight,
             chromeFill: chromeFill,
             rowSelected: rowSelected,
