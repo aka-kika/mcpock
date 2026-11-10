@@ -211,11 +211,13 @@ enum StatusReport {
             let known = names.isEmpty ? "none yet" : names.joined(separator: ", ")
             return (head + ["No server named \"\(name)\" in mcpock. Known servers: \(known)."]).joined(separator: "\n")
         }
-        return (head + serverLines(server, number: nil, full: true, now: now)).joined(separator: "\n")
+        return (head + serverLines(server, number: nil, full: true, now: now, usageWindow: status.usageWindow))
+            .joined(separator: "\n")
     }
 
     /// One server as text. `full` adds tools, env/header names and every source.
-    static func serverLines(_ s: MCPockStatus.Server, number: Int?, full: Bool, now: Date) -> [String] {
+    static func serverLines(_ s: MCPockStatus.Server, number: Int?, full: Bool, now: Date,
+                            usageWindow: String? = nil) -> [String] {
         var lines: [String] = []
         let title = (number.map { "\($0). " } ?? "") + "\(s.name) — \(s.status)"
         lines.append(title)
@@ -279,7 +281,38 @@ enum StatusReport {
             } else {
                 lines.append("Tools (\(s.toolCount)):")
                 lines.append(contentsOf: untrustedBlock(toolNames(s.tools)))
+                lines.append(contentsOf: toolCallLines(s.toolCalls, window: usageWindow))
             }
+        }
+        return lines
+    }
+
+    /// Each tool's calls and last use (1.16), the card's own numbers: the
+    /// used ones most used first, then how many were not used in the window.
+    static func toolCallLines(_ calls: [MCPockStatus.ToolCalls]?, window: String?) -> [String] {
+        guard let calls, let window else {
+            return ["Tool calls: not counted (Usage counts are off in mcpock's Settings)."]
+        }
+        let span = window == "all time" ? "ever" : "in the last \(window)"
+        let used = calls.filter { $0.calls > 0 }
+        let unused = calls.filter { $0.calls == 0 }
+        var lines: [String] = []
+        if used.isEmpty {
+            lines.append("Tool calls \(span): none (from the user's agents mcpock reads usage from).")
+        } else {
+            lines.append("Tool calls \(span), most used first (from the user's agents mcpock reads usage from):")
+            let rows = used.prefix(maxToolNames).map { tool in
+                "\(oneLine(tool.name)): \(tool.calls) \(tool.calls == 1 ? "call" : "calls")"
+                    + (tool.lastUsed.map { ", last used \($0)" } ?? "")
+            }
+            let more = used.count > maxToolNames ? ["and \(used.count - maxToolNames) more"] : []
+            lines.append(contentsOf: untrustedBlock((rows + more).joined(separator: "\n")))
+        }
+        if !unused.isEmpty {
+            lines.append("\(window == "all time" ? "Never used" : "Not used \(span)"): \(unused.count) of \(calls.count) tools:")
+            lines.append(contentsOf: untrustedBlock(toolNames(unused.map { tool in
+                tool.name + (tool.lastUsed.map { " (last used \($0))" } ?? "")
+            })))
         }
         return lines
     }

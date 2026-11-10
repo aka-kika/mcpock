@@ -203,6 +203,36 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertEqual(back.servers[1].hiddenTools?["Codex"], ["delete_repo"], "it travels in the status file")
     }
 
+    /// 1.16: each tool's calls and last use, the card's numbers, for agents.
+    func testServerDetailsCarryToolCalls() throws {
+        let s = server(at: try fixtureFile())
+        let older = try XCTUnwrap(s.callTool("mcpock_server", arguments: ["name": "wake"]))
+        XCTAssertTrue(older.contains("Tool calls: not counted (Usage counts are off in mcpock's Settings)."), older)
+
+        var status = try loadedStatus()
+        status.usageWindow = "30 days"
+        status.servers[2].toolCalls = [
+            .init(name: "wake_search", calls: 41, lastUsed: "2027-01-15"),
+            .init(name: "wake_get_session", calls: 0, lastUsed: "2026-11-02"),
+        ]
+        let back = try MCPockStatus.decoder().decode(MCPockStatus.self, from: MCPockStatus.encoder().encode(status))
+        XCTAssertEqual(back.servers[2].toolCalls?.first?.calls, 41, "it travels in the status file")
+        XCTAssertEqual(back.usageWindow, "30 days")
+        let text = StatusReport.serverText(.loaded(status), name: "wake", now: status.generated, isRunning: { _ in true })
+        XCTAssertTrue(text.contains("Tool calls in the last 30 days, most used first"), text)
+        XCTAssertTrue(text.contains("wake_search: 41 calls, last used 2027-01-15"), text)
+        XCTAssertTrue(text.contains("Not used in the last 30 days: 1 of 2 tools:"), text)
+        XCTAssertTrue(text.contains("wake_get_session (last used 2026-11-02)"), text)
+        XCTAssertTrue(text.contains(StatusReport.untrustedIntro), "tool names are the server's words: fenced")
+
+        status.usageWindow = "all time"
+        status.servers[2].toolCalls = [.init(name: "wake_search", calls: 0, lastUsed: nil),
+                                       .init(name: "wake_get_session", calls: 0, lastUsed: nil)]
+        let never = StatusReport.serverText(.loaded(status), name: "wake", now: status.generated, isRunning: { _ in true })
+        XCTAssertTrue(never.contains("Tool calls ever: none"), never)
+        XCTAssertTrue(never.contains("Never used: 2 of 2 tools:"), never)
+    }
+
     private func loadedStatus() throws -> MCPockStatus {
         guard case .loaded(let status) = StatusLoad.read(from: try fixtureFile()) else { throw XCTSkip("fixture") }
         return status

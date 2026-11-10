@@ -63,6 +63,9 @@ final class UsageStore {
     /// A refresh in flight; a second trigger before it lands is a no-op —
     /// mirrors `HealthMonitor`'s single-flight probe cycles.
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    /// Called on the main actor after new counts land (1.16: the status file
+    /// agents read follows them).
+    @ObservationIgnored var onCountsChanged: (() -> Void)?
 
     init(
         readers: [UsageReader] = UsageReaders.all,
@@ -157,6 +160,8 @@ final class UsageStore {
     /// not at the next (throttled) cycle end, which in Manual mode never came.
     @discardableResult
     func usageWindowChanged(knownServers: Set<String>) -> Task<Void, Never>? {
+        // The status file shows the new window (or no counts, when Off) at once.
+        onCountsChanged?()
         guard !knownServers.isEmpty else { return nil } // the first cycle's end starts it
         guard hasLoaded else { return start(knownServers: knownServers) }
         return refresh(knownServers: knownServers)
@@ -197,6 +202,7 @@ final class UsageStore {
             self.needsToolBackfill = false
             self.hasCounts = true
             self.refreshTask = nil
+            self.onCountsChanged?()
         }
         refreshTask = task
         return task

@@ -117,6 +117,11 @@ struct MCPockApp: App {
         )
         let panel = PanelState(monitor: monitor, defaults: monitorDefaults)
         panel.usageStore = usageStore
+        // Agents read each tool's calls through the status file (1.16).
+        monitor.toolUsage = { [weak usageStore] server, window in
+            usageStore?.toolUsage(server: server, window: window)
+        }
+        usageStore.onCountsChanged = { [weak monitor] in monitor?.usageCountsChanged() }
         _monitor = State(initialValue: monitor)
         _panel = State(initialValue: panel)
         _usageStore = State(initialValue: usageStore)

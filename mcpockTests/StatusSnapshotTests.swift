@@ -79,6 +79,36 @@ final class StatusSnapshotTests: XCTestCase {
         )
     }
 
+    /// 1.16: the card's tool counts reach the file, most used first, with
+    /// the local day of the last call; none when Usage is off.
+    func testToolCallsReachTheFile() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let now = Date(timeIntervalSince1970: 1_800_000_060)
+        let today = UsageStore.dayIndex(for: now, calendar: calendar)
+        let rows = StatusSnapshot.toolCalls(
+            tools: ["a", "b", "c"],
+            usage: ["b": ToolUsage(calls: 3, lastDay: today), "c": ToolUsage(calls: 0, lastDay: today - 40)],
+            now: now, calendar: calendar)
+        XCTAssertEqual(rows.map(\.name), ["b", "a", "c"])
+        XCTAssertEqual(rows.map(\.calls), [3, 0, 0])
+        XCTAssertEqual(rows[0].lastUsed, "2027-01-15")
+        XCTAssertNil(rows[1].lastUsed)
+        XCTAssertEqual(rows[2].lastUsed, "2026-12-06")
+
+        let usage: (ServerGroup) -> [String: ToolUsage]? = { _ in [UsageStore.toolKey("wake_search"): ToolUsage(calls: 7, lastDay: today)] }
+        let on = StatusSnapshot.build(servers: fixture(), isHidden: { _ in false }, isPinned: { _ in false },
+                                      checking: false, firstCheckDone: true, interval: .fifteenMinutes, now: now,
+                                      toolUsage: usage, usageWindow: .thirtyDays)
+        XCTAssertEqual(on.usageWindow, "30 days")
+        XCTAssertEqual(on.servers.first { $0.name == "wake" }?.toolCalls?.map(\.calls), [7])
+        let off = StatusSnapshot.build(servers: fixture(), isHidden: { _ in false }, isPinned: { _ in false },
+                                       checking: false, firstCheckDone: true, interval: .fifteenMinutes, now: now,
+                                       toolUsage: usage, usageWindow: .off)
+        XCTAssertNil(off.usageWindow)
+        XCTAssertNil(off.servers.first { $0.name == "wake" }?.toolCalls, "Usage off: no counts")
+    }
+
     func testNoSecretEverReachesTheFile() throws {
         let status = build()
         let json = String(decoding: try MCPockStatus.encoder().encode(status), as: UTF8.self)

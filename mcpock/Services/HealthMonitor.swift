@@ -24,6 +24,9 @@ final class HealthMonitor {
     /// footer's Refresh), never for a single row's Check again. Set by the app
     /// at launch so usage counts follow the checks without the panel being open.
     @ObservationIgnored var onCycleFinished: (() -> Void)?
+    /// Each tool's calls of one server in a Usage window (1.16), from the
+    /// app's `UsageStore`; nil until counts exist. Set by the app.
+    @ObservationIgnored var toolUsage: ((String, UsageWindow) -> [String: ToolUsage]?)?
     /// Work that keeps `isRefreshing` on: each probe cycle, and a user's Refresh
     /// from the tap until its discovery and forced pass are done. A count, not a
     /// flag, because the two overlap (the Refresh hold spans the cycle inside it).
@@ -61,6 +64,7 @@ final class HealthMonitor {
 
     /// What `status.json` holds right now.
     func statusSnapshot(now: Date = Date()) -> MCPockStatus {
+        let window = AppPreferences.loadUsageWindow(from: defaults)
         // Each agent file read once per snapshot, however many rows use it.
         var cache: [String: String?] = [:]
         let read = { (path: String) -> String? in
@@ -84,8 +88,16 @@ final class HealthMonitor {
             hiddenTools: switchesEnabled ? { group in
                 ToolPlanner.hiddenTools(configs: group.sources.compactMap { configs[$0.configID] },
                                         allTools: group.tools.map(\.name), claudeSettingsPath: settings, read: read)
-            } : nil
+            } : nil,
+            toolUsage: toolUsage.map { usage in { group in usage(group.name, window) } },
+            usageWindow: toolUsage == nil ? .off : window
         )
+    }
+
+    /// The usage counts were read again (1.16): the status file follows, so
+    /// agents see the card's numbers.
+    func usageCountsChanged() {
+        statusDidChange()
     }
     private var hiddenNames: Set<String>
     private var pausedNames: Set<String>

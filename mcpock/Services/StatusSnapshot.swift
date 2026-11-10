@@ -19,6 +19,10 @@ enum StatusSnapshot {
         /// Per row: the tools each declaration's agent hides (Part 2). Nil
         /// leaves them out (tests, demo).
         hiddenTools: ((ServerGroup) -> [String: Set<String>])? = nil,
+        /// Per row: each tool's calls in the Usage window (1.16), the card's
+        /// own numbers. Nil when Usage counts are off or not read yet.
+        toolUsage: ((ServerGroup) -> [String: ToolUsage]?)? = nil,
+        usageWindow: UsageWindow = .off,
         pid: Int32 = ProcessInfo.processInfo.processIdentifier,
         appVersion: String = MCPJSONRPC.clientVersion
     ) -> MCPockStatus {
@@ -33,6 +37,9 @@ enum StatusSnapshot {
         let entries = groups.map { group in
             var entry = server(group, byID: byID, hidden: staysHidden(group), pinned: isPinned(group.name))
             entry.hiddenTools = hiddenTools.flatMap { Self.hiddenByAgent(group, $0(group)) }
+            if usageWindow != .off, let usage = toolUsage?(group) {
+                entry.toolCalls = Self.toolCalls(tools: group.tools.map(\.name), usage: usage, now: now)
+            }
             return entry
         }
         // Counts and per-agent rows cover what the panel lists, so they agree
@@ -77,8 +84,32 @@ enum StatusSnapshot {
             summary: PanelText.summary(visible, firstPass: !firstCheckDone),
             counts: counts,
             servers: entries,
-            perAgent: perAgent
+            perAgent: perAgent,
+            usageWindow: usageWindow.statusWords
         )
+    }
+
+    /// Every tool of the row with its calls and last day, most used first,
+    /// then the rest in the server's order (the card's order).
+    static func toolCalls(tools: [String], usage: [String: ToolUsage], now: Date,
+                          calendar: Calendar = .current) -> [MCPockStatus.ToolCalls] {
+        let today = UsageStore.dayIndex(for: now, calendar: calendar)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        var seen = Set<String>()
+        let rows = tools.filter { seen.insert($0).inserted }.map { tool -> MCPockStatus.ToolCalls in
+            let entry = usage[UsageStore.toolKey(tool)]
+            let last = entry?.lastDay.flatMap { calendar.date(byAdding: .day, value: $0 - today, to: now) }
+            return MCPockStatus.ToolCalls(name: tool, calls: entry?.calls ?? 0, lastUsed: last.map(formatter.string(from:)))
+        }
+        let order = Dictionary(rows.enumerated().map { ($1.name, $0) }, uniquingKeysWith: { first, _ in first })
+        return rows.sorted { a, b in
+            if a.calls != b.calls { return a.calls > b.calls }
+            return order[a.name, default: 0] < order[b.name, default: 0]
+        }
     }
 
     /// A `${VAR}` mcpock can't fill, or a sign-in its agent holds: calm in the

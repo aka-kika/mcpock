@@ -105,7 +105,8 @@ struct MCPStatusServer {
         tool("mcpock_server",
              title: "mcpock server details",
              description: "Everything mcpock knows about one MCP server: state, every declaration with its config "
-                + "file, command or URL (secrets masked), env and header names, errors and tools.",
+                + "file, command or URL (secrets masked), env and header names, errors and tools, and each tool's "
+                + "calls in the last 30 days with its last use (when Usage counts are on in mcpock).",
              properties: ["name": ["type": "string", "description": "The server's name as mcpock shows it, e.g. \"firecrawl\"."]],
              required: ["name"]),
         tool("mcpock_switches",

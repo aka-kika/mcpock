@@ -32,6 +32,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
     /// (round 8, widgets). Optional: files written before 1.8 decode fine
     /// without it, and the field is simply absent from their JSON.
     var perAgent: [AgentStatus]? = nil
+    /// The Usage window the tool counts cover ("30 days", "7 days", "all
+    /// time"), 1.16. Absent when Usage counts are off and in older files.
+    var usageWindow: String? = nil
 
     struct Counts: Codable, Equatable, Sendable {
         var total: Int
@@ -102,7 +105,19 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// in the agent's own settings (Part 2, 2026-11-10). Optional: absent
         /// in older files and when nothing is hidden.
         var hiddenTools: [String: [String]]? = nil
+        /// Each tool's calls in `usageWindow` and the day it was last called,
+        /// across the agents mcpock reads usage from: the card's own numbers
+        /// (1.16). Absent when Usage counts are off and in older files.
+        var toolCalls: [ToolCalls]? = nil
         var sources: [Source]
+    }
+
+    /// One tool's calls (1.16). `lastUsed` is the local day, "2026-11-10";
+    /// nil when no call is on record.
+    struct ToolCalls: Codable, Equatable, Sendable {
+        var name: String
+        var calls: Int
+        var lastUsed: String?
     }
 
     /// One agent as the Agents tab sees it (round 8): how many servers it

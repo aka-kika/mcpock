@@ -215,6 +215,17 @@ enum UsageWindow: Int {
         case .off, .allTime: return nil
         }
     }
+
+    /// For the status file agents read: "30 days", "7 days", "all time";
+    /// nil when off.
+    var statusWords: String? {
+        switch self {
+        case .off: return nil
+        case .sevenDays: return "7 days"
+        case .thirtyDays: return "30 days"
+        case .allTime: return "all time"
+        }
+    }
 }
 
 /// How often the health monitor re-probes on its own. Raw value = seconds
