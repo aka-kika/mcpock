@@ -107,9 +107,9 @@ enum MenuText {
     /// Config… last (it asks first; opening a config is the risky one).
     static let showInFinderTitle = "Show in Finder"
     static let copyPathTitle = "Copy Path"
-    static let openConfigTitle = "Open Config\u{2026}"
+    static let openConfigTitle = "Open Config"
     /// The status file isn't a config: same menu, its own word.
-    static let openFileTitle = "Open File\u{2026}"
+    static let openFileTitle = "Open File"
 
     /// The confirmation Open Config… shows.
     static func openConfigQuestion(path: String) -> String {

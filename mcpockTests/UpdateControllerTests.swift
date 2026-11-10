@@ -58,7 +58,7 @@ final class UpdateControllerTests: XCTestCase {
     // MARK: - Wording (pinned, like ShortReason / CardText / MenuText)
 
     func testCheckForUpdatesWording() {
-        XCTAssertEqual(SettingsAboutPane.checkForUpdatesTitle, "Check for Updates\u{2026}")
+        XCTAssertEqual(SettingsAboutPane.checkForUpdatesTitle, "Check for Updates")
     }
 
     func testAutomaticUpdatesToggleWording() {

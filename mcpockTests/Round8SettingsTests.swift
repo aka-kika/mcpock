@@ -87,8 +87,8 @@ final class Round8SettingsTests: XCTestCase {
 
     func testConfigPathMenuTexts() {
         XCTAssertEqual([MenuText.showInFinderTitle, MenuText.copyPathTitle, MenuText.openConfigTitle],
-                       ["Show in Finder", "Copy Path", "Open Config\u{2026}"])
-        XCTAssertEqual(MenuText.openFileTitle, "Open File\u{2026}")
+                       ["Show in Finder", "Copy Path", "Open Config"])
+        XCTAssertEqual(MenuText.openFileTitle, "Open File")
         XCTAssertEqual(MenuText.configPathHelp(path: "/a/b.json"), "/a/b.json\nRight-click for options")
         XCTAssertFalse(MenuText.configPathHelp(path: "/a").contains("double-click"))
         XCTAssertEqual(MenuText.openConfigQuestion(path: "/Users/k/.cursor/mcp.json"), "Open mcp.json?")

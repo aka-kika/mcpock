@@ -69,7 +69,7 @@ enum StatusItemRightClick {
         let menu = NSMenu(title: "mcpock")
 
         let settings = NSMenuItem(
-            title: "Settings…",
+            title: "Settings",
             action: #selector(MenuTarget.openSettingsAction),
             keyEquivalent: ","
         )

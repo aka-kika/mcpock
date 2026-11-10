@@ -11,7 +11,7 @@ struct SettingsAboutPane: View {
     var updateController: UpdateController?
 
     static let tagline = "Checks the MCP servers your agents use and tells you what needs attention."
-    static let checkForUpdatesTitle = "Check for Updates\u{2026}"
+    static let checkForUpdatesTitle = "Check for Updates"
     static let automaticUpdatesTitle = "Automatically check for updates"
     static let madeBy = "Made by Kika"
     static let copyright = "\u{00A9} 2026 AKAKIKA.COM"
