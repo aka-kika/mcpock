@@ -244,11 +244,25 @@ final class ToolSwitchTests: XCTestCase {
     {
       "$schema": "https://opencode.ai/config.json",
       "mcp": {
-        "github": { "type": "local", "command": ["npx", "github-mcp"] }
+        "servers": {
+          "github": { "type": "local", "command": ["npx", "github-mcp"] }
+        }
       }
     }
 
     """
+
+    /// fable-3 (review 10 Nov): an OpenCode file in the older layout
+    /// (servers right under "mcp") gets no v2 deny rule; it is left alone.
+    func testOlderOpenCodeLayoutIsLeftAlone() {
+        let older = "{\n  \"mcp\": {\n    \"github\": { \"type\": \"local\", \"command\": [\"npx\"] }\n  }\n}\n"
+        XCTAssertTrue(ToolSwitch.isOlderOpenCode(older, server: "github"))
+        XCTAssertFalse(ToolSwitch.isOlderOpenCode(openCodeConfig, server: "github"))
+        XCTAssertThrowsError(try edit(older, .openCode, hide: ["create_issue"])) {
+            XCTAssertEqual($0 as? ToolSwitch.ToolError, .olderOpenCode)
+        }
+        XCTAssertNil(hidden(older, .openCode))
+    }
 
     func testOpenCodeAddsADenyRuleAndShowTakesItOut() throws {
         let off = try edit(openCodeConfig, .openCode, hide: ["create_issue"])

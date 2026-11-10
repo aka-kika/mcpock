@@ -30,6 +30,18 @@ enum ToolSwitch {
         case cannotEdit
         /// The edit did not check out, so nothing was written.
         case failedCheck
+        /// An OpenCode file in the older layout (servers right under `mcp`):
+        /// the deny rules are a v2 setting, so it is left alone (review
+        /// 10 Nov, fable-3; OpenCode's docs: "V2 does not place server names
+        /// directly under mcp").
+        case olderOpenCode
+    }
+
+    /// True when `server` sits right under `mcp` (OpenCode before v2) and
+    /// not under `mcp.servers`.
+    static func isOlderOpenCode(_ text: String, server: String) -> Bool {
+        guard let root = JSONSpanEditor.parse(text) else { return false }
+        return root.value(at: ["mcp", "servers", server])?.members == nil && root.value(at: ["mcp", server])?.members != nil
     }
 
     /// The way `agent` (a `ServerSource.label`) hides a tool, or nil when it
@@ -80,7 +92,8 @@ enum ToolSwitch {
             let rules = Set(deny.compactMap { $0 as? String })
             return Set(allTools.filter { rules.contains(claudeRule(server: server, tool: $0)) })
         case .openCode:
-            guard let root = ServerSwitch.jsonObject(text) as? [String: Any] else { return nil }
+            guard !isOlderOpenCode(text, server: server),
+                  let root = ServerSwitch.jsonObject(text) as? [String: Any] else { return nil }
             let rules = root["permissions"] as? [Any] ?? []
             let denied = Set(rules.compactMap { item -> String? in
                 guard let rule = item as? [String: Any], rule["effect"] as? String == "deny",
@@ -123,6 +136,7 @@ enum ToolSwitch {
             guard mechanism == .claudeDeny else { throw ToolError.cannotEdit }
             before = "{}\n"
         }
+        if mechanism == .openCode, isOlderOpenCode(before, server: server) { throw ToolError.olderOpenCode }
         // Tools named in the edit count as the server's even when its list
         // (from the last check) does not have them.
         let known = allTools + Array(hide.union(show).subtracting(allTools)).sorted()

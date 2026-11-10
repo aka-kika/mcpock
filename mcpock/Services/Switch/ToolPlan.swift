@@ -64,6 +64,9 @@ enum ToolPlanner {
                     // Any way but parking: the plain changed lines.
                     diff: SwitchPlanner.diff(before: before, after: after, mechanism: .claudeDeny, server: first.name, turnOn: false)
                 ))
+            } catch ToolSwitch.ToolError.olderOpenCode {
+                problems.append("\(agent): its file uses the older layout, which has no setting for hiding single tools, "
+                    + "so it is left alone.")
             } catch {
                 problems.append("\(agent): mcpock can't change its file safely, so it is left alone.")
             }
