@@ -267,6 +267,25 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(desktop().filter(\.turnedOff).count, 0)
     }
 
+    /// ds-2 (review 10 Nov): an entry an early build parked inside the file
+    /// (`_mcpock_disabled`) is listed as off and turns on, moved back in place.
+    func testAnEntryParkedInsideTheFileTurnsOn() throws {
+        let file = "{\n  \"mcpServers\": {\n    \"stripe\": { \"command\": \"stripe-mcp\" }\n  },\n"
+            + "  \"_mcpock_disabled\": {\n    \"old\": { \"command\": \"old-mcp\" }\n  }\n}\n"
+        try put("Claude/claude_desktop_config.json", file)
+        let listed = try XCTUnwrap(desktop().first { $0.name == "old" })
+        XCTAssertTrue(listed.turnedOff)
+        let on = SwitchPlanner.plan(server: "old", configs: desktop().filter { $0.name == "old" }, turnOn: true,
+                                    claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
+        XCTAssertEqual(on.problems, [])
+        XCTAssertEqual(on.changes.map(\.what), ["Moved back to where it was."])
+        XCTAssertNil(SwitchWriter.apply(on, backups: backups, parked: parked).error)
+        let root = try XCTUnwrap(ServerSwitch.jsonObject(try XCTUnwrap(text("Claude/claude_desktop_config.json"))) as? [String: Any])
+        XCTAssertNotNil((root["mcpServers"] as? [String: Any])?["old"])
+        XCTAssertNil(root["_mcpock_disabled"])
+        XCTAssertEqual(desktop().filter(\.turnedOff).count, 0)
+    }
+
     func testClaudeDesktopFileWithNoServersLeftStillListsTheParkedOne() throws {
         try put("Claude/claude_desktop_config.json", #"{"mcpServers":{"only":{"command":"x"}}}"#)
         let plan = SwitchPlanner.plan(server: "only", configs: desktop(), turnOn: false,

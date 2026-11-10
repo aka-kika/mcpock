@@ -138,9 +138,20 @@ enum SwitchPlanner {
             do {
                 var text = before
                 var parked: [ParkedEdit] = []
-                for step in fileSteps {
+                var firstMechanism = first.mechanism
+                for (index, step) in fileSteps.enumerated() {
+                    var mechanism = step.mechanism
+                    // An entry an early 1.14 build parked inside the file
+                    // (`_mcpock_disabled`) and not in mcpock's folder: moved
+                    // back where it is (review 10 Nov, ds-2).
+                    if mechanism == .parkOutside, turnOn,
+                       ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name] == nil,
+                       text.map({ ServerSwitch.isParkedInFile($0, server: step.name) }) == true {
+                        mechanism = .park
+                    }
+                    if index == 0 { firstMechanism = mechanism }
                     var parkedValue: String?
-                    if step.mechanism == .parkOutside {
+                    if mechanism == .parkOutside {
                         if turnOn {
                             parkedValue = ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name]
                             parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: nil))
@@ -151,7 +162,7 @@ enum SwitchPlanner {
                             parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: raw))
                         }
                     }
-                    text = try ServerSwitch.edited(text, mechanism: step.mechanism, server: step.name, turnOn: turnOn,
+                    text = try ServerSwitch.edited(text, mechanism: mechanism, server: step.name, turnOn: turnOn,
                                                    parkedValue: parkedValue)
                 }
                 guard let after = text, after != before else { continue }
@@ -160,9 +171,9 @@ enum SwitchPlanner {
                     path: path,
                     before: before,
                     after: after,
-                    what: what(first.mechanism, turnOn: turnOn),
+                    what: what(firstMechanism, turnOn: turnOn),
                     when: when(agent: first.agent, turnOn: turnOn, running: running(first.agent)),
-                    diff: diff(before: before, after: after, mechanism: first.mechanism, server: first.name, turnOn: turnOn,
+                    diff: diff(before: before, after: after, mechanism: firstMechanism, server: first.name, turnOn: turnOn,
                                agent: first.agent),
                     parked: parked
                 ))

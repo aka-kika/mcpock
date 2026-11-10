@@ -128,6 +128,11 @@ enum ServerSwitch {
         return after
     }
 
+    /// True when `server` waits under `_mcpock_disabled` in this file.
+    static func isParkedInFile(_ text: String, server: String) -> Bool {
+        JSONSpanEditor.parse(text)?.value(at: [parkedKey, server])?.members != nil
+    }
+
     /// The entry of `server` under `mcpServers`, exactly as the file writes
     /// it: what `ParkedStore` keeps while it is off.
     static func entryText(in text: String, server: String) -> String? {
