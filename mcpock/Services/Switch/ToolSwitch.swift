@@ -343,7 +343,11 @@ enum ToolSwitch {
         case .hermes, .goose:
             let section = mechanism == .hermes ? "mcp_servers" : "extensions"
             let key = mechanism == .hermes ? "tools" : "available_tools"
-            guard changedLines(before: before, after: after, maxOld: 2, maxNew: 2),
+            // A block list in the file before: its `- item` lines go too.
+            let entry = YAMLEntry(text: before, section: section, entry: server)
+            let block = (mechanism == .hermes ? entry?.toolsField()?.exclude?.blockLines
+                : entry?.flowListField("available_tools")?.blockLines)?.count ?? 0
+            guard changedLines(before: before, after: after, maxOld: 2 + block, maxNew: 2),
                   let old = YAMLBlock.parse(before), let new = YAMLBlock.parse(after) else { return false }
             return dropping(key, old, section: section, entry: server) == dropping(key, new, section: section, entry: server)
         }
@@ -510,6 +514,10 @@ struct YAMLEntry {
         /// nil when the field is not there.
         let items: [String]?
         let line: Int?
+        /// The `- item` lines of a list written as a block (an agent that
+        /// rewrites its file writes it that way); they go when mcpock
+        /// writes the list back on its key's line (review 10 Nov, fable-5).
+        var blockLines: [Int] = []
     }
 
     init?(text: String, section: String, entry: String) {
@@ -602,13 +610,52 @@ struct YAMLEntry {
         return (key, String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces))
     }
 
-    /// A field whose value is a flow list on its own line: its items, or nil
-    /// items when the field is not there. Nil when it is written another way.
+    /// A field whose value is a list: `[a, b]` on its line, or `- a` lines
+    /// under it (indented or not). Its items, or nil items when the field is
+    /// not there. Nil when it is written another way.
     func flowListField(_ key: String) -> FlowList? {
         guard let (fields, _) = children(of: entryLine, parentIndent: entryIndent) else { return nil }
         guard let line = fields.first(where: { split($0)?.key == key }) else { return FlowList(items: nil, line: nil) }
-        guard let value = split(line)?.value, let items = YAMLEntry.flowItems(value) else { return nil }
-        return FlowList(items: items, line: line)
+        return list(at: line)
+    }
+
+    /// The list whose key is on `line`, written either way.
+    private func list(at line: Int) -> FlowList? {
+        guard let value = split(line)?.value else { return nil }
+        if let items = YAMLEntry.flowItems(value) { return FlowList(items: items, line: line) }
+        guard value.isEmpty, let block = blockItems(after: line) else { return nil }
+        return FlowList(items: block.items, line: line, blockLines: block.lines)
+    }
+
+    /// The `- item` lines right after the key on `line`, at one indent that
+    /// is the key's own (how Goose and Hermes write them) or deeper. Plain or
+    /// quoted words only; nil for anything else, or for no items at all.
+    private func blockItems(after line: Int) -> (items: [String], lines: [Int])? {
+        let keyIndent = YAMLBlock.indent(body(line))
+        var items: [String] = []
+        var found: [Int] = []
+        var itemIndent: Int?
+        var index = line + 1
+        while index < lines.count {
+            defer { index += 1 }
+            guard hasContent(index) else { continue }
+            let text = YAMLSwitch.stripComment(body(index))
+            let indent = YAMLBlock.indent(text)
+            let trimmed = text.trimmingCharacters(in: .whitespaces)
+            let isItem = trimmed == "-" || trimmed.hasPrefix("- ")
+            if itemIndent == nil {
+                guard isItem, indent >= keyIndent else { break }
+                itemIndent = indent
+            }
+            if indent < (itemIndent ?? 0) || (indent == itemIndent && !isItem) { break }
+            guard indent == itemIndent else { return nil }
+            let value = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+            guard !value.isEmpty, let item = YAMLEntry.flowItems("[" + value + "]"), item.count == 1,
+                  !value.contains(": "), !value.hasSuffix(":") else { return nil }
+            items.append(item[0])
+            found.append(index)
+        }
+        return found.isEmpty ? nil : (items, found)
     }
 
     /// Hermes' `tools:` block: its `include` and `exclude` lists. Nil when it
@@ -621,13 +668,13 @@ struct YAMLEntry {
         var include: [String]?
         var exclude: FlowList?
         for line in inner {
-            guard let (key, value) = split(line) else { continue }
+            guard let (key, _) = split(line) else { continue }
             if key == "include" {
-                guard let items = YAMLEntry.flowItems(value) else { return nil }
-                include = items
+                guard let list = list(at: line) else { return nil }
+                include = list.items
             } else if key == "exclude" {
-                guard let items = YAMLEntry.flowItems(value) else { return nil }
-                exclude = FlowList(items: items, line: line)
+                guard let list = list(at: line) else { return nil }
+                exclude = list
             }
         }
         return (include, exclude)
@@ -640,6 +687,7 @@ struct YAMLEntry {
         let text = String(repeating: " ", count: fieldIndent) + key + ": " + YAMLEntry.flow(items)
         if let line = list.line {
             out[line] = YAMLEntry.keepingComment(of: out[line], text)
+            for block in list.blockLines.sorted(by: >) { out.remove(at: block) }
         } else {
             guard !items.isEmpty else { return lines.joined(separator: "\n") }
             out.insert(text + ending, at: entryLine + 1)
@@ -652,13 +700,14 @@ struct YAMLEntry {
     func settingExclude(_ items: [String]) -> String? {
         guard let tools = toolsField(), tools.include == nil else { return nil }
         var out = lines
+        let blockLines = tools.exclude?.blockLines ?? []
         if let line = tools.exclude?.line, items.isEmpty {
             // Nothing hidden any more: the line goes, and `tools:` with it
             // when it held nothing else.
-            out.remove(at: line)
+            for index in (blockLines + [line]).sorted(by: >) { out.remove(at: index) }
             if let (fields, _) = children(of: entryLine, parentIndent: entryIndent),
                let toolsLine = fields.first(where: { split($0)?.key == "tools" }),
-               children(of: toolsLine, parentIndent: fieldIndent)?.lines == [line] {
+               children(of: toolsLine, parentIndent: fieldIndent)?.lines.filter({ !blockLines.contains($0) }) == [line] {
                 out.remove(at: toolsLine)
             }
             return out.joined(separator: "\n")
@@ -667,6 +716,7 @@ struct YAMLEntry {
             let indent = YAMLBlock.indent(body(line))
             out[line] = YAMLEntry.keepingComment(of: out[line],
                                                  String(repeating: " ", count: indent) + "exclude: " + YAMLEntry.flow(items))
+            for block in blockLines.sorted(by: >) { out.remove(at: block) }
             return out.joined(separator: "\n")
         }
         guard !items.isEmpty else { return lines.joined(separator: "\n") }

@@ -183,6 +183,33 @@ final class ToolSwitchTests: XCTestCase {
 
     """
 
+    /// fable-5: Hermes (PyYAML) writes `exclude:` as a block list.
+    func testHermesBlockExcludeIsReadAndShowAllTakesItOut() throws {
+        let text = """
+        mcp_servers:
+          github:
+            command: npx
+            tools:
+              exclude:
+              - create_issue
+              - delete_repository
+          other:
+            command: other
+
+        """
+        XCTAssertEqual(hidden(text, .hermes), ["create_issue", "delete_repository"])
+        let one = try edit(text, .hermes, show: ["create_issue"])
+        XCTAssertTrue(one.contains("    tools:\n      exclude: [delete_repository]\n  other:"), one)
+        let none = try edit(one, .hermes, show: ["delete_repository"])
+        XCTAssertEqual(none, "mcp_servers:\n  github:\n    command: npx\n  other:\n    command: other\n")
+        XCTAssertEqual(try edit(text, .hermes, show: ["create_issue", "delete_repository"]), none)
+    }
+
+    func testHermesIndentedBlockExcludeIsRead() {
+        let text = "mcp_servers:\n  github:\n    command: npx\n    tools:\n      exclude:\n        - create_issue\n"
+        XCTAssertEqual(hidden(text, .hermes), ["create_issue"])
+    }
+
     func testHermesAddsAnExcludeList() throws {
         let off = try edit(hermesConfig, .hermes, hide: ["create_issue"])
         XCTAssertEqual(off, """
@@ -231,6 +258,44 @@ final class ToolSwitchTests: XCTestCase {
         XCTAssertTrue(off.contains("    available_tools: [search_code, get_file_contents, create_issue]\n  other:"), off)
         XCTAssertEqual(hidden(off, .goose), ["delete_repository"])
         XCTAssertEqual(try edit(off, .goose, show: ["delete_repository"]), gooseConfig, "all shown again: back to [] (all)")
+    }
+
+    /// fable-5 (review 10 Nov): Goose (serde_yaml) writes lists as `- item`
+    /// lines at the key's own indent. They are read, and written back as one line.
+    func testGooseBlockListIsReadAndWrittenBack() throws {
+        let text = """
+        extensions:
+          github:
+            enabled: true
+            available_tools:
+            - search_code
+            - get_file_contents
+            - 'create_issue'
+            name: github
+          other:
+            enabled: true
+
+        """
+        XCTAssertEqual(hidden(text, .goose), ["delete_repository"])
+        let shown = try edit(text, .goose, show: ["delete_repository"])
+        XCTAssertEqual(shown, """
+        extensions:
+          github:
+            enabled: true
+            available_tools: []
+            name: github
+          other:
+            enabled: true
+
+        """)
+        let more = try edit(text, .goose, hide: ["create_issue"])
+        XCTAssertTrue(more.contains("    available_tools: [search_code, get_file_contents]\n    name: github\n"), more)
+        XCTAssertEqual(hidden(more, .goose), ["create_issue", "delete_repository"])
+    }
+
+    func testBlockListWithAMappingItemIsLeftAlone() {
+        let text = "extensions:\n  github:\n    available_tools:\n      - name: x\n"
+        XCTAssertNil(hidden(text, .goose))
     }
 
     func testGooseCantHideWithoutTheServersList() {
