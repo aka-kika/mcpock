@@ -356,7 +356,10 @@ final class HealthMonitor {
         let outcome = await Task.detached(priority: .userInitiated) {
             SwitchWriter.apply(plan, backups: backups, parked: parked)
         }.value
-        if plan.tools == nil, plan.turnOn, !outcome.written.isEmpty {
+        // A paused row is not checked, but its configs are still read again:
+        // `refresh` stops at the pause before reading, and the card stayed
+        // "off" until the next Refresh (review 10 Nov, fable-7).
+        if plan.tools == nil, plan.turnOn, !outcome.written.isEmpty, !isPaused(plan.server) {
             await refresh(groupName: plan.server)
         } else {
             await reloadConfigs(fullScan: false)

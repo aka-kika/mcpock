@@ -170,6 +170,21 @@ final class SwitchPanelTests: XCTestCase {
         XCTAssertEqual(monitor.groups.first?.offLabels, [])
     }
 
+    /// fable-7 (review 10 Nov): turning a paused row on reads the configs
+    /// again, so the card is not left saying "off" until Refresh.
+    func testTurningAPausedRowOnReadsTheConfigsAgain() async throws {
+        let state = try await makeState()
+        let monitor = state.monitor
+        _ = await monitor.applySwitch(monitor.switchPlan(groupName: "openrouter", turnOn: false))
+        XCTAssertEqual(monitor.groups.first?.state, .off)
+        monitor.setPaused(true, name: "openrouter")
+        let outcome = await monitor.applySwitch(monitor.switchPlan(groupName: "openrouter", turnOn: true))
+        XCTAssertNil(outcome.error)
+        XCTAssertEqual(outcome.written.count, 2)
+        XCTAssertNotEqual(monitor.groups.first?.state, .off)
+        XCTAssertEqual(monitor.groups.first?.offLabels, [])
+    }
+
     func testDemoModeNeverPlansOrWrites() async throws {
         let state = try await makeState()
         state.monitor.switchesEnabled = false
