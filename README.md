@@ -29,6 +29,17 @@ server, and shows you what needs attention and why, so you (or your agent) can
 fix it. It changes a config only when you flip a switch: it shows you the
 change first and keeps a backup.
 
+## What's new in 1.16
+
+- **Agents ask, you decide:** an agent can ask you to hide a tool or turn a
+  server off, with its reason. It shows on the server's card with Yes and No,
+  a dot on the menu bar icon and one notification. Only your Yes changes
+  anything, through the usual sheet. An ask with no answer ends after a day.
+- **Agents see which tools you use:** each tool's calls and last use, the same
+  numbers the card shows (with Usage counts on).
+
+Full notes: [1.16.0](docs/release-notes/1.16.0.md).
+
 ## What's new in 1.15
 
 - **Hide single tools:** a switch beside each tool on the server's card. Your
@@ -110,8 +121,9 @@ Full notes: [1.15.1](docs/release-notes/1.15.1.md), [1.15.0](docs/release-notes/
   its own see-through window, so the glass shows your real desktop.
 - **Settings:** appearance (System, Dark, Light, Glass), how often to check, Open at
   Login, pin / show / hide each server, the list of agents found, and **Connect** for your agents.
-- **Lets your agents ask it.** A small read-only MCP server ships inside the
-  app, so you can say "check my mcpock" to an agent instead of pasting errors.
+- **Lets your agents ask it.** A small MCP server ships inside the app, so you
+  can say "check my mcpock" to an agent instead of pasting errors. An agent can
+  also ask you to hide a tool or turn a server off; only your Yes changes anything.
 
 ![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded. On the left, the Status desktop widget (4 need you, 14 servers) and the Agents widget with a health bar per agent.](docs/images/mcpock-agents.png)
 
@@ -195,10 +207,13 @@ Then ask your agent to "check my mcpock". The tools it gets:
 |------|---------|
 | `mcpock_status` | Counts: how many servers are fine, broken, slow, need a sign-in or are set up differently, and when mcpock last checked |
 | `mcpock_problems` | Every server that needs attention, with the reason, the agents and the config files involved |
-| `mcpock_server` | Everything about one server, by name |
-| `mcpock_switches` | Which servers are turned off, and in which agents, and which tools are hidden |
+| `mcpock_server` | Everything about one server, by name, with each tool's calls and last use (when Usage counts are on) |
+| `mcpock_switches` | Which servers are turned off, and in which agents, which tools are hidden, and what became of each ask |
+| `mcpock_ask` | Asks you to hide or show a tool, or turn a server off or on, with a reason. Changes nothing by itself |
 
-All four are read-only. Secrets are masked (see below). If mcpock isn't
+The first four only read. `mcpock_ask` leaves a request in mcpock's own folder;
+you answer it on the server's card (Yes opens the usual sheet), and an ask with
+no answer ends after a day. Secrets are masked (see below). If mcpock isn't
 running, hasn't checked yet, or its results are old, the answer says so.
 
 Try it from Terminal:
@@ -287,7 +302,7 @@ letters.
   `disabled_tools` in Codex, Grok's `disabled_mcp_tools`, `tools: exclude` in
   Hermes, `available_tools` in Goose, a deny rule in OpenCode (Cursor and
   Claude Desktop have none). Nothing is deleted, and agents can't flip a
-  switch. Everything else only reads: "Open Config…" asks first, with Cancel
+  switch: they can only ask, and your Yes goes through the same sheet. Everything else only reads: "Open Config…" asks first, with Cancel
   as the default.
 - **What it runs.** To check a local server, mcpock starts the exact command
   from your config, with its arguments and environment, in its project folder
@@ -384,7 +399,8 @@ answers, and the panel's wording and layout.
 - **UI:** a `MenuBarExtra` panel of fixed size, with the detail card as a child
   panel beside it that never takes focus. The tools list is on the card.
 - **Agents:** after each change the app writes `status.json` and `status.md`;
-  the bundled `mcpock-mcp` (stdio, read-only) answers from that file.
+  the bundled `mcpock-mcp` (stdio) answers from that file; its `mcpock_ask`
+  only leaves a request in `asks/` for you to answer.
 
 The full module map, the flow of one refresh, and the rules that must not
 regress are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -399,7 +415,7 @@ mcpock/                 The app
   Theme/                Colours, fonts, appearance
   Views/                Panel, rows, detail card, Agents tab, Settings
   Assets.xcassets/      App icon, agent logos, About links
-mcpock-mcp/             The read-only MCP helper (main.swift)
+mcpock-mcp/             The MCP helper (main.swift)
 mcpockWidgets/          The desktop widgets (Status, Problems, Agents)
 Shared/                 Code compiled into both app and helper
 mcpockTests/            Unit tests

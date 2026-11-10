@@ -13,8 +13,9 @@ mcpock is a menu-bar-only SwiftUI app (`LSUIElement`, no Dock icon) built on
 Foundation, AppKit, SwiftUI, ServiceManagement, (1.5.2, for one hash)
 CryptoKit, and its one third-party dependency, Sparkle 2, for
 in-app updates (`docs/THIRD-PARTY.md`). It ships two executables: the app,
-and a small read-only MCP server (`mcpock-mcp`) inside the app bundle that
-lets agents read what the app found.
+and a small MCP server (`mcpock-mcp`) inside the app bundle that lets agents
+read what the app found and, since 1.16, ask the user for a switch
+(`mcpock_ask`), which only leaves a request in mcpock's own `asks/` folder.
 
 ```
  MCPockApp (@main)
@@ -162,6 +163,17 @@ Same sheet, writer, backups and checks as the server switch; only the edits are 
 | `CardText.toolSections` | The card's tools: used (most calls first), not used in the window, hidden in every agent that can hide tools; one hidden in only some stays in place with "Hidden in Codex" |
 | `UsageStore.toolUsage` | Calls per tool in the window and the last day on record, across every agent's records (usage.json version 4; files from before are read once more from the start for the tool counts only) |
 | `StatusSnapshot` `hiddenTools` | Per agent, in `status.json`, `mcpock_switches` and `mcpock_server` |
+| `StatusSnapshot` `toolCalls` / `usageWindow` | 1.16: each tool's calls in the Usage window and its last day, the card's numbers, in `mcpock_server`; rewritten when `UsageStore.onCountsChanged` fires |
+
+### Asks from agents (1.16)
+
+| File | Role |
+|------|------|
+| `Shared/AgentAsk.swift` | `AgentAsk` (one request), `AskRecord` (what became of it: waiting, done, no, expired), `AskBox` (the `asks/` folder: write a new 0600 file with O_EXCL, at most 10; read only plain files of this user, mode 0600, `<uuid>.json`, ask keys only; a day's lifetime) |
+| `MCPStatusServer` `mcpock_ask` | Checks the ask against the status file (`StatusReport.checkAsk`), refuses duplicates, writes it, and tells the agent what to say to the user. The client's name comes from `initialize` |
+| `Services/Asks/AskCenter.swift` | The app's side: reads and watches the folder, removes what is not an ask, ends asks after a day, keeps the week's answers in `asks-answered.json` (with the ids already notified), feeds `status.json` |
+| `Services/Asks/AskNotifier.swift` | One notification per new ask, no sound; a click opens the server's card (`PanelState.showAsk`), or `AskWindowController` when the menu bar item can't open the panel |
+| `Views/AskViews.swift`, `PanelState.answerAsk` | The card's row with Yes / No; Yes opens the usual sheet with the agent's reason on top, and only its confirm ends the ask as done. The icon (`StatusIconView` `asksYou`) and the server's row show a dot |
 
 ### Usage counts (1.7)
 
@@ -198,7 +210,7 @@ per-agent widget; it's the same rows `AgentSections.build` gives the tab.
 | `mcpock-mcp/main.swift` | stdin loop: one JSON-RPC line in, at most one out |
 | `Shared/MCPockStatus.swift` | The status file's model (schema 1). Compiled into the app and the helper |
 | `Shared/MCPStatusServer.swift` | `initialize`, `ping`, `tools/list`, `tools/call`, empty resources/prompts |
-| `Shared/StatusReport.swift` | The text answers of `mcpock_status`, `mcpock_problems`, `mcpock_server` and `mcpock_switches` (1.14: what is off, and where), including "isn't running" and "results are old" |
+| `Shared/StatusReport.swift` | The text answers of `mcpock_status`, `mcpock_problems`, `mcpock_server` and `mcpock_switches` (1.14: what is off, and where; 1.16: tool calls, asks), and `mcpock_ask`'s checks and answer, including "isn't running" and "results are old" |
 
 The helper also compiles `MCPJSONRPC.swift` and `Models.swift` from the app
 (see `project.yml`). It is embedded at `mcpock.app/Contents/Helpers/mcpock-mcp`
@@ -358,9 +370,12 @@ falls back to streamable HTTP, because many configs label streamable servers
     change: `SwitchWriter`
     is the single write path, every write is checked (`ServerSwitch.verify`),
     backed up and done in one rename, and a file that changed since the sheet
-    is refused. No other feature writes a config, and the helper has no write
-    tool. Open Config… asks first, with Cancel as the default button.
-    `ServerSwitchTests`, `SwitchPlanTests`, `SwitchPanelTests`, `ToolSwitchTests`.
+    is refused. No other feature writes a config. The helper writes no
+    config: `mcpock_ask` (1.16) leaves one checked request file (0600, at most
+    10) in `asks/`, and only her Yes, through the same sheet and confirm, runs
+    the switch (`PanelState.answerAsk`). Open Config… asks first, with Cancel
+    as the default button.
+    `ServerSwitchTests`, `SwitchPlanTests`, `SwitchPanelTests`, `ToolSwitchTests`, `AgentAskTests`.
 13. **Sandbox off; the only entitlement is the App Group** the widgets read
     their snapshot from. No sandbox is needed to spawn servers and read configs
     under `~`. Hardened runtime is added only when `scripts/release.sh`
