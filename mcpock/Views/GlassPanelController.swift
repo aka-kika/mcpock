@@ -125,6 +125,7 @@ final class GlassPanelController: NSObject {
     private func observeIcon() {
         withObservationTracking {
             _ = monitor.aggregate
+            _ = state.asks?.hasWaiting
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.updateIcon()
@@ -136,8 +137,9 @@ final class GlassPanelController: NSObject {
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
         let aggregate = monitor.aggregate
-        button.image = StatusIconView.image(for: StatusBadgeKind.forAggregate(aggregate))
-        button.setAccessibilityLabel(StatusIconView.accessibilityLabel(for: aggregate))
+        let asksYou = state.asks?.hasWaiting ?? false
+        button.image = StatusIconView.image(for: StatusBadgeKind.forAggregate(aggregate), asksYou: asksYou)
+        button.setAccessibilityLabel(StatusIconView.accessibilityLabel(for: aggregate, asksYou: asksYou))
     }
 
     // MARK: - Open and close

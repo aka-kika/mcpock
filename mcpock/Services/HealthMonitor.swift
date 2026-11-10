@@ -27,6 +27,8 @@ final class HealthMonitor {
     /// Each tool's calls of one server in a Usage window (1.16), from the
     /// app's `UsageStore`; nil until counts exist. Set by the app.
     @ObservationIgnored var toolUsage: ((String, UsageWindow) -> [String: ToolUsage]?)?
+    /// What agents asked with mcpock_ask (1.16), from the app's `AskCenter`.
+    @ObservationIgnored var askRecords: (() -> [AskRecord])?
     /// Work that keeps `isRefreshing` on: each probe cycle, and a user's Refresh
     /// from the tap until its discovery and forced pass are done. A count, not a
     /// flag, because the two overlap (the Refresh hold spans the cycle inside it).
@@ -90,8 +92,14 @@ final class HealthMonitor {
                                         allTools: group.tools.map(\.name), claudeSettingsPath: settings, read: read)
             } : nil,
             toolUsage: toolUsage.map { usage in { group in usage(group.name, window) } },
-            usageWindow: toolUsage == nil ? .off : window
+            usageWindow: toolUsage == nil ? .off : window,
+            asks: askRecords?()
         )
+    }
+
+    /// An ask came, was answered or ended (1.16): the status file follows.
+    func asksChanged() {
+        statusDidChange()
     }
 
     /// The usage counts were read again (1.16): the status file follows, so

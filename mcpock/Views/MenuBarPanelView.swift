@@ -279,6 +279,7 @@ struct MenuBarPanelView: View {
             isPinned: monitor.isPinned(name),
             isSelected: panel.selectedName == name,
             isChecking: panel.isChecking(name),
+            asksYou: !(panel.asks?.asks(for: name).isEmpty ?? true),
             actions: panel.rowActions(for: name)
         )
     }

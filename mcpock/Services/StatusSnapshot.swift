@@ -23,6 +23,8 @@ enum StatusSnapshot {
         /// own numbers. Nil when Usage counts are off or not read yet.
         toolUsage: ((ServerGroup) -> [String: ToolUsage]?)? = nil,
         usageWindow: UsageWindow = .off,
+        /// What agents asked with mcpock_ask and what became of it (1.16).
+        asks: [AskRecord]? = nil,
         pid: Int32 = ProcessInfo.processInfo.processIdentifier,
         appVersion: String = MCPJSONRPC.clientVersion
     ) -> MCPockStatus {
@@ -85,7 +87,8 @@ enum StatusSnapshot {
             counts: counts,
             servers: entries,
             perAgent: perAgent,
-            usageWindow: usageWindow.statusWords
+            usageWindow: usageWindow.statusWords,
+            asks: asks.flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 

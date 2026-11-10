@@ -9,6 +9,8 @@ struct MCPockApp: App {
     /// Usage counts (1.7): read-only, off the main thread. Owned here so it
     /// survives the panel view's theme-change rebuilds, same as `monitor`.
     @State private var usageStore: UsageStore
+    /// Agents' asks (1.16); nil in tests and the demo.
+    @State private var askCenter: AskCenter?
     /// The Glass theme's own panel on macOS 27+ (`GlassPanelController`),
     /// kept alive for the app's lifetime. `AnyObject` so this property needs
     /// no availability check; nil on macOS 26 and in tests.
@@ -208,6 +210,29 @@ struct MCPockApp: App {
                 usageStore.start(knownServers: names)
             }
         }
+        // Agents ask, Kika answers (1.16): asks from mcpock_ask on the card,
+        // a dot on the icon and one notification each. Never in the demo.
+        if !isDemo {
+            let asks = AskCenter()
+            _askCenter = State(initialValue: asks)
+            panel.asks = asks
+            monitor.askRecords = { [weak asks] in asks?.records ?? [] }
+            asks.onChange = { [weak monitor] in monitor?.asksChanged() }
+            asks.onNew = { AskNotifier.shared.post($0) }
+            asks.onGone = { AskNotifier.shared.withdraw($0) }
+            AskNotifier.shared.open = { [weak panel, weak asks] server in
+                guard let panel, let asks else { return }
+                panel.showAsk(server: server)
+                guard !panel.isPanelOpen else { return }
+                if !PanelToggle.toggle() {
+                    // Hidden from the menu bar: a small window instead.
+                    panel.serverToOpen = nil
+                    AskWindowController.shared.show(state: panel, asks: asks)
+                }
+            }
+            AskNotifier.shared.start()
+            asks.start()
+        }
         // Check from launch (1.7.1), not from the first panel open: before,
         // after an install, restart or login nothing was checked, status.json
         // stayed old and agents got no answer until someone opened the panel.
@@ -223,7 +248,7 @@ struct MCPockApp: App {
         )) {
             MenuBarPanelView(monitor: monitor, panel: panel)
         } label: {
-            StatusIconView(aggregate: monitor.aggregate)
+            StatusIconView(aggregate: monitor.aggregate, asksYou: askCenter?.hasWaiting ?? false)
         }
         .menuBarExtraStyle(.window)
     }

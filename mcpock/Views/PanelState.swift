@@ -28,6 +28,13 @@ final class PanelState {
     /// that builds a `PanelState` for something else, and those never touch
     /// usage. `AgentServerRow` reads it directly.
     @ObservationIgnored var usageStore: UsageStore?
+    /// What agents asked with mcpock_ask (1.16); nil in tests that don't use it.
+    /// Observed: the Glass icon set up before it is reads it again once set.
+    var asks: AskCenter?
+    /// The ask whose Yes opened the sheet now showing; done once it is written.
+    private(set) var pendingAskID: String?
+    /// The server a notification asked to show, once the panel is up.
+    @ObservationIgnored var serverToOpen: String?
 
     /// Agents first (1.5.4): the health bars are the most telling view.
     /// Not saved; the tab she picks lasts until the app quits.
@@ -373,6 +380,14 @@ final class PanelState {
             self.selectedName = nil
         }
         dropStaleAgentSelection()
+        // A notification asked for a server's card (1.16): once the panel's
+        // window is there to hang it on.
+        if serverToOpen != nil {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(250))
+                self?.openAskedCard()
+            }
+        }
     }
 
     func panelClosed() {
@@ -722,6 +737,60 @@ final class PanelState {
         guard !isApplyingSwitch else { return }
         pendingSwitch = nil
         switchError = nil
+        // Closed without writing: the ask stays, she can still say No.
+        pendingAskID = nil
+    }
+
+    // MARK: - Asks from agents (1.16)
+
+    /// The ask that opened the sheet, for its "Claude Code asked" line.
+    var pendingAsk: AgentAsk? {
+        pendingAskID.flatMap { asks?.ask(id: $0) }
+    }
+
+    /// Yes opens the usual sheet for what the agent asked (nothing is written
+    /// until she confirms there); No ends the ask, nothing changes.
+    func answerAsk(_ ask: AgentAsk, yes: Bool) {
+        guard yes else {
+            asks?.answerNo(ask.id)
+            return
+        }
+        switch ask.action {
+        case .hideTool: askToolSwitch(ask.server, hide: [ask.tool].compactMap { $0 })
+        case .showTool: askToolSwitch(ask.server, show: [ask.tool].compactMap { $0 })
+        case .turnOff: askSwitch(ask.server, turnOn: false)
+        case .turnOn: askSwitch(ask.server, turnOn: true)
+        }
+        guard let plan = pendingSwitch else { return }
+        if plan.isEmpty, plan.problems.isEmpty, plan.skipped.isEmpty {
+            // Already that way: nothing to write, the ask is done.
+            pendingSwitch = nil
+            asks?.completed(ask.id)
+            return
+        }
+        pendingAskID = ask.id
+    }
+
+    /// A notification was clicked: the panel opens on that server's card.
+    func showAsk(server: String) {
+        guard let group = monitor.groups.first(where: { HealthMonitor.normalizedName($0.name) == HealthMonitor.normalizedName(server) })
+        else { return }
+        tab = .servers
+        selectedName = group.name
+        if isPanelOpen, panelWindow?.isVisible == true {
+            openCard()
+        } else {
+            serverToOpen = group.name
+        }
+    }
+
+    /// The panel came up: open the card a notification asked for.
+    func openAskedCard() {
+        guard let name = serverToOpen else { return }
+        serverToOpen = nil
+        tab = .servers
+        selectedName = name
+        openCard()
     }
 
     /// She pressed Turn Off / Turn On on the sheet.
@@ -752,6 +821,10 @@ final class PanelState {
                 }
             } else {
                 pendingSwitch = nil
+                if let id = pendingAskID {
+                    pendingAskID = nil
+                    asks?.completed(id)
+                }
             }
         }
     }

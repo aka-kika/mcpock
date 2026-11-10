@@ -27,6 +27,8 @@ struct ServerRowView: View {
     let isSelected: Bool
     /// Being re-checked on its own (Check again): the health mark spins.
     var isChecking = false
+    /// An agent asks about this server (1.16): a small dot after the name.
+    var asksYou = false
     let actions: ServerRowActions
     @State private var isHovered = false
 
@@ -49,6 +51,14 @@ struct ServerRowView: View {
                         .foregroundStyle(theme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
+
+                    if asksYou {
+                        Circle()
+                            .fill(theme.textSecondary)
+                            .frame(width: 6, height: 6)
+                            .help("An agent asks you about this server: open its card")
+                            .accessibilityLabel("An agent asks you about it")
+                    }
 
                     if isPinned {
                         Image(systemName: "pin.fill")

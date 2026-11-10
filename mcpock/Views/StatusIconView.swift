@@ -40,6 +40,8 @@ enum StatusBadgeKind: Equatable, Sendable {
 /// the plain template glyph, exactly as before.
 struct StatusIconView: View {
     let aggregate: AggregateState
+    /// An agent's ask waits for her answer (1.16): a small dot at the top right.
+    var asksYou = false
 
     static let ringSize: CGFloat = 7
     static let ringStroke: CGFloat = 2
@@ -51,12 +53,15 @@ struct StatusIconView: View {
     /// The badge's centre, in top-left coordinates on the canvas: on the glyph's
     /// bottom-right corner.
     static let badgeCenter = NSPoint(x: 17.5, y: 13.5)
+    /// The ask dot (1.16): top right, the glyph's own colour, no new colour.
+    static let askCenter = NSPoint(x: 18.5, y: 3.5)
+    static let askSize: CGFloat = 5.5
 
     private var kind: StatusBadgeKind { StatusBadgeKind.forAggregate(aggregate) }
 
     var body: some View {
-        Image(nsImage: Self.image(for: kind))
-            .accessibilityLabel(Self.accessibilityLabel(for: aggregate))
+        Image(nsImage: Self.image(for: kind, asksYou: asksYou))
+            .accessibilityLabel(Self.accessibilityLabel(for: aggregate, asksYou: asksYou))
     }
 
     private static func glyph(color: NSColor? = nil) -> NSImage? {
@@ -68,8 +73,8 @@ struct StatusIconView: View {
             .withSymbolConfiguration(config)
     }
 
-    static func image(for kind: StatusBadgeKind) -> NSImage {
-        if kind == .none, let plain = glyph() {
+    static func image(for kind: StatusBadgeKind, asksYou: Bool = false) -> NSImage {
+        if kind == .none, !asksYou, let plain = glyph() {
             plain.isTemplate = true
             return plain
         }
@@ -87,8 +92,13 @@ struct StatusIconView: View {
             // Punch the knockout through the glyph, then draw the badge in it.
             context.compositingOperation = .destinationOut
             NSColor.black.setFill()
-            badgePath(kind, grow: knockout).fill()
+            if kind != .none { badgePath(kind, grow: knockout).fill() }
+            if asksYou { askPath(grow: knockout).fill() }
             context.compositingOperation = .sourceOver
+            if asksYou {
+                NSColor.labelColor.setFill()
+                askPath(grow: 0).fill()
+            }
 
             switch kind {
             case .ring:
@@ -106,6 +116,11 @@ struct StatusIconView: View {
         }
         image.isTemplate = false
         return image
+    }
+
+    private static func askPath(grow: CGFloat) -> NSBezierPath {
+        let r = askSize / 2 + grow
+        return NSBezierPath(ovalIn: NSRect(x: askCenter.x - r, y: askCenter.y - r, width: r * 2, height: r * 2))
     }
 
     /// The badge's outline, grown (knockout) or shrunk (stroke inset) by `grow`.
@@ -129,6 +144,11 @@ struct StatusIconView: View {
     }
 
     /// One label per state, for VoiceOver; the shapes are not readable aloud.
+    nonisolated static func accessibilityLabel(for aggregate: AggregateState, asksYou: Bool) -> String {
+        let label = accessibilityLabel(for: aggregate)
+        return asksYou ? label + ", and an agent asks you something" : label
+    }
+
     nonisolated static func accessibilityLabel(for aggregate: AggregateState) -> String {
         switch aggregate {
         case .allHealthy:

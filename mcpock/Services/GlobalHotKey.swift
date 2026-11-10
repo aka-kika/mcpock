@@ -120,13 +120,17 @@ enum PanelToggle {
     /// Set by `GlassPanelController`; true when it handled the press.
     static var glassToggle: (() -> Bool)?
 
-    static func toggle() {
-        if glassToggle?() == true { return }
-        guard let button = statusItemButton() else { return }
+    /// False when there is no menu bar item to open it from (hidden from
+    /// the menu bar): the caller shows another way (1.16, asks).
+    @discardableResult
+    static func toggle() -> Bool {
+        if glassToggle?() == true { return true }
+        guard let button = statusItemButton() else { return false }
         // A shortcut from another app: bring mcpock forward so the panel
         // takes the arrow keys, Return and Escape at once.
         NSApp.activate()
         button.performClick(nil)
+        return true
     }
 
     /// The item's button in the menu bar of the screen she is working on.

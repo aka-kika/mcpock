@@ -189,6 +189,99 @@ final class SwitchPanelTests: XCTestCase {
         XCTAssertEqual(monitor.groups.first?.offLabels, [])
     }
 
+    // MARK: Asks from agents (1.16)
+
+    private func askCenter(now: Date = Date()) -> AskCenter {
+        AskCenter(folder: home.appendingPathComponent("asks"), historyFile: home.appendingPathComponent("asks-answered.json"),
+                  now: { now })
+    }
+
+    private func leaveAsk(_ action: AgentAsk.Action, server: String = "openrouter", tool: String? = nil,
+                          asked: Date = Date()) throws -> AgentAsk {
+        let ask = AgentAsk(id: UUID().uuidString, server: server, tool: tool, action: action, reason: "never used",
+                           agent: "Claude Code", asked: asked)
+        try AskBox.write(ask, to: home.appendingPathComponent("asks"))
+        return ask
+    }
+
+    func testYesOpensTheUsualSheetAndOnlyTheConfirmWritesAndEndsTheAsk() async throws {
+        let state = try await makeState()
+        let asks = askCenter()
+        state.asks = asks
+        asks.start()
+        defer { asks.stop() }
+        var notified: [String] = []
+        asks.onNew = { notified += $0.map(\.id) }
+        let ask = try leaveAsk(.turnOff)
+        asks.reload()
+        XCTAssertEqual(asks.waiting.map(\.id), [ask.id])
+        XCTAssertEqual(notified, [ask.id])
+        asks.reload()
+        XCTAssertEqual(notified, [ask.id], "one notification per ask")
+        XCTAssertEqual(asks.asks(for: "OpenRouter").count, 1)
+        let before = try String(contentsOfFile: path(".codex/config.toml"), encoding: .utf8)
+
+        state.answerAsk(ask, yes: true)
+        XCTAssertEqual(state.pendingSwitch?.changes.count, 2, "the usual sheet, every agent")
+        XCTAssertEqual(state.pendingAsk?.id, ask.id)
+        XCTAssertEqual(try String(contentsOfFile: path(".codex/config.toml"), encoding: .utf8), before, "nothing written by Yes")
+
+        // Closing the sheet keeps the ask.
+        state.cancelSwitch()
+        XCTAssertNil(state.pendingAsk)
+        XCTAssertEqual(asks.waiting.count, 1)
+
+        state.answerAsk(ask, yes: true)
+        state.confirmSwitch()
+        for _ in 0..<100 where !asks.waiting.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertEqual(asks.waiting, [])
+        XCTAssertEqual(asks.answered.first?.state, .done)
+        XCTAssertTrue(try String(contentsOfFile: path(".codex/config.toml"), encoding: .utf8).contains("enabled = false"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: home.appendingPathComponent("asks/\(ask.id).json").path))
+        XCTAssertNil(state.monitor.statusSnapshot().asks, "no records source set in this test")
+    }
+
+    func testNoAndAnUnansweredDayChangeNothing() async throws {
+        let state = try await makeState()
+        let asks = askCenter()
+        state.asks = asks
+        let no = try leaveAsk(.turnOff)
+        let old = try leaveAsk(.turnOff, server: "other", asked: Date().addingTimeInterval(-AgentAsk.lifetime - 60))
+        var gone: [String] = []
+        asks.onGone = { gone += $0 }
+        asks.start()
+        defer { asks.stop() }
+        XCTAssertEqual(asks.waiting.map(\.id), [no.id])
+        XCTAssertEqual(asks.answered.map(\.state), [.expired])
+        state.answerAsk(no, yes: false)
+        XCTAssertEqual(asks.answered.map(\.state), [.no, .expired])
+        XCTAssertEqual(Set(gone), [no.id, old.id], "their notifications go")
+        XCTAssertFalse(try String(contentsOfFile: path(".codex/config.toml"), encoding: .utf8).contains("enabled"))
+        state.monitor.askRecords = { asks.records }
+        XCTAssertEqual(state.monitor.statusSnapshot().asks?.map(\.state), [.no, .expired])
+
+        // Kept across launches, and never notified again.
+        let again = askCenter()
+        var notified = 0
+        again.onNew = { notified += $0.count }
+        again.start()
+        defer { again.stop() }
+        XCTAssertEqual(again.answered.map(\.id), [no.id, old.id])
+        XCTAssertEqual(notified, 0)
+    }
+
+    func testAskForWhatIsAlreadySoIsDoneWithoutASheet() async throws {
+        let state = try await makeState()
+        let asks = askCenter()
+        state.asks = asks
+        let ask = try leaveAsk(.turnOn)
+        asks.start()
+        defer { asks.stop() }
+        state.answerAsk(ask, yes: true)
+        XCTAssertNil(state.pendingSwitch)
+        XCTAssertEqual(asks.answered.first?.state, .done)
+    }
+
     func testDemoModeNeverPlansOrWrites() async throws {
         let state = try await makeState()
         state.monitor.switchesEnabled = false

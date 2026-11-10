@@ -142,9 +142,23 @@ struct DetailCardView: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill)
                     }
             }
+            askRows
             usedBy
             tools
             actions
+        }
+    }
+
+    /// What agents asked about this server (1.16): Yes / No each.
+    @ViewBuilder
+    private var askRows: some View {
+        let asks = state.asks?.asks(for: group.name) ?? []
+        if state.monitor.switchesEnabled, !asks.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(asks, id: \.id) { ask in
+                    AskRow(ask: ask, theme: theme) { state.answerAsk(ask, yes: $0) }
+                }
+            }
         }
     }
 
@@ -1010,6 +1024,24 @@ struct SwitchSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let ask = state.pendingAsk {
+                // The agent's ask that opened this sheet (1.16).
+                HStack(alignment: .top, spacing: 8) {
+                    AgentBadgeView(badge: AgentBadge.forLabel(CardText.agentLabel(forDisplay: ask.agent)), theme: theme, size: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(ask.agent) asked")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.textPrimary)
+                        Text(AskText.reason(ask))
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background { RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.fieldFill) }
+            }
             Text(plan.isEmpty ? "Nothing to change" : plan.title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.textPrimary)
