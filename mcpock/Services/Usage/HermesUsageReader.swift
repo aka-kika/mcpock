@@ -132,8 +132,8 @@ struct HermesUsageReader: UsageReader {
             guard let namePtr = sqlite3_column_text(stmt, 1) else { continue } // bad line: no name, skip it
             let name = String(cString: namePtr)
             let time = sqlite3_column_double(stmt, 2)
-            guard time > 0, let server = serverName(from: name, knownServers: knownServers) else { continue }
-            events.append(UsageEvent(agent: agentLabel, server: server, date: Date(timeIntervalSince1970: time)))
+            guard time > 0, let split = split(name, knownServers: knownServers) else { continue }
+            events.append(UsageEvent(agent: agentLabel, server: split.server, date: Date(timeIntervalSince1970: time), tool: split.tool))
         }
         // A restart cut short is not kept: next time starts over again, so
         // the old rows it didn't reach are never counted without the check.
@@ -159,6 +159,13 @@ struct HermesUsageReader: UsageReader {
     /// server. Falls back to the first word when nothing matches. `nil` for a
     /// non-MCP name, or `mcp` with nothing after it.
     static func serverName(from toolName: String, knownServers: Set<String>) -> String? {
+        split(toolName, knownServers: knownServers)?.server
+    }
+
+    /// `serverName`, plus the words left over after the server as the tool
+    /// (nil when nothing is left). Joined with `_`, so `mcp__srv__get_file`
+    /// reads back as `get_file`.
+    static func split(_ toolName: String, knownServers: Set<String>) -> (server: String, tool: String?)? {
         let parts = toolName.split(separator: "_", omittingEmptySubsequences: true).map(String.init)
         guard let first = parts.first, first.lowercased() == "mcp" else { return nil }
         let remainder = Array(parts.dropFirst())
@@ -169,9 +176,10 @@ struct HermesUsageReader: UsageReader {
             let candidate = remainder[0..<count]
             let normalized = candidate.joined().lowercased().filter { $0.isLetter || $0.isNumber }
             if knownServers.contains(normalized) {
-                return candidate.joined(separator: "_")
+                return (candidate.joined(separator: "_"), remainder[count...].joined(separator: "_"))
             }
         }
-        return remainder[0]
+        let rest = remainder.dropFirst().joined(separator: "_")
+        return (remainder[0], rest.isEmpty ? nil : rest)
     }
 }

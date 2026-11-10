@@ -22,6 +22,15 @@ final class UsageStore {
         let server: String
     }
 
+    /// One agent × server × tool bucket (Part 2, 2026-11-10). `server` and
+    /// `tool` are normalized with `HealthMonitor.normalizedName`, so a tool
+    /// an agent spells `get-file` and the server lists as `get_file` meet.
+    private struct ToolKey: Hashable {
+        let agent: String
+        let server: String
+        let tool: String
+    }
+
     /// At most once every ten minutes for the "after a full probe cycle"
     /// trigger; the very first call (the monitor starting) is never throttled.
     static let throttle: TimeInterval = 10 * 60
@@ -33,8 +42,15 @@ final class UsageStore {
 
     /// Day index (see `dayIndex`) -> call count, keyed by (agent, server).
     private var buckets: [BucketKey: [Int: Int]] = [:]
+    /// Day index -> call count, keyed by (agent, server, tool).
+    private var toolBuckets: [ToolKey: [Int: Int]] = [:]
     /// Where each reader left off, keyed by `UsageEvent.agent`.
     private var cursors: [String: UsageCursor] = [:]
+    /// Counts saved before per-tool counts (version < 4) have server buckets
+    /// but none per tool, and the cursors are already past those calls: the
+    /// next refresh reads every source once more from the start for the tool
+    /// buckets only.
+    private var needsToolBackfill = false
 
     private var hasLoaded = false
     /// True once real counts exist: a saved file was read, or a scan finished.
@@ -112,6 +128,31 @@ final class UsageStore {
         return days.reduce(0) { sum, entry in entry.key >= cutoff ? sum + entry.value : sum }
     }
 
+    /// Per tool of `server`, across every agent's records: calls in `window`
+    /// and the last day one was seen (any time, so a tool used 40 days ago
+    /// still says when). Keys are normalized tool names (look them up with
+    /// `toolKey`). Nil until real counts exist (never a fake "never used").
+    func toolUsage(server: String, window: UsageWindow, now: Date = Date()) -> [String: ToolUsage]? {
+        guard hasCounts, window != .off else { return nil }
+        let wanted = HealthMonitor.normalizedName(server)
+        let cutoff = window.days.map { Self.dayIndex(for: now) - ($0 - 1) }
+        var result: [String: ToolUsage] = [:]
+        for (key, days) in toolBuckets where key.server == wanted {
+            var entry = result[key.tool] ?? ToolUsage(calls: 0, lastDay: nil)
+            for (day, count) in days {
+                if cutoff.map({ day >= $0 }) ?? true { entry.calls += count }
+                if count > 0 { entry.lastDay = max(entry.lastDay ?? day, day) }
+            }
+            result[key.tool] = entry
+        }
+        return result
+    }
+
+    /// The key `toolUsage` files a tool under.
+    nonisolated static func toolKey(_ tool: String) -> String {
+        HealthMonitor.normalizedName(tool)
+    }
+
     /// Settings changed the Usage window. Turning Usage on reads at once,
     /// not at the next (throttled) cycle end, which in Manual mode never came.
     @discardableResult
@@ -131,6 +172,8 @@ final class UsageStore {
         let readers = self.readers
         let cursorsSnapshot = cursors
         let existingBuckets = buckets
+        let existingToolBuckets = toolBuckets
+        let backfill = needsToolBackfill
         let isHostingTests = self.isHostingTests
         let directory = self.directory
 
@@ -140,15 +183,18 @@ final class UsageStore {
         // I/O, the readers, the write to disk) is `Task.detached`, off the
         // main thread at utility priority, and takes no reference to `self`.
         let task = Task { [weak self] in
-            let (newBuckets, newCursors) = await Task.detached(priority: .utility) {
+            let result = await Task.detached(priority: .utility) {
                 Self.process(
                     readers: readers, cursors: cursorsSnapshot, buckets: existingBuckets,
+                    toolBuckets: existingToolBuckets, backfillTools: backfill,
                     knownServers: knownServers, isHostingTests: isHostingTests, directory: directory
                 )
             }.value
             guard let self else { return }
-            self.buckets = newBuckets
-            self.cursors = newCursors
+            self.buckets = result.buckets
+            self.toolBuckets = result.toolBuckets
+            self.cursors = result.cursors
+            self.needsToolBackfill = false
             self.hasCounts = true
             self.refreshTask = nil
         }
@@ -159,13 +205,25 @@ final class UsageStore {
     /// Every reader's new events, folded into `buckets`, off the main actor.
     /// Takes and returns only Sendable snapshots — never `self` — so it can
     /// run detached.
+    ///
+    /// `backfillTools`: the saved counts predate per-tool counts. Each reader
+    /// first reads its sources from the start into the tool buckets only
+    /// (the server buckets already hold those calls), then the usual read
+    /// from the saved cursor fills the server buckets only. Calls written in
+    /// the moment between the two reads miss the tool counts, never doubled.
     nonisolated private static func process(
         readers: [UsageReader], cursors: [String: UsageCursor], buckets: [BucketKey: [Int: Int]],
+        toolBuckets: [ToolKey: [Int: Int]], backfillTools: Bool,
         knownServers: Set<String>, isHostingTests: Bool, directory: URL
-    ) -> (buckets: [BucketKey: [Int: Int]], cursors: [String: UsageCursor]) {
+    ) -> (buckets: [BucketKey: [Int: Int]], toolBuckets: [ToolKey: [Int: Int]], cursors: [String: UsageCursor]) {
         var newBuckets = buckets
+        var newToolBuckets = backfillTools ? [:] : toolBuckets
         var newCursors = cursors
         for reader in readers {
+            if backfillTools {
+                let (all, _) = reader.read(since: .empty, knownServers: knownServers)
+                for event in all { addTool(event, to: &newToolBuckets) }
+            }
             let cursor = cursors[reader.agent] ?? .empty
             let (events, nextCursor) = reader.read(since: cursor, knownServers: knownServers)
             newCursors[reader.agent] = nextCursor
@@ -173,12 +231,19 @@ final class UsageStore {
                 let key = BucketKey(agent: event.agent, server: HealthMonitor.normalizedName(event.server))
                 let day = dayIndex(for: event.date)
                 newBuckets[key, default: [:]][day, default: 0] += 1
+                if !backfillTools { addTool(event, to: &newToolBuckets) }
             }
         }
         if !isHostingTests {
-            try? persist(buckets: newBuckets, cursors: newCursors, to: directory)
+            try? persist(buckets: newBuckets, toolBuckets: newToolBuckets, cursors: newCursors, to: directory)
         }
-        return (newBuckets, newCursors)
+        return (newBuckets, newToolBuckets, newCursors)
+    }
+
+    nonisolated private static func addTool(_ event: UsageEvent, to buckets: inout [ToolKey: [Int: Int]]) {
+        guard let tool = event.tool, !toolKey(tool).isEmpty else { return }
+        let key = ToolKey(agent: event.agent, server: HealthMonitor.normalizedName(event.server), tool: toolKey(tool))
+        buckets[key, default: [:]][dayIndex(for: event.date), default: 0] += 1
     }
 
     // MARK: - Day math
@@ -223,9 +288,17 @@ final class UsageStore {
         /// indexes come from the calendar date; missing before 1.10.6.
         var version: Int?
         var buckets: [PersistedBucket]
+        /// Version 4 (Part 2, 2026-11-10): calls per tool.
+        var tools: [PersistedToolBucket]?
         var cursors: [String: UsageCursor]
     }
-    nonisolated private static let formatVersion = 3
+    nonisolated private static let formatVersion = 4
+    private struct PersistedToolBucket: Codable {
+        let agent: String
+        let server: String
+        let tool: String
+        let days: [String: Int]
+    }
     private struct PersistedBucket: Codable {
         let agent: String
         let server: String
@@ -249,6 +322,16 @@ final class UsageStore {
             loaded[key] = days
         }
         buckets = loaded
+        var loadedTools: [ToolKey: [Int: Int]] = [:]
+        for bucket in decoded.tools ?? [] {
+            let key = ToolKey(agent: bucket.agent, server: bucket.server, tool: bucket.tool)
+            for (dayString, count) in bucket.days {
+                guard let day = Int(dayString) else { continue }
+                loadedTools[key, default: [:]][day, default: 0] += count
+            }
+        }
+        toolBuckets = loadedTools
+        needsToolBackfill = (decoded.version ?? 0) < 4
         cursors = decoded.cursors
         hasCounts = true
         // Saved before 1.10.6: the counts are kept as they are, and every
@@ -263,7 +346,8 @@ final class UsageStore {
     }
 
     nonisolated private static func persist(
-        buckets: [BucketKey: [Int: Int]], cursors: [String: UsageCursor], to directory: URL
+        buckets: [BucketKey: [Int: Int]], toolBuckets: [ToolKey: [Int: Int]],
+        cursors: [String: UsageCursor], to directory: URL
     ) throws {
         let bucketList = buckets.map { key, days in
             PersistedBucket(
@@ -272,13 +356,26 @@ final class UsageStore {
                 days: Dictionary(uniqueKeysWithValues: days.map { (String($0.key), $0.value) })
             )
         }
-        let payload = Persisted(version: formatVersion, buckets: bucketList, cursors: cursors)
+        let toolList = toolBuckets.map { key, days in
+            PersistedToolBucket(
+                agent: key.agent, server: key.server, tool: key.tool,
+                days: Dictionary(uniqueKeysWithValues: days.map { (String($0.key), $0.value) })
+            )
+        }
+        let payload = Persisted(version: formatVersion, buckets: bucketList, tools: toolList, cursors: cursors)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(payload)
         try StatusWriter.ensurePrivateDirectory(directory)
         try StatusWriter.writePrivate(data, to: directory.appendingPathComponent(fileName))
     }
+}
+
+/// One tool's calls in the Usage window and the last day it was called
+/// (`UsageStore.dayIndex`; nil = no call on record).
+struct ToolUsage: Equatable, Sendable {
+    var calls: Int
+    var lastDay: Int?
 }
 
 /// "42", "1.2k" from 1,000 up, "3.4M" from 1,000,000 up (a trailing ".0" is

@@ -73,6 +73,7 @@ final class GrokUsageReaderTests: XCTestCase {
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(events.first?.agent, "Grok")
         XCTAssertEqual(events.first?.server, "reed-md")
+        XCTAssertEqual(events.first?.tool, "note_get_active")
     }
 
     /// A non-MCP tool call (no `server_name`, generic `tool_started`) never

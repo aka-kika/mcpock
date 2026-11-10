@@ -105,6 +105,7 @@ final class HermesUsageReaderTests: XCTestCase {
         let event = try XCTUnwrap(events.first)
         XCTAssertEqual(event.agent, "Hermes")
         XCTAssertEqual(event.server, "skill_librarian")
+        XCTAssertEqual(event.tool, "librarian_find", "the words after the server are the tool")
         XCTAssertEqual(event.date, Date(timeIntervalSince1970: 1_780_000_000))
     }
 

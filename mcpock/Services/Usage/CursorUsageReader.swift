@@ -285,7 +285,7 @@ struct CursorUsageReader: UsageReader {
             }
 
             let key = Self.columnText(statement, 4) ?? "rowid:\(rowid)"
-            batch.calls.append(Call(key: key, event: UsageEvent(agent: "Cursor", server: split.server, date: date)))
+            batch.calls.append(Call(key: key, event: UsageEvent(agent: "Cursor", server: split.server, date: date, tool: split.tool)))
         }
         return batch
     }

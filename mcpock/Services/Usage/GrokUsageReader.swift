@@ -174,7 +174,7 @@ struct GrokUsageReader: UsageReader {
         guard object["type"] as? String == "mcp_tool_call_started" else { return nil }
         guard let server = object["server_name"] as? String, !server.isEmpty else { return nil }
         guard let timestamp = object["ts"] as? String, let date = parseTimestamp(timestamp) else { return nil }
-        return UsageEvent(agent: "Grok", server: server, date: date)
+        return UsageEvent(agent: "Grok", server: server, date: date, tool: object["tool_name"] as? String)
     }
 
     private static let isoFormatterWithFractionalSeconds: ISO8601DateFormatter = {

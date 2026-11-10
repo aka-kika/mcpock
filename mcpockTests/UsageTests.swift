@@ -40,6 +40,7 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         let (events, cursor) = reader.read(since: .empty, knownServers: [])
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(events.first?.server, "skill-librarian")
+        XCTAssertEqual(events.first?.tool, "librarian_find")
         XCTAssertEqual(events.first?.agent, AgentRegistry.claudeCodeLabel)
         XCTAssertGreaterThan(cursor.values.values.first ?? 0, 0, "the offset advanced")
     }
@@ -480,7 +481,87 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .allTime), 6, "5 kept, 1 new, the old call not again")
 
         let written = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-        XCTAssertEqual(written?["version"] as? Int, 3)
+        XCTAssertEqual(written?["version"] as? Int, 4)
+    }
+
+    // MARK: - Per tool (Part 2, 2026-11-10)
+
+    func testToolUsageAddsUpEveryAgentAndKnowsTheLastDay() async throws {
+        let now = Date()
+        let old = now.addingTimeInterval(-40 * 86400)
+        let code = [
+            UsageEvent(agent: "Code", server: "github", date: now, tool: "search_code"),
+            UsageEvent(agent: "Code", server: "github", date: now, tool: "search_code"),
+            UsageEvent(agent: "Code", server: "github", date: old, tool: "create_issue"),
+            UsageEvent(agent: "Code", server: "other", date: now, tool: "search_code"),
+            UsageEvent(agent: "Code", server: "github", date: now),          // no tool on record
+        ]
+        let cursor = [UsageEvent(agent: "Cursor", server: "GitHub", date: now, tool: "search-code")]
+        let store = UsageStore(readers: [FakeReader(agent: "Code", events: code), FakeReader(agent: "Cursor", events: cursor)],
+                               directory: directory, isHostingTests: true, defaults: defaults)
+        await store.start(knownServers: [])?.value
+        let usage = try XCTUnwrap(store.toolUsage(server: "github", window: .thirtyDays, now: now))
+        XCTAssertEqual(usage[UsageStore.toolKey("search_code")]?.calls, 3, "two agents, two spellings, one tool")
+        XCTAssertEqual(usage[UsageStore.toolKey("search_code")]?.lastDay, UsageStore.dayIndex(for: now))
+        XCTAssertEqual(usage[UsageStore.toolKey("create_issue")]?.calls, 0, "outside 30 days")
+        XCTAssertEqual(usage[UsageStore.toolKey("create_issue")]?.lastDay, UsageStore.dayIndex(for: old), "but it still says when")
+        XCTAssertEqual(usage.count, 2)
+        XCTAssertEqual(store.count(agent: "Code", server: "github", window: .thirtyDays, now: now), 3, "server counts unchanged")
+    }
+
+    func testToolUsageIsNilWhenOffOrBeforeCounts() {
+        let store = UsageStore(readers: [FakeReader(agent: "Code", events: [])], directory: directory, isHostingTests: true, defaults: defaults)
+        XCTAssertNil(store.toolUsage(server: "github", window: .thirtyDays), "no fake 'never used' before the first read")
+    }
+
+    func testToolCountsPersist() async {
+        let events = [UsageEvent(agent: "Code", server: "github", date: Date(), tool: "search_code")]
+        let first = UsageStore(readers: [FakeReader(agent: "Code", events: events)], directory: directory, isHostingTests: false, defaults: defaults)
+        await first.start(knownServers: [])?.value
+        let second = UsageStore(readers: [FakeReader(agent: "Code", events: [])], directory: directory, isHostingTests: false, defaults: defaults)
+        await second.start(knownServers: [])?.value
+        XCTAssertEqual(second.toolUsage(server: "github", window: .allTime)?[UsageStore.toolKey("search_code")]?.calls, 1)
+    }
+
+    /// Counts saved before per-tool counts: the tool counts are read once
+    /// from the start of every source, and the server counts never double.
+    func testCountsSavedBeforeToolCountsAreBackfilledOnce() async throws {
+        let day = Date()
+        let legacy = """
+            {"version":3,"buckets":[{"agent":"Code","server":"github","days":{"\(UsageStore.dayIndex(for: day))":2}}],
+             "cursors":{"Code":{"values":{"pos":2}}}}
+            """
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(legacy.utf8).write(to: directory.appendingPathComponent(UsageStore.fileName))
+        let all = [
+            UsageEvent(agent: "Code", server: "github", date: day, tool: "search_code"),
+            UsageEvent(agent: "Code", server: "github", date: day, tool: "search_code"),
+            UsageEvent(agent: "Code", server: "github", date: day, tool: "create_issue"), // new since the save
+        ]
+        let store = UsageStore(readers: [PositionReader(agent: "Code", events: all)], directory: directory, isHostingTests: false, defaults: defaults)
+        await store.start(knownServers: [])?.value
+        XCTAssertEqual(store.count(agent: "Code", server: "github", window: .allTime), 3, "2 saved + 1 new")
+        let usage = try XCTUnwrap(store.toolUsage(server: "github", window: .allTime))
+        XCTAssertEqual(usage[UsageStore.toolKey("search_code")]?.calls, 2)
+        XCTAssertEqual(usage[UsageStore.toolKey("create_issue")]?.calls, 1)
+
+        // The next refresh reads only what is new: nothing doubles.
+        let again = UsageStore(readers: [PositionReader(agent: "Code", events: all)], directory: directory, isHostingTests: false, defaults: defaults)
+        await again.start(knownServers: [])?.value
+        XCTAssertEqual(again.count(agent: "Code", server: "github", window: .allTime), 3)
+        XCTAssertEqual(again.toolUsage(server: "github", window: .allTime)?[UsageStore.toolKey("search_code")]?.calls, 2)
+    }
+
+    /// A file-like source: the cursor is how many events were read.
+    private struct PositionReader: UsageReader {
+        let agent: String
+        let events: [UsageEvent]
+        func read(since cursor: UsageCursor, knownServers: Set<String>) -> (events: [UsageEvent], cursor: UsageCursor) {
+            let start = Int(cursor.values["pos"] ?? 0)
+            var next = cursor
+            next.values["pos"] = Int64(events.count)
+            return (Array(events.dropFirst(min(start, events.count))), next)
+        }
     }
 
     /// Plays a source that started over: hands back every event it holds,

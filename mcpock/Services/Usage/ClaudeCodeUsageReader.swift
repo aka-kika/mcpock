@@ -170,7 +170,7 @@ struct ClaudeCodeUsageReader: UsageReader {
             guard block.type == "tool_use", let name = block.name,
                   let server = resolveServerName(name, knownServers: knownServers)
             else { return nil }
-            return UsageEvent(agent: agent, server: server, date: date)
+            return UsageEvent(agent: agent, server: server, date: date, tool: toolName(name))
         }
     }
 
@@ -188,11 +188,20 @@ struct ClaudeCodeUsageReader: UsageReader {
     /// text (normalizing happens once, in `UsageStore`, from every reader's
     /// raw name alike). No match: the raw `<plugin>_<server>` text, as the
     /// contract asks for.
+    /// `mcp__<server>__<tool>` -> `<tool>` (the part after the last `__`);
+    /// nil for anything not shaped like an MCP call.
+    static func toolName(_ name: String) -> String? {
+        guard name.hasPrefix("mcp__") else { return nil }
+        let parts = name.dropFirst(5).components(separatedBy: "__")
+        guard parts.count >= 2, let last = parts.last, !last.isEmpty else { return nil }
+        return last
+    }
+
     static func resolveServerName(_ toolName: String, knownServers: Set<String>) -> String? {
         guard toolName.hasPrefix("mcp__") else { return nil }
         var parts = toolName.dropFirst(5).components(separatedBy: "__")
         guard parts.count >= 2 else { return nil }
-        parts.removeLast() // the tool name; never kept (arguments/results/chat never are either)
+        parts.removeLast() // the tool name (`toolName` reads it); arguments, results and chat are never kept
         let serverPart = parts.joined(separator: "__")
         guard !serverPart.isEmpty else { return nil }
         guard serverPart.hasPrefix("plugin_") else { return serverPart }

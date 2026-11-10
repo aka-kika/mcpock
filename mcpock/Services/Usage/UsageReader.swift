@@ -4,8 +4,8 @@ import Foundation
 // the agent's own on-disk records. This file is the shared contract between
 // the store and the per-agent readers.
 
-/// One MCP tool call found in an agent's own records. Only these three facts
-/// are ever kept: never arguments, results or any chat text.
+/// One MCP tool call found in an agent's own records. Only these facts are
+/// ever kept: never arguments, results or any chat text.
 struct UsageEvent: Hashable, Sendable {
     /// The agent's source label as `AgentRegistry` uses it
     /// (`AgentRegistry.claudeCodeLabel`, "Grok", "Cursor", "Hermes").
@@ -13,6 +13,16 @@ struct UsageEvent: Hashable, Sendable {
     /// The server name as the call named it, before `HealthMonitor.normalizedName`.
     let server: String
     let date: Date
+    /// The tool's name as the call named it (Part 2, 2026-11-10: per-tool
+    /// counts say which tools never run). Nil when the record has none.
+    var tool: String? = nil
+
+    init(agent: String, server: String, date: Date, tool: String? = nil) {
+        self.agent = agent
+        self.server = server
+        self.date = date
+        self.tool = tool.flatMap { $0.isEmpty ? nil : $0 }
+    }
 }
 
 /// Where a reader stopped last time, so the next read only looks at what is
