@@ -17,9 +17,9 @@ final class AskNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     func post(_ asks: [AgentAsk]) {
         let items = asks.map { (id: $0.id, server: $0.server, body: AskText.notification($0)) }
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert]) { granted, _ in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { granted, _ in
             guard granted else { return }
+            let center = UNUserNotificationCenter.current()
             for item in items {
                 let content = UNMutableNotificationContent()
                 content.title = "mcpock"
