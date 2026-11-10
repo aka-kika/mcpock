@@ -404,8 +404,12 @@ enum TOMLList {
                     lastLine = index
                     inTable = true
                 } else {
-                    // `[disabled_mcp_tools.x]` would be the same keys written another way.
-                    if path.count > table.count, Array(path.prefix(table.count)) == table { return nil }
+                    // `[disabled_mcp_tools.x]` is the key itself written as a table:
+                    // left alone. Another sub-table (Codex's `[mcp_servers.x.env]`,
+                    // `.http_headers`) is a different key and is fine (fable-4).
+                    if path.count > table.count, Array(path.prefix(table.count)) == table, path[table.count] == key {
+                        return nil
+                    }
                     inTable = false
                 }
                 continue

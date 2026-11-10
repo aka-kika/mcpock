@@ -120,6 +120,21 @@ final class ToolSwitchTests: XCTestCase {
         XCTAssertThrowsError(try edit(text, .codex, hide: ["create_issue"]))
     }
 
+    /// fable-4 (review 10 Nov): `[mcp_servers.x.env]` and `.http_headers`
+    /// sub-tables are other keys; the list goes in the server's own table.
+    func testCodexServerWithEnvAndHeadersSubTables() throws {
+        let text = "[mcp_servers.github]\ncommand = \"x\"\n\n[mcp_servers.github.env]\nTOKEN = \"t\"\n\n[mcp_servers.github.http_headers]\nA = \"b\"\n"
+        let off = try edit(text, .codex, hide: ["create_issue"])
+        XCTAssertEqual(off, "[mcp_servers.github]\ncommand = \"x\"\ndisabled_tools = [\"create_issue\"]\n\n[mcp_servers.github.env]\nTOKEN = \"t\"\n\n[mcp_servers.github.http_headers]\nA = \"b\"\n")
+        XCTAssertEqual(hidden(off, .codex), ["create_issue"])
+        XCTAssertEqual(try edit(off, .codex, show: ["create_issue"]), text)
+    }
+
+    func testCodexListWrittenAsItsOwnTableIsNotGuessed() {
+        let text = "[mcp_servers.github]\ncommand = \"x\"\n\n[mcp_servers.github.disabled_tools]\na = 1\n"
+        XCTAssertThrowsError(try edit(text, .codex, hide: ["create_issue"]))
+    }
+
     func testCodexServerWithNoTableIsNotGuessed() {
         XCTAssertThrowsError(try edit("[mcp_servers]\ngithub = { command = \"x\" }\n", .codex, hide: ["create_issue"]))
     }
