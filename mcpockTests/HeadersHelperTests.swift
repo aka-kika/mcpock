@@ -144,19 +144,26 @@ final class HeadersHelperTests: XCTestCase {
         XCTAssertFalse(error.localizedDescription.contains(secret))
     }
 
+    /// Timing-safe under load (e57e, failed once at load 10+): the helper
+    /// gets 3 s so its shell surely starts the child first, and the child's
+    /// end is waited for (up to 10 s) instead of a fixed 300 ms.
     func testTimeoutKillsTheWholeTree() async throws {
         let pidFile = dir.appendingPathComponent("child.pid").path
-        let path = try script("sleep 30 &\necho $! > '\(pidFile)'\nwait")
+        let path = try script("sleep 60 &\necho $! > '\(pidFile)'\nwait")
         let started = Date()
-        let result = await HeadersHelper.run(helper: path, serverName: "s", serverURL: "", timeout: .seconds(1))
+        let result = await HeadersHelper.run(helper: path, serverName: "s", serverURL: "", timeout: .seconds(3))
         guard case .failure(let error) = result else { return XCTFail("expected failure") }
-        XCTAssertEqual(error.localizedDescription, "Header helper timed out after 1 s")
-        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        XCTAssertEqual(error.localizedDescription, "Header helper timed out after 3 s")
+        XCTAssertLessThan(Date().timeIntervalSince(started), 20, "stops near its timeout, not after the child's 60 s")
 
-        let pid = Int32(try String(contentsOfFile: pidFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        XCTAssertGreaterThan(pid, 0)
-        try await Task.sleep(for: .milliseconds(300))
+        let pid = Int32((try? String(contentsOfFile: pidFile, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+        XCTAssertGreaterThan(pid, 0, "the helper's shell wrote its child's pid")
+        guard pid > 0 else { return }
+        let deadline = Date().addingTimeInterval(10)
+        while kill(pid, 0) == 0, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         XCTAssertNotEqual(kill(pid, 0), 0, "the helper's child \(pid) must not be left running")
     }
 
