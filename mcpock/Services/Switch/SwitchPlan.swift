@@ -315,21 +315,67 @@ enum SwitchWriter {
             permissions = (try? fm.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber) ?? 0o600
             try fm.createDirectory(at: backups, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let copy = backups.appendingPathComponent(backupName(for: target, agent: change.agents.first ?? "", now: now))
-            try Data(contentsOf: target).write(to: copy, options: .atomic)
-            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: copy.path)
+            let copyTemp = backups.appendingPathComponent(".\(copy.lastPathComponent).mcpock-\(UUID().uuidString)")
+            do {
+                try writeNew(Data(contentsOf: target), to: copyTemp, mode: 0o600)
+                guard rename(copyTemp.path, copy.path) == 0 else { throw WriteError.failed(change.path) }
+            } catch {
+                try? fm.removeItem(at: copyTemp)
+                throw WriteError.failed(change.path)
+            }
         } else {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         }
 
+        removeLeftovers(of: target, now: now)
         let temp = target.deletingLastPathComponent()
             .appendingPathComponent(".\(target.lastPathComponent).mcpock-\(UUID().uuidString)")
         do {
-            try Data(change.after.utf8).write(to: temp)
-            try fm.setAttributes([.posixPermissions: permissions], ofItemAtPath: temp.path)
+            try writeNew(Data(change.after.utf8), to: temp, mode: mode_t(permissions.uint16Value))
             guard rename(temp.path, target.path) == 0 else { throw WriteError.failed(change.path) }
         } catch {
             try? fm.removeItem(at: temp)
             throw WriteError.failed(change.path)
+        }
+    }
+
+    /// A new file made 0600 from its first byte (the config may hold keys),
+    /// set to `mode` only once it is whole. It must not exist yet; on any
+    /// failure it is removed (review 10 Nov, fable-6 / mcode-6).
+    static func writeNew(_ data: Data, to url: URL, mode: mode_t) throws {
+        let fd = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw WriteError.failed(url.path) }
+        var done = false
+        defer {
+            close(fd)
+            if !done { unlink(url.path) }
+        }
+        try data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            var offset = 0
+            while offset < raw.count {
+                let wrote = Darwin.write(fd, raw.baseAddress! + offset, raw.count - offset)
+                if wrote < 0 {
+                    if errno == EINTR { continue }
+                    throw WriteError.failed(url.path)
+                }
+                offset += wrote
+            }
+        }
+        guard fsync(fd) == 0, fchmod(fd, mode & 0o7777) == 0 else { throw WriteError.failed(url.path) }
+        done = true
+    }
+
+    /// Temp files of an earlier write that never finished (mcpock quit
+    /// between write and rename): ".<name>.mcpock-<uuid>", at least a minute old.
+    static func removeLeftovers(of target: URL, now: Date) {
+        let fm = FileManager.default
+        let folder = target.deletingLastPathComponent()
+        let prefix = ".\(target.lastPathComponent).mcpock-"
+        guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
+        for name in names where name.hasPrefix(prefix) && UUID(uuidString: String(name.dropFirst(prefix.count))) != nil {
+            let file = folder.appendingPathComponent(name)
+            let changed = (try? fm.attributesOfItem(atPath: file.path)[.modificationDate] as? Date) ?? now
+            if now.timeIntervalSince(changed) >= 60 { try? fm.removeItem(at: file) }
         }
     }
 

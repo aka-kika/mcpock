@@ -67,4 +67,41 @@ final class ReviewNov10Tests: XCTestCase {
         }
         XCTAssertEqual(lines, ["data: \"caf\u{e9} \u{4E2D}\""])
     }
+
+    // MARK: b36c (fable-6 / mcode-6): switch temp file 0600 from the start
+
+    private func tempFolder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mcpock-nov10-\(UUID().uuidString)").resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        return folder
+    }
+
+    func testNewFileIsMadeWithItsModeAndRefusesAnOldOne() throws {
+        let file = try tempFolder().appendingPathComponent("a.json")
+        try SwitchWriter.writeNew(Data("{\"k\":1}".utf8), to: file, mode: 0o644)
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "{\"k\":1}")
+        let mode = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o644)
+        XCTAssertThrowsError(try SwitchWriter.writeNew(Data("x".utf8), to: file, mode: 0o600))
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "{\"k\":1}", "an existing file is never overwritten")
+    }
+
+    func testLeftoverTempFilesAreRemovedOnlyWhenOld() throws {
+        let folder = try tempFolder()
+        let target = folder.appendingPathComponent("settings.json")
+        let old = folder.appendingPathComponent(".settings.json.mcpock-\(UUID().uuidString)")
+        let fresh = folder.appendingPathComponent(".settings.json.mcpock-\(UUID().uuidString)")
+        let other = folder.appendingPathComponent(".settings.json.mcpock-notauuid")
+        for file in [old, fresh, other] { try Data("x".utf8).write(to: file) }
+        let now = Date()
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: old.path)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: other.path)
+        SwitchWriter.removeLeftovers(of: target, now: now)
+        let fm = FileManager.default
+        XCTAssertFalse(fm.fileExists(atPath: old.path))
+        XCTAssertTrue(fm.fileExists(atPath: fresh.path))
+        XCTAssertTrue(fm.fileExists(atPath: other.path))
+    }
 }
