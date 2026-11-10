@@ -7,17 +7,21 @@ import Foundation
 enum ToolPlanner {
     /// The plan for hiding `hide` and showing `show` in every declaration in
     /// `configs` (one server's, already narrowed to the agents she kept).
-    /// `allTools` is the server's own list from its last check.
+    /// `allTools` is the server's own list from its last check. `ownTools`
+    /// holds each declaration's own list (`ServerConfig.id`) where it was
+    /// checked: Goose writes the tools it may use, and the row's list can be
+    /// another agent's copy with fewer tools (review 10 Nov, fable-2).
     static func plan(
         server: String,
         configs: [ServerConfig],
         hide: [String],
         show: [String],
         allTools: [String],
+        ownTools: [String: [String]] = [:],
         claudeSettingsPath: String,
         read: (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) }
     ) -> SwitchPlan {
-        struct Step { let mechanism: ToolMechanism; let name: String; let agent: String }
+        struct Step { let mechanism: ToolMechanism; let name: String; let agent: String; let tools: [String] }
         var order: [String] = []
         var steps: [String: [Step]] = [:]
         var skipped: [String] = []
@@ -32,7 +36,8 @@ enum ToolPlanner {
             if steps[path] == nil { order.append(path) }
             // Claude Code's rules go by name: two projects with it are one step.
             if steps[path]?.contains(where: { $0.name == config.name }) == true { continue }
-            steps[path, default: []].append(Step(mechanism: mechanism, name: config.name, agent: config.source.label))
+            steps[path, default: []].append(Step(mechanism: mechanism, name: config.name, agent: config.source.label,
+                                                 tools: tools(for: config, mechanism: mechanism, allTools: allTools, ownTools: ownTools)))
         }
 
         let hideSet = Set(hide), showSet = Set(show)
@@ -46,7 +51,7 @@ enum ToolPlanner {
                 var text = before
                 for step in fileSteps {
                     text = try ToolSwitch.edited(text, mechanism: step.mechanism, server: step.name,
-                                                 hide: hideSet, show: showSet, allTools: allTools)
+                                                 hide: hideSet, show: showSet, allTools: step.tools)
                 }
                 guard let after = text, after != before else { continue }
                 changes.append(SwitchChange(
@@ -67,6 +72,14 @@ enum ToolPlanner {
         return SwitchPlan(server: server, turnOn: hide.isEmpty, changes: changes, skipped: hide.isEmpty ? [] : skipped,
                           problems: problems,
                           tools: ToolEdit(hide: hide, show: show))
+    }
+
+    /// The list an agent's edit works from: Goose's own copy when it was
+    /// checked (its setting names every tool it may use), else the row's.
+    static func tools(for config: ServerConfig, mechanism: ToolMechanism, allTools: [String],
+                      ownTools: [String: [String]]) -> [String] {
+        guard mechanism == .goose, let own = ownTools[config.id], !own.isEmpty else { return allTools }
+        return own
     }
 
     /// What happens in the file, in plain words.
@@ -105,6 +118,7 @@ enum ToolPlanner {
     static func hiddenTools(
         configs: [ServerConfig],
         allTools: [String],
+        ownTools: [String: [String]] = [:],
         claudeSettingsPath: String,
         read: (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) }
     ) -> [String: Set<String>] {
@@ -117,7 +131,8 @@ enum ToolPlanner {
             let path = mechanism == .claudeDeny ? claudeSettingsPath : config.source.path
             if cache[path] == nil { cache[path] = .some(read(path)) }
             let text = cache[path] ?? nil
-            if let hidden = ToolSwitch.hidden(in: text, mechanism: mechanism, server: config.name, allTools: allTools) {
+            let list = tools(for: config, mechanism: mechanism, allTools: allTools, ownTools: ownTools)
+            if let hidden = ToolSwitch.hidden(in: text, mechanism: mechanism, server: config.name, allTools: list) {
                 result[config.id] = hidden
             }
         }

@@ -383,7 +383,17 @@ final class HealthMonitor {
         let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
         let configs = servers.map(\.config).filter { ids.contains($0.id) }
         return ToolPlanner.plan(server: groupName, configs: configs, hide: hide, show: show,
-                                allTools: toolNames(groupName: groupName), claudeSettingsPath: claudeSettingsPath)
+                                allTools: toolNames(groupName: groupName), ownTools: ownToolNames(ids),
+                                claudeSettingsPath: claudeSettingsPath)
+    }
+
+    /// Each declaration's own tool names from its last check (empty ones left out).
+    private func ownToolNames(_ ids: Set<String>) -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        for server in servers where ids.contains(server.config.id) && !server.tools.isEmpty {
+            result[server.config.id] = server.tools.map(\.name)
+        }
+        return result
     }
 
     /// Per declaration of the row (`ServerConfig.id`): the tools its agent
@@ -391,7 +401,7 @@ final class HealthMonitor {
     func hiddenTools(groupName: String) -> [String: Set<String>] {
         let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
         let configs = servers.map(\.config).filter { ids.contains($0.id) }
-        return ToolPlanner.hiddenTools(configs: configs, allTools: toolNames(groupName: groupName),
+        return ToolPlanner.hiddenTools(configs: configs, allTools: toolNames(groupName: groupName), ownTools: ownToolNames(ids),
                                        claudeSettingsPath: claudeSettingsPath)
     }
 

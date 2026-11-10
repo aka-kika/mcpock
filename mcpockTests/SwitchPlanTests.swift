@@ -316,6 +316,25 @@ final class SwitchPlanTests: XCTestCase {
                          allTools: orTools, claudeSettingsPath: path(".claude/settings.json"))
     }
 
+    /// fable-2 (review 10 Nov): Goose's copy has a tool the row's list (from
+    /// another agent's copy) lacks. Its allow list is built from its own
+    /// tools, so that extra tool is not hidden with the one she picked.
+    func testGooseUsesItsOwnCopysToolList() throws {
+        try seed()
+        let configs = discover().filter { $0.name == "openrouter" }
+        let goose = try XCTUnwrap(configs.first { $0.source.label == "Goose" })
+        let own = orTools + ["goose_only"]
+        let plan = ToolPlanner.plan(server: "openrouter", configs: [goose], hide: ["delete_key"], show: [],
+                                    allTools: orTools, ownTools: [goose.id: own],
+                                    claudeSettingsPath: path(".claude/settings.json"))
+        let change = try XCTUnwrap(plan.changes.first)
+        XCTAssertTrue(change.after.contains("available_tools: [chat_completion, list_models, goose_only]"), change.after)
+        XCTAssertNil(SwitchWriter.apply(plan, backups: home.appendingPathComponent("backups"), parked: parked).error)
+        let hidden = ToolPlanner.hiddenTools(configs: [goose], allTools: orTools, ownTools: [goose.id: own],
+                                             claudeSettingsPath: path(".claude/settings.json"))
+        XCTAssertEqual(hidden[goose.id], ["delete_key"])
+    }
+
     func testHidingAToolEverywhereWritesEachAgentsOwnSettingAndShowPutsItBack() throws {
         try seed()
         let configs = discover()
