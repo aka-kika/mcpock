@@ -38,8 +38,10 @@ change first and keeps a backup.
   **Hide all** button.
 - **Every agent, untick to keep:** the sheet lists each agent that has the
   server; untick one to leave it alone. A backup is saved before every change.
+- **1.15.1:** one "All" switch above the agents' switches on the card, easier
+  to read in light mode, and fixes (a slow server can no longer stop the checks).
 
-Full notes: [1.15.0](docs/release-notes/1.15.0.md). Earlier: [1.14.0](docs/release-notes/1.14.0.md) (the server switch), [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md).
+Full notes: [1.15.1](docs/release-notes/1.15.1.md), [1.15.0](docs/release-notes/1.15.0.md). Earlier: [1.14.0](docs/release-notes/1.14.0.md) (the server switch), [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md).
 
 ## What it does
 
