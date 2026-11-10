@@ -116,10 +116,14 @@ enum PanelText {
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
-            signIn = groups.filter(\.needsSignIn).count
-            notChecked = groups.filter(\.notCheckedHere).count
-            incomplete = groups.filter(\.incompleteConfig).count
-            slow = groups.filter { $0.state == .degraded }.count - signIn - notChecked - incomplete
+            // One word per row, in the status file's order (sign-in, not
+            // checked, bad config, slow): a row whose copies have two of
+            // these reasons was counted twice and took one off slow (ds-3).
+            let degraded = groups.filter { $0.state == .degraded }
+            signIn = degraded.filter(\.needsSignIn).count
+            notChecked = degraded.filter { !$0.needsSignIn && $0.notCheckedHere }.count
+            incomplete = degraded.filter { !$0.needsSignIn && !$0.notCheckedHere && $0.incompleteConfig }.count
+            slow = degraded.count - signIn - notChecked - incomplete
             needsApp = groups.filter { $0.state == .needsApp }.count
             differs = groups.filter { $0.state == .healthy && $0.differsNeedsAttention }.count
             checking = groups.filter { $0.state == .unknown }.count

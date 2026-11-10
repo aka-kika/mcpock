@@ -48,6 +48,22 @@ final class PanelTextTests: XCTestCase {
         XCTAssertEqual(PanelText.summary(groups), "2 servers \u{00B7} 2 need sign-in")
     }
 
+    /// ds-3 (review 10 Nov): one row whose copies have two reasons (one
+    /// needs a sign-in, the other is signed in by its agent) is one row:
+    /// "need sign-in", never also "not checked", and slow keeps its count.
+    func testARowWithTwoReasonsIsCountedOnce() {
+        let issues = [
+            ServerIssue(label: "Code", reason: "Needs authentication (HTTP 401)", command: "x"),
+            ServerIssue(label: "Cursor", reason: HealthMonitor.agentSignInPrefix + " (HTTP 401)", command: "x"),
+        ]
+        let both = ServerGroup(name: "a", state: .degraded, sourceLabels: ["Code", "Cursor"], tools: [], issues: issues,
+                               variantCount: 2, differs: [], lastChecked: nil)
+        XCTAssertTrue(both.needsSignIn)
+        XCTAssertTrue(both.notCheckedHere)
+        let slow = group("b", .degraded, reason: "Timed out after 10s")
+        XCTAssertEqual(PanelText.summary([both, slow]), "2 servers \u{00B7} 1 slow \u{00B7} 1 needs sign-in")
+    }
+
     /// r3 6eef / b964: a Not checked row (a ${VAR} to fill) is named in the
     /// footer, never "all fine", but stays calm: out of Needs you, no ring.
     func testNotCheckedIsNamedButCalm() {
