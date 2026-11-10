@@ -3,56 +3,8 @@
     {
       "layers": [
         {
-          "image-name": "layer-0.svg",
-          "name": "layer-0",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "image-name": "layer-1.svg",
-          "name": "layer-1",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "image-name": "layer-2.svg",
-          "name": "layer-2",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "image-name": "layer-3.svg",
-          "name": "layer-3",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "image-name": "layer-4.svg",
-          "name": "layer-4",
+          "image-name": "pocket.png",
+          "name": "pocket",
           "glass": true,
           "position": {
             "scale": 1,
@@ -63,13 +15,83 @@
           }
         }
       ],
-      "name": "Foreground",
+      "name": "Pocket",
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "blur-material": null,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "light.png",
+          "name": "light",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "image-name": "plugs.png",
+          "name": "plugs",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "name": "Plugs",
       "specular": true,
       "shadow": {
         "kind": "neutral",
         "opacity": 0.35
       },
-      "blur-material": null
+      "blur-material": null,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "tile.png",
+          "name": "tile",
+          "glass": false,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "name": "Tile",
+      "specular": false,
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "blur-material": null,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
     }
   ],
   "supported-platforms": {
@@ -82,27 +104,8 @@
     {
       "value": {
         "linear-gradient": [
-          "srgb:0.24706,0.43529,0.84706,1.00000",
-          "srgb:0.49412,0.65882,0.96078,1.00000"
-        ],
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 1
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 0
-          }
-        }
-      }
-    },
-    {
-      "appearance": "dark",
-      "value": {
-        "linear-gradient": [
-          "srgb:0.08627,0.13725,0.24706,1.00000",
-          "srgb:0.18039,0.29020,0.50980,1.00000"
+          "srgb:0.49804,0.60784,0.86667,1.00000",
+          "srgb:0.56078,0.66275,0.90196,1.00000"
         ],
         "orientation": {
           "start": {
