@@ -251,6 +251,52 @@ enum CardText {
 
     /// "Used by · 3 agents": distinct agents, not declarations (two Claude Code
     /// projects are one agent).
+    // MARK: The server switch (1.14)
+
+    struct EverywhereSwitch: Equatable {
+        let title: String
+        let help: String
+        let turnOn: Bool
+    }
+
+    /// The button beside "Used by": "Turn off everywhere" while any agent
+    /// with a switch has it on, "Turn on everywhere" when all of them are
+    /// off. Nil with fewer than two such agents (the row's own switch does it).
+    static func everywhereSwitch(for group: ServerGroup) -> EverywhereSwitch? {
+        let switchable = group.sources.filter(\.canSwitch)
+        guard switchable.count > 1 else { return nil }
+        if switchable.contains(where: { !$0.isOff }) {
+            return EverywhereSwitch(title: "Turn off everywhere", help: "Turn it off in every agent that has a switch", turnOn: false)
+        }
+        return EverywhereSwitch(title: "Turn on everywhere", help: "Turn it back on in every agent", turnOn: true)
+    }
+
+    /// Under an agent's name in "Used by", in place of the file path: what
+    /// the last flip said ("Off after Cursor reopens"), else "Turned off";
+    /// nil for a row that is on and untouched.
+    static func switchLine(isOff: Bool, note: String?) -> String? {
+        if let note { return note }
+        return isOff ? "Turned off" : nil
+    }
+
+    /// The sheet's small print: agents with no switch, files left alone.
+    static func switchNotes(for plan: SwitchPlan) -> [String] {
+        var lines = plan.problems
+        if !plan.skipped.isEmpty {
+            let agents = list(plan.skipped)
+            lines.append("No switch for \(agents) yet: turn it \(plan.turnOn ? "on" : "off") there by hand.")
+        }
+        if plan.isEmpty, lines.isEmpty {
+            lines.append("It is already \(plan.turnOn ? "on" : "off") there.")
+        }
+        return lines
+    }
+
+    /// "Claude Code" back to the label its badge is stored under ("Code").
+    static func agentLabel(forDisplay name: String) -> String {
+        AgentBadge.displayNames.first { $0.value == name }?.key ?? name
+    }
+
     static func usedByTitle(for group: ServerGroup) -> String {
         let count = group.agents.count
         return "Used by \u{00B7} \(count) agent\(count == 1 ? "" : "s")"

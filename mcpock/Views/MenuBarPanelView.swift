@@ -209,13 +209,23 @@ struct MenuBarPanelView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(sections) { section in
-                            SectionHeader(title: section.title, count: section.count, theme: theme)
-                                .padding(.horizontal, 8)
-                                .padding(.top, 12)
-                                .padding(.bottom, 4)
-                            ForEach(section.groups) { group in
-                                row(group)
-                                    .id(Self.rowID(section: section.kind, name: group.name))
+                            if section.kind == .turnedOff {
+                                // 1.14: servers switched off everywhere wait
+                                // behind one line (Kika's pick).
+                                TurnedOffFold(count: section.count, isOpen: panel.turnedOffIsOpen, theme: theme) {
+                                    panel.showsTurnedOff.toggle()
+                                }
+                            } else {
+                                SectionHeader(title: section.title, count: section.count, theme: theme)
+                                    .padding(.horizontal, 8)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 4)
+                            }
+                            if section.kind != .turnedOff || panel.turnedOffIsOpen {
+                                ForEach(section.groups) { group in
+                                    row(group)
+                                        .id(Self.rowID(section: section.kind, name: group.name))
+                                }
                             }
                         }
                     }
@@ -486,5 +496,44 @@ struct MenuBarPanelView: View {
             hiddenCount: hidden,
             now: now
         )
+    }
+}
+
+/// "Turned off · 2" with a chevron: the last line of the server list. A click
+/// opens the servers switched off in every agent that has them (1.14).
+struct TurnedOffFold: View {
+    let count: Int
+    let isOpen: Bool
+    let theme: ThemeColors
+    let toggle: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack {
+                Text("Turned off \u{00B7} \(count)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.textSecondary)
+                Spacer()
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.textTertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(isHovered ? theme.rowHighlight : .clear)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .padding(.top, 8)
+        .overlay(alignment: .top) {
+            Rectangle().fill(theme.divider).frame(height: 1).padding(.top, 4)
+        }
+        .help(isOpen ? "Hide the servers that are turned off" : "Show the servers that are turned off")
+        .accessibilityLabel("Turned off, \(count) server\(count == 1 ? "" : "s")")
+        .accessibilityValue(isOpen ? "open" : "closed")
     }
 }

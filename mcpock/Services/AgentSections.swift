@@ -53,7 +53,9 @@ struct AgentSection: Identifiable, Hashable, Sendable {
     /// Waiting for a closed app, or not checked for a `${VAR}`: calm, but not
     /// "answers normally" either.
     var waitingCount: Int { servers.filter { $0.state == .needsApp || ($0.mark == .needsApp && !$0.needsYou) }.count }
-    var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount - waitingCount }
+    /// Switched off in this agent (1.14): her choice, not checked, never "fine".
+    var offCount: Int { servers.filter { $0.state == .off }.count }
+    var fineCount: Int { servers.count - problems.count - checkingCount - pausedCount - waitingCount - offCount }
     /// An installed agent with no servers (1.12.1, Grok Bot): the line that
     /// stands in for them. nil while it has any.
     var emptyLine: String? {
@@ -272,6 +274,7 @@ enum AgentSections {
             // Not "All fine" beside a server mcpock isn't checking (review 2026-10-30, a965).
             if section.pausedCount > 0 { return "\(section.pausedCount) paused" }
             if section.waitingCount > 0 { return "\(section.waitingCount) waiting" }
+            if section.offCount > 0 { return section.fineCount == 0 ? "All off" : "\(section.offCount) off" }
             return "All fine"
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
@@ -330,6 +333,7 @@ enum AgentSections {
         let paused = section.pausedCount
         let waiting = section.waitingCount
         let pausedPart = (paused > 0 ? ", \(paused) paused" : "") + (waiting > 0 ? ", \(waiting) waiting" : "")
+            + (section.offCount > 0 ? ", \(section.offCount) off" : "")
         if checking > 0 {
             let more = section.problems.isEmpty ? "" : "\(rest + checking + paused + waiting) more, "
             return more + "\(checking) not checked yet" + pausedPart
@@ -347,7 +351,10 @@ enum AgentSections {
             if rest == 0, paused > 0 {
                 return paused == 1 ? "Its only server is paused" : "All \(paused) servers are paused"
             }
-            if paused + waiting > 0 { return "\(rest) \(rest == 1 ? "answers" : "answer") normally" + pausedPart }
+            if rest == 0, section.offCount > 0, paused + waiting == 0 {
+                return section.offCount == 1 ? "Its only server is turned off" : "All \(section.offCount) servers are turned off"
+            }
+            if paused + waiting + section.offCount > 0 { return "\(rest) \(rest == 1 ? "answers" : "answer") normally" + pausedPart }
             return rest == 1 ? "Its only server answers normally" : "All \(rest) servers answer normally"
         }
         if rest == 0 {

@@ -312,6 +312,41 @@ final class HealthMonitor {
         }
     }
 
+    // MARK: - The server switch (1.14)
+
+    /// False in demo mode: its rows are made up, and nothing may be written.
+    @ObservationIgnored var switchesEnabled = true
+    /// Claude Code's user settings, where its blocked list lives.
+    @ObservationIgnored var claudeSettingsPath = ServerSwitch.claudeSettingsPath(
+        claudeJSON: (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json"))
+    /// Where a config is copied before it is changed. Replaced in tests.
+    @ObservationIgnored var switchBackups = SwitchWriter.backupDirectory
+
+    /// What turning a row on or off would change: read, nothing written.
+    /// `configIDs` nil is every declaration of the row ("everywhere").
+    func switchPlan(groupName: String, configIDs: Set<String>? = nil, turnOn: Bool) -> SwitchPlan {
+        let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
+        let configs = servers.map(\.config).filter { ids.contains($0.id) }
+        return SwitchPlanner.plan(server: groupName, configs: configs, turnOn: turnOn,
+                                  claudeSettingsPath: claudeSettingsPath, running: SwitchPlanner.isRunning)
+    }
+
+    /// Writes a plan she confirmed, then reads the configs again; a server
+    /// turned on is checked at once. The only write to another app's file.
+    func applySwitch(_ plan: SwitchPlan) async -> SwitchWriter.Outcome {
+        guard switchesEnabled else { return SwitchWriter.Outcome(error: .failed("")) }
+        let backups = switchBackups
+        let outcome = await Task.detached(priority: .userInitiated) {
+            SwitchWriter.apply(plan, backups: backups)
+        }.value
+        if plan.turnOn, !outcome.written.isEmpty {
+            await refresh(groupName: plan.server)
+        } else {
+            await reloadConfigs(fullScan: false)
+        }
+        return outcome
+    }
+
     /// True when the row is set up differently and she marked it as intended
     /// (and the setups still match what she acknowledged).
     func isDifferentOnPurpose(_ name: String) -> Bool {
@@ -992,7 +1027,9 @@ final class HealthMonitor {
                     state: v.state,
                     failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) },
                     compareKey: Differs.launchTarget(v.config).parts.joined(separator: "\u{1F}"),
-                    awaitingFileOK: v.awaitingFileOK
+                    awaitingFileOK: v.awaitingFileOK,
+                    canSwitch: ServerSwitch.mechanism(agent: v.config.source.label, configID: v.config.id,
+                                                      builtin: v.config.builtin) != nil
                 )
             }
             // A switched-off declaration is not compared: nothing starts it.

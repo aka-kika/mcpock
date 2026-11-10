@@ -235,6 +235,10 @@ struct GroupSource: Sendable, Hashable, Identifiable {
     var compareKey: String = ""
     /// From a file only the scan found, waiting for her OK (`ServerSnapshot`).
     var awaitingFileOK = false
+    /// mcpock has a way to turn this declaration on or off (`ServerSwitch`).
+    var canSwitch = false
+
+    var isOff: Bool { state == .off }
 }
 
 /// A server an open Claude Code session lost (inbox 2026-10-17): mcpock's own

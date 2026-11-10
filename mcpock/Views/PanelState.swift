@@ -66,6 +66,7 @@ final class PanelState {
             guard selectedName != oldValue else { return }
             if selectedName != nil { selectedAgent = nil }
             isComparing = false
+            cancelSwitch()
             // A server the arrow keys landed on but the fold is hiding: unfold
             // its agent so the row (and the scroll that follows) has something
             // to land on. A click can only ever hit a row already on screen,
@@ -82,6 +83,23 @@ final class PanelState {
     var isCardOpen = false
     /// The card is showing Compare ("Compare setups") instead of its details.
     var isComparing = false
+    /// The card is showing what a flip of the switch would change (1.14).
+    /// Nothing is written while it shows; Turn Off / Turn On writes it.
+    private(set) var pendingSwitch: SwitchPlan?
+    /// The declarations that sheet is about; nil is every one of the row's.
+    private var pendingSwitchIDs: Set<String>?
+    /// "Show the exact change in each file" is open on that sheet.
+    var switchShowsChange = false
+    /// Why the last write stopped, shown on the sheet.
+    private(set) var switchError: String?
+    private(set) var isApplyingSwitch = false
+    /// "Off after Cursor reopens": what each flip said about when it counts,
+    /// by declaration id, until mcpock quits.
+    private(set) var switchNotes: [String: String] = [:]
+    /// The Turned off fold at the end of the server list is open.
+    var showsTurnedOff = false {
+        didSet { if showsTurnedOff != oldValue { dropRowsNoLongerListed() } }
+    }
     /// Bumped whenever the search opens (magnifier, ⌘F); the panel focuses its
     /// search field when it changes.
     var searchFocusRequest = 0
@@ -254,7 +272,7 @@ final class PanelState {
     var orderedNames: [String] {
         switch tab {
         case .servers:
-            return sections.flatMap { $0.groups.map(\.name) }
+            return sections.filter { $0.kind != .turnedOff || turnedOffIsOpen }.flatMap { $0.groups.map(\.name) }
         case .agents:
             let agents = agentSections
             return Self.agentServerNames(in: agents, open: openAgent(in: agents))
@@ -278,6 +296,12 @@ final class PanelState {
     /// The servers the open agent lists, in order. Pure.
     nonisolated static func agentServerNames(in sections: [AgentSection], open: String?) -> [String] {
         sections.first { $0.agent == open }?.listed.map(\.name) ?? []
+    }
+
+    /// The fold is open when she opened it, or while a search is on (a match
+    /// in it must be seen).
+    var turnedOffIsOpen: Bool {
+        showsTurnedOff || !query.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var selectedGroup: ServerGroup? {
@@ -493,6 +517,7 @@ final class PanelState {
     func closeCard() {
         isCardOpen = false
         isComparing = false
+        cancelSwitch()
         card.hide()
     }
 
@@ -641,6 +666,57 @@ final class PanelState {
         checkAgain(name)
     }
 
+    // MARK: - The server switch (1.14)
+
+    /// A switch on the card was flipped: show what it would change. `source`
+    /// nil is the row's "everywhere" button. Nothing is written here.
+    func askSwitch(_ name: String, source: GroupSource? = nil, turnOn: Bool) {
+        guard monitor.switchesEnabled else { return }
+        isComparing = false
+        switchError = nil
+        switchShowsChange = false
+        pendingSwitchIDs = source.map { [$0.configID] }
+        pendingSwitch = monitor.switchPlan(groupName: name, configIDs: pendingSwitchIDs, turnOn: turnOn)
+    }
+
+    func cancelSwitch() {
+        guard !isApplyingSwitch else { return }
+        pendingSwitch = nil
+        switchError = nil
+    }
+
+    /// She pressed Turn Off / Turn On on the sheet.
+    func confirmSwitch() {
+        guard let plan = pendingSwitch, !plan.isEmpty, !isApplyingSwitch else { return }
+        isApplyingSwitch = true
+        Task {
+            let outcome = await monitor.applySwitch(plan)
+            isApplyingSwitch = false
+            let whenByPath = Dictionary(plan.changes.map { ($0.path, $0.when) }, uniquingKeysWith: { first, _ in first })
+            for source in monitor.groups.first(where: { $0.name == plan.server })?.sources ?? [] {
+                let path = source.agent == AgentRegistry.claudeCodeLabel ? monitor.claudeSettingsPath : source.path
+                if outcome.written.contains(path), let when = whenByPath[path] { switchNotes[source.configID] = when }
+            }
+            if let error = outcome.error {
+                switchError = Self.switchErrorText(error, plan: plan)
+                // What was written is done; the sheet now shows what is left.
+                pendingSwitch = monitor.switchPlan(groupName: plan.server, configIDs: pendingSwitchIDs, turnOn: plan.turnOn)
+            } else {
+                pendingSwitch = nil
+            }
+        }
+    }
+
+    nonisolated static func switchErrorText(_ error: SwitchWriter.WriteError, plan: SwitchPlan) -> String {
+        let agent: (String) -> String = { path in plan.changes.first { $0.path == path }?.agents.first ?? "A" }
+        switch error {
+        case .fileChanged(let path):
+            return "\(agent(path))'s file changed while this was open, so it was not written. Look again and confirm."
+        case .failed(let path):
+            return "\(agent(path))'s file could not be written. Nothing in it changed."
+        }
+    }
+
     /// Re-probe one row, with the card's button spinning until it's done.
     func checkAgain(_ name: String) {
         guard !checkingNames.contains(name) else { return }
@@ -732,6 +808,10 @@ final class PanelState {
     /// Glass panel only) the panel itself. False lets it travel on, so the
     /// MenuBarExtra window closes itself. Not private: the tests drive it.
     func handleEscape() -> Bool {
+        if pendingSwitch != nil {
+            cancelSwitch()
+            return true
+        }
         if isComparing {
             isComparing = false
             return true

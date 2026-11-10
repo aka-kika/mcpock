@@ -57,6 +57,7 @@ struct MCPockApp: App {
         let monitor = HealthMonitor(defaults: monitorDefaults)
         if isDemo {
             monitor.discover = { DemoData.configs }
+            monitor.switchesEnabled = false
             monitor.probe = { config, _ in DemoData.probeResult(for: config) }
         }
         // Timer rounds re-read only the files already found; the home-folder

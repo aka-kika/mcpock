@@ -51,7 +51,10 @@ struct DetailCardView: View {
     var body: some View {
         ScrollView(.vertical) {
             Group {
-                if state.isComparing {
+                if let plan = state.pendingSwitch {
+                    SwitchSheet(plan: plan, state: state, theme: theme)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else if state.isComparing {
                     compareSetups
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 } else {
@@ -65,6 +68,7 @@ struct DetailCardView: View {
         }
         .panelScrollIndicators()
         .animation(.easeInOut(duration: 0.16), value: state.isComparing)
+        .animation(.easeInOut(duration: 0.16), value: state.pendingSwitch != nil)
     }
 
     // MARK: - Details
@@ -306,8 +310,16 @@ struct DetailCardView: View {
 
     private var usedBy: some View {
         VStack(alignment: .leading, spacing: 4) {
-            SectionHeader(title: CardText.usedByTitle(for: group), count: nil, theme: theme)
-                .padding(.bottom, 2)
+            HStack(spacing: 8) {
+                SectionHeader(title: CardText.usedByTitle(for: group), count: nil, theme: theme)
+                // 1.14: one button for every agent that has a switch.
+                if state.monitor.switchesEnabled, let everywhere = CardText.everywhereSwitch(for: group) {
+                    CardButton(title: everywhere.title, help: everywhere.help, theme: theme) {
+                        state.askSwitch(group.name, turnOn: everywhere.turnOn)
+                    }
+                }
+            }
+            .padding(.bottom, 2)
             let shown = CardText.usedByRows(for: group, expanded: showsAllSources)
             ForEach(shown.rows) { source in
                 usedByRow(source)
@@ -349,7 +361,10 @@ struct DetailCardView: View {
         UsedByRow(
             source: source,
             differs: group.differs.contains { $0.label == source.label },
-            theme: theme
+            theme: theme,
+            note: state.switchNotes[source.configID],
+            flip: source.canSwitch && state.monitor.switchesEnabled
+                ? { state.askSwitch(group.name, source: source, turnOn: source.isOff) } : nil
         )
     }
 
@@ -396,7 +411,7 @@ struct DetailCardView: View {
                     if group.isPausedByUser {
                         iconButton(.resume) { state.togglePause(group.name) }
                     }
-                } else {
+                } else if group.state != .off {
                     // Labeled: the key fix action was an unlabeled arrow (r3 50f1).
                     iconButton(.checkAgain, spinning: state.isChecking(group.name), labeled: true) {
                         state.checkAgain(group.name)
@@ -722,6 +737,11 @@ private struct UsedByRow: View {
     let source: GroupSource
     let differs: Bool
     let theme: ThemeColors
+    /// "Off after Cursor reopens": what the last flip said, this session.
+    var note: String? = nil
+    /// Flips this agent's switch (opens the sheet); nil when mcpock has no
+    /// way to switch it there.
+    var flip: (() -> Void)? = nil
     @State private var isHovered = false
 
     var body: some View {
@@ -732,7 +752,12 @@ private struct UsedByRow: View {
                     .font(.system(size: 12.5))
                     .foregroundStyle(theme.textPrimary)
                     .lineLimit(1)
-                if !source.path.isEmpty {
+                if let line = CardText.switchLine(isOff: source.isOff, note: note) {
+                    Text(line)
+                        .font(.system(size: 11))
+                        .foregroundStyle(note == nil ? theme.textTertiary : theme.statusDegraded)
+                        .lineLimit(1)
+                } else if !source.path.isEmpty {
                     Text(CardText.shortPath(source.path))
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(theme.textTertiary)
@@ -741,6 +766,12 @@ private struct UsedByRow: View {
                 }
             }
             Spacer(minLength: 4)
+            if let flip {
+                MiniSwitch(isOn: !source.isOff, theme: theme, action: flip)
+                    .help(source.isOff ? "Turn on in \(AgentBadge.displayLabel(source.label))"
+                        : "Turn off in \(AgentBadge.displayLabel(source.label))")
+                    .accessibilityLabel("\(AgentBadge.displayLabel(source.label)) switch")
+            }
             if differs {
                 Text("differs")
                     .font(.system(size: 10.5, weight: .semibold))
@@ -767,6 +798,136 @@ private struct UsedByRow: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isButton)
                 .configPathAccessibilityActions(source.path)
+        }
+    }
+}
+
+/// The small on/off switch beside an agent under "Used by" (1.14). A click
+/// never writes: it opens the sheet that says what would change.
+struct MiniSwitch: View {
+    let isOn: Bool
+    let theme: ThemeColors
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Capsule()
+                .fill(isOn ? theme.statusHealthy : theme.selectedFill)
+                .frame(width: 28, height: 16)
+                .overlay(alignment: isOn ? .trailing : .leading) {
+                    Circle()
+                        .fill(Color.white.opacity(isOn ? 1 : 0.75))
+                        .frame(width: 12, height: 12)
+                        .padding(2)
+                }
+                .overlay { Capsule().strokeBorder(theme.controlStroke, lineWidth: isOn ? 0 : 1) }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(isOn ? "on" : "off")
+    }
+}
+
+/// What a flip of the switch would do, in place of the card's details (a real
+/// sheet would take key and close the panel): each agent in plain words, when
+/// it counts, the exact change one click away. Nothing is written until the
+/// Turn Off / Turn On button (Kika's pick, 2026-11-10).
+struct SwitchSheet: View {
+    let plan: SwitchPlan
+    @Bindable var state: PanelState
+    let theme: ThemeColors
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(plan.isEmpty ? "Nothing to change" : plan.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !plan.isEmpty {
+                Text(SwitchPlan.reassurance)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(plan.changes) { change in
+                Rectangle().fill(theme.divider).frame(height: 1)
+                changeRow(change)
+            }
+            if !plan.isEmpty {
+                Rectangle().fill(theme.divider).frame(height: 1)
+                ShowMoreRow(
+                    title: state.switchShowsChange ? "Hide the exact change" : "Show the exact change in each file",
+                    expanded: state.switchShowsChange,
+                    help: "The lines that change, keys hidden",
+                    theme: theme
+                ) { state.switchShowsChange.toggle() }
+            }
+            ForEach(CardText.switchNotes(for: plan), id: \.self) { line in
+                Text(line)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let error = state.switchError {
+                Text(error)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.statusBroken)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !plan.isEmpty {
+                Text(SwitchPlan.backupLine)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.textTertiary)
+            }
+            HStack(spacing: 6) {
+                CardButton(title: plan.isEmpty ? "Close" : "Cancel", fillsWidth: true, theme: theme) { state.cancelSwitch() }
+                if !plan.isEmpty {
+                    CardButton(title: plan.turnOn ? "Turn On" : "Turn Off", fillsWidth: true, theme: theme) {
+                        state.confirmSwitch()
+                    }
+                    .disabled(state.isApplyingSwitch)
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func changeRow(_ change: SwitchChange) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            AgentBadgeView(badge: AgentBadge.forLabel(CardText.agentLabel(forDisplay: change.agents.first ?? "")),
+                           theme: theme, size: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(change.agents.joined(separator: ", "))
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(theme.textPrimary)
+                Text(change.what)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(change.when)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.statusDegraded)
+                    .fixedSize(horizontal: false, vertical: true)
+                if state.switchShowsChange {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(CardText.shortPath(change.path))
+                            .foregroundStyle(theme.textTertiary)
+                        ForEach(Array(change.diff.enumerated()), id: \.offset) { _, line in
+                            Text(line)
+                                .foregroundStyle(line.hasPrefix("+") ? theme.statusHealthy
+                                    : line.hasPrefix("-") ? theme.statusBroken : theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background { RoundedRectangle(cornerRadius: 6, style: .continuous).fill(theme.fieldFill) }
+                    .padding(.top, 4)
+                }
+            }
+            Spacer(minLength: 0)
         }
     }
 }
