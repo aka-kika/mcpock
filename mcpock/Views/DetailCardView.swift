@@ -47,6 +47,12 @@ struct DetailCardView: View {
     @State private var showsAllSources = false
     /// "+N more" under the tools was clicked: list every tool (1.5.3).
     @State private var showsAllTools = false
+    @State private var contentHeight: CGFloat = 0
+
+    /// The card is as tall as its content, plus the sheet's pinned buttons.
+    private func reportHeight() {
+        onHeight(contentHeight + (state.pendingSwitch == nil ? 0 : SwitchSheetButtons.height))
+    }
 
     var body: some View {
         ScrollView(.vertical) {
@@ -64,9 +70,18 @@ struct DetailCardView: View {
             }
             .padding(16)
             .frame(width: DetailCardPresenter.width, alignment: .leading)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeight($0) }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .panelScrollIndicators()
+        // The sheet's buttons stay in view however many agents it lists
+        // (seen in the VM: with six, Turn Off was below the fold).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let plan = state.pendingSwitch {
+                SwitchSheetButtons(plan: plan, state: state, theme: theme)
+            }
+        }
+        .onChange(of: contentHeight) { _, _ in reportHeight() }
+        .onChange(of: state.pendingSwitch != nil) { _, _ in reportHeight() }
         .animation(.easeInOut(duration: 0.16), value: state.isComparing)
         .animation(.easeInOut(duration: 0.16), value: state.pendingSwitch != nil)
     }
@@ -880,16 +895,6 @@ struct SwitchSheet: View {
                     .font(Theme.caption)
                     .foregroundStyle(theme.textTertiary)
             }
-            HStack(spacing: 6) {
-                CardButton(title: plan.isEmpty ? "Close" : "Cancel", fillsWidth: true, theme: theme) { state.cancelSwitch() }
-                if !plan.isEmpty {
-                    CardButton(title: plan.turnOn ? "Turn On" : "Turn Off", fillsWidth: true, theme: theme) {
-                        state.confirmSwitch()
-                    }
-                    .disabled(state.isApplyingSwitch)
-                }
-            }
-            .padding(.top, 2)
         }
     }
 
@@ -929,5 +934,34 @@ struct SwitchSheet: View {
             }
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// Cancel and Turn Off / Turn On, pinned under the sheet so they never
+/// scroll out of view.
+struct SwitchSheetButtons: View {
+    let plan: SwitchPlan
+    @Bindable var state: PanelState
+    let theme: ThemeColors
+
+    static let height: CGFloat = 47
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(theme.divider).frame(height: 1)
+            HStack(spacing: 6) {
+                CardButton(title: plan.isEmpty ? "Close" : "Cancel", fillsWidth: true, theme: theme) { state.cancelSwitch() }
+                if !plan.isEmpty {
+                    CardButton(title: plan.turnOn ? "Turn On" : "Turn Off", fillsWidth: true, theme: theme) {
+                        state.confirmSwitch()
+                    }
+                    .disabled(state.isApplyingSwitch)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+        }
+        .frame(width: DetailCardPresenter.width, height: Self.height)
+        .background(theme.background)
     }
 }

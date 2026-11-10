@@ -55,7 +55,9 @@ enum ShortReason {
         guard !group.isOffEverywhere else { return nil }
         var agents: [String] = []
         for label in group.offLabels.map(AgentBadge.displayLabel) where !agents.contains(label) { agents.append(label) }
-        return agents.isEmpty ? nil : clip("Off in \(CardText.list(agents))")
+        if agents.isEmpty { return nil }
+        // Seen in the VM: seven names ran off the row.
+        return agents.count > 2 ? "Off in \(agents.count) agents" : clip("Off in \(CardText.list(agents))")
     }
 
     /// Map one `failureReason` to a short line. `state` only changes the wording of

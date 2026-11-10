@@ -61,6 +61,9 @@ final class SwitchPanelTests: XCTestCase {
         XCTAssertEqual(stripe.state, .healthy)
         XCTAssertEqual(ShortReason.line(for: stripe), "Off in Cursor")
         XCTAssertFalse(PanelSections.needsYou(stripe))
+        let many = groups([config("m", "Code", off: true), config("m", "Codex", off: true), config("m", "Cursor", off: true),
+                           config("m", "Goose")])[0]
+        XCTAssertEqual(ShortReason.line(for: many), "Off in 3 agents")
         XCTAssertNil(ShortReason.line(for: all.first { $0.name == "linear" }!))
 
         XCTAssertEqual(PanelText.compactSummary(all), "4 servers \u{00B7} 2 off")
