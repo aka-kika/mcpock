@@ -96,6 +96,10 @@ final class PanelState {
     /// "Off after Cursor reopens": what each flip said about when it counts,
     /// by declaration id, until mcpock quits.
     private(set) var switchNotes: [String: String] = [:]
+    /// The open card's server: tools hidden per declaration id, read from
+    /// the agents' files when the card opens and after each write (Part 2).
+    private(set) var hiddenTools: [String: Set<String>] = [:]
+    private var hiddenToolsGroup: String?
     /// The Turned off fold at the end of the server list is open.
     var showsTurnedOff = false {
         didSet { if showsTurnedOff != oldValue { dropRowsNoLongerListed() } }
@@ -679,6 +683,34 @@ final class PanelState {
         pendingSwitch = monitor.switchPlan(groupName: name, configIDs: pendingSwitchIDs, turnOn: turnOn)
     }
 
+    /// A tool switch on the card was flipped, or "Hide all" pressed: show
+    /// what it would change. Nothing is written here.
+    func askToolSwitch(_ name: String, hide: [String] = [], show: [String] = [], configIDs: Set<String>? = nil) {
+        guard monitor.switchesEnabled, !(hide.isEmpty && show.isEmpty) else { return }
+        isComparing = false
+        switchError = nil
+        switchShowsChange = false
+        pendingSwitchIDs = configIDs
+        pendingSwitch = monitor.toolPlan(groupName: name, configIDs: configIDs, hide: hide, show: show)
+    }
+
+    /// Reads which tools each agent hides for `name` (the card opened, or a
+    /// write landed).
+    func loadHiddenTools(for name: String) {
+        hiddenToolsGroup = name
+        hiddenTools = monitor.hiddenTools(groupName: name)
+    }
+
+    /// The tools hidden in every agent that can hide them, and those hidden
+    /// in only some (by tool name), for the open card's server.
+    func hiddenToolSummary(for name: String) -> (everywhere: Set<String>, some: [String: Int], agents: Int) {
+        guard hiddenToolsGroup == name, !hiddenTools.isEmpty else { return ([], [:], hiddenTools.count) }
+        var counts: [String: Int] = [:]
+        for set in hiddenTools.values { for tool in set { counts[tool, default: 0] += 1 } }
+        let all = Set(counts.filter { $0.value == hiddenTools.count }.keys)
+        return (all, counts.filter { $0.value < hiddenTools.count }, hiddenTools.count)
+    }
+
     func cancelSwitch() {
         guard !isApplyingSwitch else { return }
         pendingSwitch = nil
@@ -697,10 +729,16 @@ final class PanelState {
                 let path = source.agent == AgentRegistry.claudeCodeLabel ? monitor.claudeSettingsPath : source.path
                 if outcome.written.contains(path), let when = whenByPath[path] { switchNotes[source.configID] = when }
             }
+            if plan.tools != nil { loadHiddenTools(for: plan.server) }
             if let error = outcome.error {
                 switchError = Self.switchErrorText(error, plan: plan)
                 // What was written is done; the sheet now shows what is left.
-                pendingSwitch = monitor.switchPlan(groupName: plan.server, configIDs: pendingSwitchIDs, turnOn: plan.turnOn)
+                if let tools = plan.tools {
+                    pendingSwitch = monitor.toolPlan(groupName: plan.server, configIDs: pendingSwitchIDs,
+                                                     hide: tools.hide, show: tools.show)
+                } else {
+                    pendingSwitch = monitor.switchPlan(groupName: plan.server, configIDs: pendingSwitchIDs, turnOn: plan.turnOn)
+                }
             } else {
                 pendingSwitch = nil
             }

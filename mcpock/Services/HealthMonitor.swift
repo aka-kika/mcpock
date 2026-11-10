@@ -342,12 +342,37 @@ final class HealthMonitor {
         let outcome = await Task.detached(priority: .userInitiated) {
             SwitchWriter.apply(plan, backups: backups, parked: parked)
         }.value
-        if plan.turnOn, !outcome.written.isEmpty {
+        if plan.tools == nil, plan.turnOn, !outcome.written.isEmpty {
             await refresh(groupName: plan.server)
         } else {
             await reloadConfigs(fullScan: false)
         }
         return outcome
+    }
+
+    // MARK: - Hiding single tools (Part 2, 2026-11-10)
+
+    /// The server's tool names from its last check, in its own order.
+    func toolNames(groupName: String) -> [String] {
+        groups.first { Self.normalizedName($0.name) == Self.normalizedName(groupName) }?.tools.map(\.name) ?? []
+    }
+
+    /// What hiding or showing tools would change: read, nothing written.
+    /// `configIDs` nil is every declaration of the row.
+    func toolPlan(groupName: String, configIDs: Set<String>? = nil, hide: [String], show: [String]) -> SwitchPlan {
+        let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
+        let configs = servers.map(\.config).filter { ids.contains($0.id) }
+        return ToolPlanner.plan(server: groupName, configs: configs, hide: hide, show: show,
+                                allTools: toolNames(groupName: groupName), claudeSettingsPath: claudeSettingsPath)
+    }
+
+    /// Per declaration of the row (`ServerConfig.id`): the tools its agent
+    /// hides. Agents with no way to hide tools are left out.
+    func hiddenTools(groupName: String) -> [String: Set<String>] {
+        let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
+        let configs = servers.map(\.config).filter { ids.contains($0.id) }
+        return ToolPlanner.hiddenTools(configs: configs, allTools: toolNames(groupName: groupName),
+                                       claudeSettingsPath: claudeSettingsPath)
     }
 
     /// True when the row is set up differently and she marked it as intended
