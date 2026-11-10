@@ -254,21 +254,24 @@ enum CardText {
     // MARK: The server switch (1.14)
 
     struct EverywhereSwitch: Equatable {
-        let title: String
-        let help: String
+        /// True when the switch turns every agent on (all of them are off).
         let turnOn: Bool
+        /// The agents it covers: every one that has a switch.
+        let count: Int
+        /// Beside the switch: "All 5" (Kika's pick, Mocker 10 Nov).
+        var label: String { "All \(count)" }
+        /// What a click does: "Turn off in all 5" / "Turn on in all 5".
+        var actionTitle: String { "Turn \(turnOn ? "on" : "off") in all \(count)" }
     }
 
-    /// The button beside "Used by": "Turn off everywhere" while any agent
-    /// with a switch has it on, "Turn on everywhere" when all of them are
-    /// off. Nil with fewer than two such agents (the row's own switch does it).
+    /// The switch above the agents' switches under "Used by": on while any
+    /// agent with a switch has the server on, off when all of them have it
+    /// off. Nil with fewer than two such agents (the row's own switch does
+    /// it). It replaced the "Turn off everywhere" button (Kika, 10 Nov).
     static func everywhereSwitch(for group: ServerGroup) -> EverywhereSwitch? {
         let switchable = group.sources.filter(\.canSwitch)
         guard switchable.count > 1 else { return nil }
-        if switchable.contains(where: { !$0.isOff }) {
-            return EverywhereSwitch(title: "Turn off everywhere", help: "Turn it off in every agent that has a switch", turnOn: false)
-        }
-        return EverywhereSwitch(title: "Turn on everywhere", help: "Turn it back on in every agent", turnOn: true)
+        return EverywhereSwitch(turnOn: !switchable.contains(where: { !$0.isOff }), count: switchable.count)
     }
 
     /// Under an agent's name in "Used by", in place of the file path: what

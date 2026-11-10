@@ -332,11 +332,9 @@ struct DetailCardView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 SectionHeader(title: CardText.usedByTitle(for: group), count: nil, theme: theme)
-                // 1.14: one button for every agent that has a switch.
+                // One switch for every agent that has one ("All 5", 10 Nov; a button in 1.14).
                 if state.monitor.switchesEnabled, let everywhere = CardText.everywhereSwitch(for: group) {
-                    CardButton(title: everywhere.title, help: everywhere.help, theme: theme) {
-                        state.askSwitch(group.name, turnOn: everywhere.turnOn)
-                    }
+                    everywhereControl(everywhere)
                 }
             }
             .padding(.bottom, 2)
@@ -347,6 +345,21 @@ struct DetailCardView: View {
             if shown.folded > 0 {
                 moreSourcesRow(folded: shown.folded)
             }
+        }
+    }
+
+    /// "All 5" and a switch, lined up with the agents' switches below
+    /// (Kika's pick, Mocker 10 Nov). Opens the same sheet as before.
+    private func everywhereControl(_ everywhere: CardText.EverywhereSwitch) -> some View {
+        HStack(spacing: 8) {
+            Text(everywhere.label)
+                .font(.system(size: 11))
+                .foregroundStyle(theme.textSecondary)
+            MiniSwitch(isOn: !everywhere.turnOn, theme: theme) {
+                state.askSwitch(group.name, turnOn: everywhere.turnOn)
+            }
+            .help(everywhere.actionTitle)
+            .accessibilityLabel(everywhere.actionTitle)
         }
     }
 
@@ -476,13 +489,13 @@ struct DetailCardView: View {
                 ShowMoreRow(title: title, expanded: expanded, help: expanded ? "Fold these tools" : "Show these tools",
                             theme: theme, action: toggle)
                 if let hideAll {
-                    CardButton(title: "Hide all \(hideAll.count)\u{2026}", help: "Hide every tool in this group", theme: theme) {
+                    CardButton(title: "Hide all \(hideAll.count)", help: "Hide every tool in this group", theme: theme) {
                         state.askToolSwitch(group.name, hide: hideAll)
                     }
                     .fixedSize()
                 }
                 if let showAll {
-                    CardButton(title: "Show all \(showAll.count)\u{2026}", help: "Show every hidden tool again", theme: theme) {
+                    CardButton(title: "Show all \(showAll.count)", help: "Show every hidden tool again", theme: theme) {
                         state.askToolSwitch(group.name, show: showAll)
                     }
                     .fixedSize()
@@ -813,19 +826,21 @@ private struct UsedByRow: View {
                 if let line = CardText.switchLine(isOff: source.isOff, note: note) {
                     Text(line)
                         .font(.system(size: 11))
-                        .foregroundStyle(note == nil ? theme.textTertiary : theme.statusDegraded)
+                        // Calm gray, even right after a flip (Kika's pick, Mocker 10 Nov):
+                        // the amber read 2.5:1 on light glass and turned the card yellow.
+                        .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                 } else if !source.path.isEmpty {
                     Text(CardText.shortPath(source.path))
                         .font(.system(size: 10.5, design: .monospaced))
-                        .foregroundStyle(theme.textTertiary)
+                        .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
                 if let toolNote {
                     Text(toolNote)
                         .font(.system(size: 11))
-                        .foregroundStyle(theme.textTertiary)
+                        .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -1085,7 +1100,7 @@ struct SwitchSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(change.when)
                     .font(.system(size: 11.5))
-                    .foregroundStyle(theme.statusDegraded)
+                    .foregroundStyle(theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if state.switchShowsChange {
                     VStack(alignment: .leading, spacing: 1) {

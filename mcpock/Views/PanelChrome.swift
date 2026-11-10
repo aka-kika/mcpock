@@ -168,7 +168,7 @@ struct SectionHeader: View {
         }
         .font(.system(size: 10.5, weight: .semibold))
         .tracking(0.6)
-        .foregroundStyle(theme.textTertiary)
+        .foregroundStyle(theme.textSecondary)
     }
 }
 
