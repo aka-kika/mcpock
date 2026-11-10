@@ -324,7 +324,7 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(hide.confirmTitle, "Hide")
         XCTAssertEqual(Set(hide.changes.flatMap(\.agents)), ["Claude Code", "Codex", "Goose"])
         XCTAssertEqual(Set(hide.skipped), ["Cursor", "VS Code"], "no setting for single tools there")
-        XCTAssertTrue(CardText.switchNotes(for: hide).first?.contains("can't hide single tools") == true)
+        XCTAssertTrue(CardText.switchNotes(for: hide).isEmpty, "they are rows of their own on the sheet")
         let before = [".claude/settings.json", ".cursor/mcp.json", ".codex/config.toml", ".config/goose/config.yaml"].map(text)
 
         let backups = home.appendingPathComponent("backups")

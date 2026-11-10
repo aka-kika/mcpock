@@ -283,11 +283,8 @@ enum CardText {
     static func switchNotes(for plan: SwitchPlan) -> [String] {
         var lines = plan.problems
         if plan.tools != nil {
-            if !plan.skipped.isEmpty {
-                let agents = list(plan.skipped)
-                lines.append("\(agents) can't hide single tools from \(plan.skipped.count == 1 ? "its file" : "their files"). Use \(plan.skipped.count == 1 ? "its" : "their") own tool list, or turn \(plan.server) off there.")
-            }
-            if plan.isEmpty, lines.isEmpty { lines.append("Nothing to change there.") }
+            // Agents with no way to hide tools are listed as rows of their own.
+            if plan.isEmpty, lines.isEmpty, plan.skipped.isEmpty { lines.append("Nothing to change there.") }
             return lines
         }
         if !plan.skipped.isEmpty {
@@ -353,12 +350,109 @@ enum CardText {
         "Show \(folded) more tool\(folded == 1 ? "" : "s")"
     }
 
-    /// The tools the card lists: all of them when expanded, else the first
-    /// `toolsLimit` in the server's own order. The second value is how many
-    /// "+N more" would add.
-    static func toolRows(for group: ServerGroup, expanded: Bool) -> (rows: [MCPToolInfo], folded: Int) {
-        guard !expanded, group.tools.count > toolsLimit else { return (group.tools, 0) }
-        return (Array(group.tools.prefix(toolsLimit)), group.tools.count - toolsLimit)
+    /// The tool rows the card lists: all of them when expanded, else the
+    /// first `toolsLimit`. The second value is how many "+N more" would add.
+    static func toolRows<Row>(_ rows: [Row], expanded: Bool) -> (rows: [Row], folded: Int) {
+        guard !expanded, rows.count > toolsLimit else { return (rows, 0) }
+        return (Array(rows.prefix(toolsLimit)), rows.count - toolsLimit)
+    }
+
+    // MARK: - Tools on the card (Part 2, 2026-11-10)
+
+    /// One tool on the card: its calls, and where it is hidden.
+    struct ToolRow: Identifiable, Equatable {
+        var id: String { tool.name }
+        let tool: MCPToolInfo
+        /// Calls in the Usage window; nil when counts are off or not read yet.
+        let calls: Int?
+        /// `UsageStore.dayIndex` of the last call on record.
+        let lastDay: Int?
+        /// Hidden in every agent that can hide tools.
+        let hiddenEverywhere: Bool
+        /// Agents (display names) that hide it, when only some do.
+        let hiddenIn: [String]
+    }
+
+    struct ToolSections: Equatable {
+        /// Used in the window, most calls first (or every tool, in the
+        /// server's order, when there are no counts).
+        var used: [ToolRow] = []
+        /// No call in the window (only with counts).
+        var unused: [ToolRow] = []
+        var hidden: [ToolRow] = []
+    }
+
+    /// The card's tools in three groups. `hidden` is per declaration id;
+    /// `labels` names each declaration's agent.
+    static func toolSections(tools: [MCPToolInfo], usage: [String: ToolUsage]?, hidden: [String: Set<String>],
+                             labels: [String: String]) -> ToolSections {
+        var sections = ToolSections()
+        for tool in tools {
+            let hiders = hidden.filter { $0.value.contains(tool.name) }.map(\.key)
+            let everywhere = !hidden.isEmpty && hiders.count == hidden.count
+            let names = hiders.compactMap { labels[$0].map(AgentBadge.displayLabel) }
+            let entry = usage?[UsageStore.toolKey(tool.name)]
+            let row = ToolRow(tool: tool, calls: usage == nil ? nil : (entry?.calls ?? 0), lastDay: entry?.lastDay,
+                              hiddenEverywhere: everywhere,
+                              hiddenIn: everywhere ? [] : Array(Set(names)).sorted())
+            if everywhere {
+                sections.hidden.append(row)
+            } else if let calls = row.calls, calls == 0 {
+                sections.unused.append(row)
+            } else {
+                sections.used.append(row)
+            }
+        }
+        if usage != nil {
+            // Most calls first; ties keep the server's order (a stable sort).
+            sections.used = sections.used.enumerated()
+                .sorted { ($0.element.calls ?? 0, -$0.offset) > ($1.element.calls ?? 0, -$1.offset) }
+                .map(\.element)
+        }
+        return sections
+    }
+
+    /// "Not used in 30 days" / "Not used in 7 days" / "Never used".
+    static func unusedTitle(window: UsageWindow) -> String {
+        guard let days = window.days else { return "Never used" }
+        return "Not used in \(days) days"
+    }
+
+    /// "Calls in 30 days" beside "Tools · 26"; nil without counts.
+    static func callsWindowTitle(window: UsageWindow) -> String? {
+        switch window {
+        case .off: return nil
+        case .allTime: return "calls, all time"
+        default: return "calls in \(window.days ?? 0) days"
+        }
+    }
+
+    /// "today", "yesterday", "3 days ago", "Nov 2"; nil with no call on record.
+    static func lastUsed(_ day: Int?, now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard let day else { return nil }
+        let ago = UsageStore.dayIndex(for: now, calendar: calendar) - day
+        switch ago {
+        case ..<1: return "today"
+        case 1: return "yesterday"
+        case 2..<7: return "\(ago) days ago"
+        default:
+            guard let date = calendar.date(byAdding: .day, value: -ago, to: now) else { return nil }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = calendar.isDate(date, equalTo: now, toGranularity: .year) ? "MMM d" : "MMM d, yyyy"
+            return formatter.string(from: date)
+        }
+    }
+
+    /// Under an agent on the card: what is hidden there, or that it can't
+    /// hide tools while another agent does. Nil when nothing is hidden.
+    static func toolNote(canHide: Bool, hiddenHere: Int, anyHidden: Bool, toolCount: Int) -> String? {
+        if canHide {
+            guard hiddenHere > 0 else { return nil }
+            return hiddenHere == 1 ? "1 tool hidden" : "\(hiddenHere) tools hidden"
+        }
+        guard anyHidden else { return nil }
+        return "Sees all \(toolCount) tools: can't hide single tools"
     }
 
     /// "A", "A and B", "A, B and C".

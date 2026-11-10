@@ -47,6 +47,11 @@ struct DetailCardView: View {
     @State private var showsAllSources = false
     /// "+N more" under the tools was clicked: list every tool (1.5.3).
     @State private var showsAllTools = false
+    /// The "Not used in 30 days" and "Hidden" folds under the tools (Part 2).
+    @State private var showsUnusedTools = false
+    @State private var showsHiddenTools = false
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
+    private var usageWindow: UsageWindow { UsageWindow(rawValue: usageWindowRaw) ?? .default }
     @State private var contentHeight: CGFloat = 0
 
     /// The card is as tall as its content, plus the sheet's pinned buttons.
@@ -372,12 +377,20 @@ struct DetailCardView: View {
         .accessibilityLabel("Show \(folded) more agents")
     }
 
+    private func toolNote(for source: GroupSource) -> String? {
+        guard !source.isOff else { return nil }
+        let hidden = state.hiddenTools(for: group.name)
+        return CardText.toolNote(canHide: hidden[source.configID] != nil, hiddenHere: hidden[source.configID]?.count ?? 0,
+                                 anyHidden: hidden.values.contains { !$0.isEmpty }, toolCount: group.tools.count)
+    }
+
     private func usedByRow(_ source: GroupSource) -> some View {
         UsedByRow(
             source: source,
             differs: group.differs.contains { $0.label == source.label },
             theme: theme,
             note: state.switchNotes[source.configID],
+            toolNote: toolNote(for: source),
             flip: source.canSwitch && state.monitor.switchesEnabled
                 ? { state.askSwitch(group.name, source: source, turnOn: source.isOff) } : nil
         )
@@ -388,26 +401,83 @@ struct DetailCardView: View {
     /// few show; "+N more" lists the rest in place and "Show less" folds them
     /// again. The card grows with the list up to the panel's height and
     /// scrolls past that, so the old "+N more" side window is gone.
+    ///
+    /// Part 2 (Kika's pick, 2026-11-10): a switch beside each tool, most-used
+    /// first with their calls, the ones not used in the Usage window folded
+    /// with one "Hide all" button, the hidden ones folded last. A switch
+    /// never writes: it opens the sheet.
     @ViewBuilder
     private var tools: some View {
+        let hidden = state.hiddenTools(for: group.name)
+        let canHide = state.monitor.switchesEnabled && !hidden.isEmpty && group.state != .off
+        let usage = state.usageStore?.toolUsage(server: group.name, window: usageWindow)
+        let sections = CardText.toolSections(tools: group.tools, usage: usage, hidden: hidden,
+                                             labels: Dictionary(group.sources.map { ($0.configID, $0.label) },
+                                                                uniquingKeysWith: { first, _ in first }))
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: "Tools \u{00B7} \(group.tools.count)", count: nil, theme: theme)
+            SectionHeader(title: ["Tools \u{00B7} \(group.tools.count)", usage == nil ? nil : CardText.callsWindowTitle(window: usageWindow)]
+                .compactMap { $0 }.joined(separator: " \u{00B7} "), count: nil, theme: theme)
             if group.tools.isEmpty {
                 Text(group.state == .unknown ? "Tools show up after the first check." : "No tools reported.")
                     .font(Theme.caption)
                     .foregroundStyle(theme.textTertiary)
             } else {
-                let shown = CardText.toolRows(for: group, expanded: showsAllTools)
-                ToolsList(tools: shown.rows, theme: theme, rowInset: 0)
-                if shown.folded > 0 || showsAllTools && group.tools.count > CardText.toolsLimit {
+                let (shown, folded) = CardText.toolRows(sections.used, expanded: showsAllTools)
+                toolRows(shown, canHide: canHide)
+                if folded > 0 || showsAllTools && sections.used.count > CardText.toolsLimit {
                     ShowMoreRow(
-                        title: showsAllTools ? CardText.showLessTitle : CardText.showMoreTitle(folded: shown.folded),
+                        title: showsAllTools ? CardText.showLessTitle : CardText.showMoreTitle(folded: folded),
                         expanded: showsAllTools,
-                        help: showsAllTools ? "Show only the first \(CardText.toolsLimit)" : CardText.showMoreHelp(folded: shown.folded),
+                        help: showsAllTools ? "Show only the first \(CardText.toolsLimit)" : CardText.showMoreHelp(folded: folded),
                         theme: theme
                     ) {
                         showsAllTools.toggle()
                     }
+                }
+                if !sections.unused.isEmpty {
+                    toolFold(title: "\(CardText.unusedTitle(window: usageWindow)) \u{00B7} \(sections.unused.count)",
+                             expanded: showsUnusedTools,
+                             hideAll: canHide ? sections.unused.map(\.tool.name) : nil) { showsUnusedTools.toggle() }
+                    if showsUnusedTools { toolRows(sections.unused, canHide: canHide) }
+                }
+                if !sections.hidden.isEmpty {
+                    toolFold(title: "Hidden \u{00B7} \(sections.hidden.count)", expanded: showsHiddenTools, hideAll: nil) {
+                        showsHiddenTools.toggle()
+                    }
+                    if showsHiddenTools { toolRows(sections.hidden, canHide: canHide) }
+                }
+            }
+        }
+        .task(id: "\(group.name)|\(group.tools.count)|\(group.sources.count)") { state.loadHiddenTools(for: group.name) }
+    }
+
+    private func toolRows(_ rows: [CardText.ToolRow], canHide: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+                ToolSwitchRow(row: row, theme: theme, flip: canHide ? {
+                    if row.hiddenEverywhere {
+                        state.askToolSwitch(group.name, show: [row.tool.name])
+                    } else {
+                        state.askToolSwitch(group.name, hide: [row.tool.name])
+                    }
+                } : nil)
+            }
+        }
+    }
+
+    /// "Not used in 30 days · 22   [Hide all 22…]" / "Hidden · 1", a line
+    /// that opens its tools in place.
+    private func toolFold(title: String, expanded: Bool, hideAll: [String]?, toggle: @escaping () -> Void) -> some View {
+        VStack(spacing: 6) {
+            Rectangle().fill(theme.divider).frame(height: 1)
+            HStack(spacing: 8) {
+                ShowMoreRow(title: title, expanded: expanded, help: expanded ? "Fold these tools" : "Show these tools",
+                            theme: theme, action: toggle)
+                if let hideAll {
+                    CardButton(title: "Hide all \(hideAll.count)\u{2026}", help: "Hide every tool in this group", theme: theme) {
+                        state.askToolSwitch(group.name, hide: hideAll)
+                    }
+                    .fixedSize()
                 }
             }
         }
@@ -707,43 +777,6 @@ struct ShowMoreRow: View {
     }
 }
 
-/// Every tool given, one under the other: the name in monospace, its
-/// first-line description underneath. The card's tools list (1.5.3; it was
-/// the tools window's list until that window was dropped).
-struct ToolsList: View {
-    let tools: [MCPToolInfo]
-    let theme: ThemeColors
-    /// Horizontal padding of each row.
-    var rowInset: CGFloat = 8
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(tools) { tool in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tool.name)
-                        .font(.system(size: 11.5, design: .monospaced))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if !tool.firstLineDescription.isEmpty {
-                        // Masked: a server that got a header could echo it here (r3 505c).
-                        Text(SecretMask.scrub(tool.firstLineDescription))
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.textSecondary)
-                            .lineLimit(2)
-                            .truncationMode(.tail)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.horizontal, rowInset)
-                .padding(.vertical, 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .help(tool.description.isEmpty ? tool.name : SecretMask.scrub(tool.description))
-            }
-        }
-    }
-}
-
 /// One "Used by" row (round 7: no open glyph). With a config file behind it,
 /// right-click offers the shared path menu (round 8: Show in Finder, Copy Path,
 /// Open Config… last; no double-click); a faint hover fill says the row does
@@ -754,6 +787,8 @@ private struct UsedByRow: View {
     let theme: ThemeColors
     /// "Off after Cursor reopens": what the last flip said, this session.
     var note: String? = nil
+    /// "2 tools hidden" / "Sees all 26 tools: can't hide single tools" (Part 2).
+    var toolNote: String? = nil
     /// Flips this agent's switch (opens the sheet); nil when mcpock has no
     /// way to switch it there.
     var flip: (() -> Void)? = nil
@@ -778,6 +813,12 @@ private struct UsedByRow: View {
                         .foregroundStyle(theme.textTertiary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                }
+                if let toolNote {
+                    Text(toolNote)
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.textTertiary)
+                        .lineLimit(1)
                 }
             }
             Spacer(minLength: 4)
@@ -814,6 +855,97 @@ private struct UsedByRow: View {
                 .accessibilityAddTraits(.isButton)
                 .configPathAccessibilityActions(source.path)
         }
+    }
+}
+
+/// One tool on the card (Part 2): name and first line of its description,
+/// its calls and last use, and a switch when an agent can hide it.
+struct ToolSwitchRow: View {
+    let row: CardText.ToolRow
+    let theme: ThemeColors
+    /// Opens the sheet; nil when no agent of this server can hide tools.
+    let flip: (() -> Void)?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.tool.name)
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundStyle(row.hiddenEverywhere ? theme.textTertiary : theme.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if !row.hiddenIn.isEmpty {
+                    Text("Hidden in \(CardText.list(row.hiddenIn))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.textTertiary)
+                        .lineLimit(1)
+                } else if !row.tool.firstLineDescription.isEmpty {
+                    // Masked: a server that got a header could echo it here (r3 505c).
+                    Text(SecretMask.scrub(row.tool.firstLineDescription))
+                        .font(.system(size: 11))
+                        .foregroundStyle(row.hiddenEverywhere ? theme.textTertiary : theme.textSecondary)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 4)
+            if let calls = row.calls {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(calls == 0 && row.lastDay == nil ? "never" : UsageText.compact(calls))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(calls == 0 ? theme.textTertiary : theme.textSecondary)
+                    if let last = CardText.lastUsed(row.lastDay) {
+                        Text(last)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                }
+                .help(row.lastDay == nil ? "No call on record" : "Calls in the Usage window; last used \(CardText.lastUsed(row.lastDay) ?? "")")
+            }
+            if let flip {
+                MiniSwitch(isOn: !row.hiddenEverywhere, theme: theme, action: flip)
+                    .help(row.hiddenEverywhere ? "Show \(row.tool.name) to your agents again" : "Hide \(row.tool.name) from your agents")
+                    .accessibilityLabel("\(row.tool.name) switch")
+            }
+        }
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(row.tool.description.isEmpty ? row.tool.name : SecretMask.scrub(row.tool.description))
+    }
+}
+
+/// A tick on a tools sheet: the agent is changed when it is ticked. `action`
+/// nil is a greyed box (an agent that can't hide tools).
+struct TickBox: View {
+    let isOn: Bool
+    let theme: ThemeColors
+    let action: (() -> Void)?
+
+    var body: some View {
+        Button { action?() } label: {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(isOn ? theme.textSecondary : .clear)
+                .frame(width: 14, height: 14)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(theme.controlStroke, lineWidth: isOn ? 0 : 1)
+                }
+                .overlay {
+                    if isOn {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(theme.background)
+                    }
+                }
+                .opacity(action == nil ? 0.4 : 1)
+                .padding(.top, 3)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(action == nil)
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(isOn ? "ticked" : "not ticked")
     }
 }
 
@@ -869,6 +1001,12 @@ struct SwitchSheet: View {
                 Rectangle().fill(theme.divider).frame(height: 1)
                 changeRow(change)
             }
+            if plan.tools != nil {
+                ForEach(plan.skipped, id: \.self) { agent in
+                    Rectangle().fill(theme.divider).frame(height: 1)
+                    skippedRow(agent)
+                }
+            }
             if !plan.isEmpty {
                 Rectangle().fill(theme.divider).frame(height: 1)
                 ShowMoreRow(
@@ -898,8 +1036,35 @@ struct SwitchSheet: View {
         }
     }
 
+    /// An agent that can't hide single tools, on a tools sheet: greyed, no tick.
+    private func skippedRow(_ agent: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            TickBox(isOn: false, theme: theme, action: nil)
+            AgentBadgeView(badge: AgentBadge.forLabel(CardText.agentLabel(forDisplay: agent)), theme: theme, size: 20)
+                .opacity(0.5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(agent)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(theme.textSecondary)
+                Text("Can't hide single tools from its file. Use its own tool list, or turn \(plan.server) off there.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private func changeRow(_ change: SwitchChange) -> some View {
         HStack(alignment: .top, spacing: 8) {
+            if plan.tools != nil {
+                let ticked = !state.untickedPaths.contains(change.path)
+                TickBox(isOn: ticked, theme: theme) {
+                    if ticked { state.untickedPaths.insert(change.path) } else { state.untickedPaths.remove(change.path) }
+                }
+                .help(ticked ? "Leave \(change.agents.first ?? "this agent") as it is" : "Change \(change.agents.first ?? "this agent") too")
+                .accessibilityLabel("\(change.agents.joined(separator: ", "))")
+            }
             AgentBadgeView(badge: AgentBadge.forLabel(CardText.agentLabel(forDisplay: change.agents.first ?? "")),
                            theme: theme, size: 20)
             VStack(alignment: .leading, spacing: 2) {
@@ -952,10 +1117,13 @@ struct SwitchSheetButtons: View {
             HStack(spacing: 6) {
                 CardButton(title: plan.isEmpty ? "Close" : "Cancel", fillsWidth: true, theme: theme) { state.cancelSwitch() }
                 if !plan.isEmpty {
-                    CardButton(title: plan.confirmTitle, fillsWidth: true, theme: theme) {
+                    let ticked = PanelState.ticked(plan, unticked: state.untickedPaths).changes.count
+                    CardButton(title: plan.tools != nil && ticked != plan.changes.count
+                                   ? "\(plan.confirmTitle) in \(ticked) agent\(ticked == 1 ? "" : "s")" : plan.confirmTitle,
+                               fillsWidth: true, theme: theme) {
                         state.confirmSwitch()
                     }
-                    .disabled(state.isApplyingSwitch)
+                    .disabled(state.isApplyingSwitch || ticked == 0)
                 }
             }
             .padding(.horizontal, 16)

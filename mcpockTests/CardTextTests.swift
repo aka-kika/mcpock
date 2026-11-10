@@ -203,18 +203,18 @@ final class CardTextTests: XCTestCase {
 
     func testToolsShowTheFirstFiveThenShowMore() {
         let many = group(tools: 12, sources: [source("Code")])
-        let folded = CardText.toolRows(for: many, expanded: false)
+        let folded = CardText.toolRows(many.tools, expanded: false)
         XCTAssertEqual(folded.rows.map(\.name), ["t0", "t1", "t2", "t3", "t4"], "the server's own order")
         XCTAssertEqual(folded.folded, 7)
         XCTAssertEqual(CardText.showMoreHelp(folded: folded.folded), "Show 7 more tools")
         XCTAssertEqual(CardText.showMoreHelp(folded: 1), "Show 1 more tool")
-        let open = CardText.toolRows(for: many, expanded: true)
+        let open = CardText.toolRows(many.tools, expanded: true)
         XCTAssertEqual(open.rows.count, 12, "Show more lists every tool in place")
         XCTAssertEqual(open.folded, 0)
 
         let few = group(tools: 5, sources: [source("Code")])
-        XCTAssertEqual(CardText.toolRows(for: few, expanded: false).rows.count, 5)
-        XCTAssertEqual(CardText.toolRows(for: few, expanded: false).folded, 0, "five or fewer: no Show more")
+        XCTAssertEqual(CardText.toolRows(few.tools, expanded: false).rows.count, 5)
+        XCTAssertEqual(CardText.toolRows(few.tools, expanded: false).folded, 0, "five or fewer: no Show more")
         XCTAssertEqual(CardText.showMoreTitle(folded: 7), "+7 more")
         XCTAssertEqual(CardText.showLessTitle, "Show less")
     }
@@ -273,4 +273,64 @@ final class DetailCardPlacementTests: XCTestCase {
         XCTAssertNil(CardText.plainHTTPWarning(for: group(SecretMask.url("https://x.test/mcp?token=abc123"), headers: [])))
         XCTAssertNil(CardText.plainHTTPWarning(for: group("http://10.0.0.5:8080/mcp", headers: [])))
     }
+
+    // MARK: Tools with switches and counts (Part 2)
+
+    private func tool(_ name: String) -> MCPToolInfo { MCPToolInfo(name: name, description: "") }
+
+    func testToolSectionsSortByCallsFoldTheUnusedAndTheHidden() {
+        let tools = ["a", "b", "c", "d", "e"].map(tool)
+        let usage: [String: ToolUsage] = [
+            "a": ToolUsage(calls: 2, lastDay: 100), "b": ToolUsage(calls: 9, lastDay: 101),
+            "c": ToolUsage(calls: 0, lastDay: 50),
+        ]
+        let hidden: [String: Set<String>] = ["code": ["e", "a"], "codex": ["e"]]
+        let s = CardText.toolSections(tools: tools, usage: usage, hidden: hidden, labels: ["code": "Code", "codex": "Codex"])
+        XCTAssertEqual(s.used.map(\.tool.name), ["b", "a"], "most calls first")
+        XCTAssertEqual(s.used.last?.hiddenIn, ["Claude Code"], "hidden in only some agents: stays, with a note")
+        XCTAssertEqual(s.unused.map(\.tool.name), ["c", "d"])
+        XCTAssertEqual(s.unused.first?.lastDay, 50, "a call before the window still says when")
+        XCTAssertEqual(s.hidden.map(\.tool.name), ["e"], "hidden in every agent that can hide tools")
+    }
+
+    func testWithoutCountsEveryToolStaysInTheServersOrder() {
+        let s = CardText.toolSections(tools: ["z", "a"].map(tool), usage: nil, hidden: [:], labels: [:])
+        XCTAssertEqual(s.used.map(\.tool.name), ["z", "a"])
+        XCTAssertTrue(s.unused.isEmpty, "no counts: never a fake 'not used'")
+        XCTAssertNil(s.used.first?.calls)
+    }
+
+    func testToolWordsAndLastUse() {
+        XCTAssertEqual(CardText.unusedTitle(window: .thirtyDays), "Not used in 30 days")
+        XCTAssertEqual(CardText.unusedTitle(window: .allTime), "Never used")
+        XCTAssertEqual(CardText.callsWindowTitle(window: .sevenDays), "calls in 7 days")
+        XCTAssertNil(CardText.callsWindowTitle(window: .off))
+        let now = ISO8601DateFormatter().date(from: "2026-11-10T12:00:00Z")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let today = UsageStore.dayIndex(for: now, calendar: calendar)
+        XCTAssertEqual(CardText.lastUsed(today, now: now, calendar: calendar), "today")
+        XCTAssertEqual(CardText.lastUsed(today - 1, now: now, calendar: calendar), "yesterday")
+        XCTAssertEqual(CardText.lastUsed(today - 3, now: now, calendar: calendar), "3 days ago")
+        XCTAssertEqual(CardText.lastUsed(today - 8, now: now, calendar: calendar), "Nov 2")
+        XCTAssertNil(CardText.lastUsed(nil))
+        XCTAssertEqual(CardText.toolNote(canHide: true, hiddenHere: 2, anyHidden: true, toolCount: 9), "2 tools hidden")
+        XCTAssertNil(CardText.toolNote(canHide: true, hiddenHere: 0, anyHidden: true, toolCount: 9))
+        XCTAssertEqual(CardText.toolNote(canHide: false, hiddenHere: 0, anyHidden: true, toolCount: 9),
+                       "Sees all 9 tools: can't hide single tools")
+        XCTAssertNil(CardText.toolNote(canHide: false, hiddenHere: 0, anyHidden: false, toolCount: 9), "nothing hidden: no note")
+    }
+
+    func testUntickedAgentsAreLeftOutOfTheWrite() {
+        let change = { (path: String) in
+            SwitchChange(agents: [path], path: path, before: "", after: "x", what: "", when: "", diff: [])
+        }
+        let plan = SwitchPlan(server: "s", turnOn: false, changes: [change("a"), change("b")], skipped: [], problems: [],
+                              tools: ToolEdit(hide: ["t"], show: []))
+        XCTAssertEqual(PanelState.ticked(plan, unticked: ["a"]).changes.map(\.path), ["b"])
+        XCTAssertEqual(plan.title, "Hide t in s?")
+        let serverPlan = SwitchPlan(server: "s", turnOn: false, changes: [change("a")], skipped: [], problems: [])
+        XCTAssertEqual(PanelState.ticked(serverPlan, unticked: ["a"]).changes.count, 1, "the server switch has no ticks")
+    }
+
 }

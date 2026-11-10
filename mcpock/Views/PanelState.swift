@@ -100,6 +100,16 @@ final class PanelState {
     /// the agents' files when the card opens and after each write (Part 2).
     private(set) var hiddenTools: [String: Set<String>] = [:]
     private var hiddenToolsGroup: String?
+    /// Files she unticked on a tools sheet: left out of the write (Kika's
+    /// pick, 2026-11-10: every agent, untick to keep).
+    var untickedPaths: Set<String> = []
+
+    /// The sheet's plan without the unticked files.
+    nonisolated static func ticked(_ plan: SwitchPlan, unticked: Set<String>) -> SwitchPlan {
+        guard plan.tools != nil, !unticked.isEmpty else { return plan }
+        return SwitchPlan(server: plan.server, turnOn: plan.turnOn, changes: plan.changes.filter { !unticked.contains($0.path) },
+                          skipped: plan.skipped, problems: plan.problems, tools: plan.tools)
+    }
     /// The Turned off fold at the end of the server list is open.
     var showsTurnedOff = false {
         didSet { if showsTurnedOff != oldValue { dropRowsNoLongerListed() } }
@@ -690,6 +700,7 @@ final class PanelState {
         isComparing = false
         switchError = nil
         switchShowsChange = false
+        untickedPaths = []
         pendingSwitchIDs = configIDs
         pendingSwitch = monitor.toolPlan(groupName: name, configIDs: configIDs, hide: hide, show: show)
     }
@@ -701,14 +712,10 @@ final class PanelState {
         hiddenTools = monitor.hiddenTools(groupName: name)
     }
 
-    /// The tools hidden in every agent that can hide them, and those hidden
-    /// in only some (by tool name), for the open card's server.
-    func hiddenToolSummary(for name: String) -> (everywhere: Set<String>, some: [String: Int], agents: Int) {
-        guard hiddenToolsGroup == name, !hiddenTools.isEmpty else { return ([], [:], hiddenTools.count) }
-        var counts: [String: Int] = [:]
-        for set in hiddenTools.values { for tool in set { counts[tool, default: 0] += 1 } }
-        let all = Set(counts.filter { $0.value == hiddenTools.count }.keys)
-        return (all, counts.filter { $0.value < hiddenTools.count }, hiddenTools.count)
+    /// Per declaration id of `name`: the tools hidden there. Empty until
+    /// read for that server, and for agents that can't hide tools.
+    func hiddenTools(for name: String) -> [String: Set<String>] {
+        hiddenToolsGroup == name ? hiddenTools : [:]
     }
 
     func cancelSwitch() {
@@ -719,7 +726,9 @@ final class PanelState {
 
     /// She pressed Turn Off / Turn On on the sheet.
     func confirmSwitch() {
-        guard let plan = pendingSwitch, !plan.isEmpty, !isApplyingSwitch else { return }
+        guard let shown = pendingSwitch, !isApplyingSwitch else { return }
+        let plan = Self.ticked(shown, unticked: untickedPaths)
+        guard !plan.isEmpty else { return }
         isApplyingSwitch = true
         Task {
             let outcome = await monitor.applySwitch(plan)
