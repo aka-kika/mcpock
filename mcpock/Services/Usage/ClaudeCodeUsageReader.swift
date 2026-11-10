@@ -50,6 +50,10 @@ struct ClaudeCodeUsageReader: UsageReader {
             if restarted {
                 offset = 0
                 nextCursor.startOver(path)
+                // Saved before the size check: a file cut to nothing kept its
+                // old offset, so once it grew back past it, the start of the
+                // new text was never read (review 10 Nov, mcode-4).
+                nextCursor.values[path] = 0
             }
             guard size > offset else { continue }
             var (found, newOffset) = scan(file, from: offset, knownServers: knownServers)

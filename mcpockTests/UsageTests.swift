@@ -105,6 +105,25 @@ final class ClaudeCodeUsageReaderTests: XCTestCase {
         XCTAssertEqual(events.first?.server, "pieces")
     }
 
+    /// mcode-4 (review 10 Nov): a transcript cut to nothing, then written
+    /// again longer than before. The empty read saves offset 0, so the new
+    /// text is read from its start, not from the old offset.
+    func testFileCutToNothingThenRegrownIsReadFromTheStart() {
+        let url = write([line(name: "mcp__skill-librarian__librarian_find", timestamp: "2026-01-01T10:00:00.000Z")])
+        let reader = ClaudeCodeUsageReader(root: root)
+        let (_, cursor) = reader.read(since: .empty, knownServers: [])
+        try! Data().write(to: url)
+        let (empty, afterEmpty) = reader.read(since: cursor, knownServers: [])
+        XCTAssertTrue(empty.isEmpty)
+        XCTAssertEqual(afterEmpty.values.values.first, 0)
+        try! Data([
+            line(name: "mcp__pieces__ask_pieces_ltm", timestamp: "2026-01-02T10:00:00.000Z"),
+            line(name: "mcp__eventkit__list_reminders", timestamp: "2026-01-02T11:00:00.000Z"),
+        ].map { $0 + "\n" }.joined().utf8).write(to: url)
+        let (regrown, _) = reader.read(since: afterEmpty, knownServers: [])
+        XCTAssertEqual(regrown.map(\.server), ["pieces", "eventkit"])
+    }
+
     /// A transcript rewritten shorter but still holding calls already counted
     /// (review, 2026-10-14, item 11): only the call newer than those counts.
     func testRewrittenFileNeverCountsOldCallsTwice() {
