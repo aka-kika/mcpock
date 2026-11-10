@@ -17,6 +17,19 @@ struct SwitchChange: Identifiable, Equatable, Sendable {
     let when: String
     /// The changed lines, `- old` and `+ new`, secrets masked.
     let diff: [String]
+    /// Entries that move to or from mcpock's own folder with this change.
+    var parked: [ParkedEdit] = []
+}
+
+/// One server moving into `ParkedStore` (off) or out of it (on).
+struct ParkedEdit: Equatable, Sendable {
+    /// The agent's label ("Claude Desktop").
+    let agent: String
+    let configPath: String
+    let name: String
+    /// The entry's JSON as the config wrote it; set when it moves in.
+    let raw: String?
+    var movesIn: Bool { raw != nil }
 }
 
 /// Everything one flip of the switch would do: shown first, written only on
@@ -63,6 +76,7 @@ enum SwitchPlanner {
         turnOn: Bool,
         claudeSettingsPath: String,
         running: (String) -> Bool,
+        parkedDirectory: URL = ParkedStore.defaultDirectory,
         read: (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) }
     ) -> SwitchPlan {
         struct Step { let mechanism: SwitchMechanism; let name: String; let agent: String }
@@ -91,8 +105,22 @@ enum SwitchPlanner {
             let before = read(path)
             do {
                 var text = before
+                var parked: [ParkedEdit] = []
                 for step in fileSteps {
-                    text = try ServerSwitch.edited(text, mechanism: step.mechanism, server: step.name, turnOn: turnOn)
+                    var parkedValue: String?
+                    if step.mechanism == .parkOutside {
+                        if turnOn {
+                            parkedValue = ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name]
+                            parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: nil))
+                        } else {
+                            guard let raw = text.flatMap({ ServerSwitch.entryText(in: $0, server: step.name) }) else {
+                                throw ServerSwitch.SwitchError.cannotEdit
+                            }
+                            parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: raw))
+                        }
+                    }
+                    text = try ServerSwitch.edited(text, mechanism: step.mechanism, server: step.name, turnOn: turnOn,
+                                                   parkedValue: parkedValue)
                 }
                 guard let after = text, after != before else { continue }
                 changes.append(SwitchChange(
@@ -102,7 +130,8 @@ enum SwitchPlanner {
                     after: after,
                     what: what(first.mechanism, turnOn: turnOn),
                     when: when(agent: first.agent, turnOn: turnOn, running: running(first.agent)),
-                    diff: diff(before: before, after: after, mechanism: first.mechanism, server: first.name, turnOn: turnOn)
+                    diff: diff(before: before, after: after, mechanism: first.mechanism, server: first.name, turnOn: turnOn),
+                    parked: parked
                 ))
             } catch {
                 problems.append("\(agent): mcpock can't change its file safely, so it is left alone.")
@@ -120,6 +149,9 @@ enum SwitchPlanner {
             return turnOn ? "Marked on in its config." : "Marked off in its config."
         case .park:
             return turnOn ? "Moved back to where it was." : "Parked inside its config, keys and all."
+        case .parkOutside:
+            return turnOn ? "Moved back into its config from mcpock's folder."
+                : "Moved out of its config into mcpock's own folder, keys and all. Claude Desktop removes what it does not know from its file."
         }
     }
 
@@ -149,6 +181,12 @@ enum SwitchPlanner {
             let active = "\"mcpServers\": { \(name): {\u{2026}} }"
             let parked = "\"\(ServerSwitch.parkedKey)\": { \(name): {\u{2026}} }"
             return turnOn ? ["- " + parked, "+ " + active] : ["- " + active, "+ " + parked]
+        }
+        if mechanism == .parkOutside {
+            let name = JSONSpanEditor.quoted(server)
+            let active = "\"mcpServers\": { \(name): {\u{2026}} }"
+            let kept = "mcpock/parked/\(ParkedStore.fileName(forAgent: "Claude Desktop")): \(name)"
+            return turnOn ? ["- " + kept, "+ " + active] : ["- " + active, "+ " + kept]
         }
         let old = (before ?? "").components(separatedBy: "\n")
         let new = after.components(separatedBy: "\n")
@@ -193,11 +231,29 @@ enum SwitchWriter {
 
     /// Stops at the first file that can't be written; the ones before it stay
     /// written (each is whole and backed up).
-    static func apply(_ plan: SwitchPlan, backups: URL = backupDirectory, now: Date = Date()) -> Outcome {
+    static func apply(_ plan: SwitchPlan, backups: URL = backupDirectory, parked: URL = ParkedStore.defaultDirectory,
+                      now: Date = Date()) -> Outcome {
         var outcome = Outcome()
         for change in plan.changes {
             do {
-                try write(change, backups: backups, now: now)
+                // An entry that leaves its config is in mcpock's folder first,
+                // so no failure in between can lose it.
+                guard change.parked.isEmpty || allowed(parked) else { throw WriteError.failed(change.path) }
+                let movingIn = change.parked.filter(\.movesIn)
+                for edit in movingIn {
+                    try ParkedStore.add(name: edit.name, raw: edit.raw ?? "", agent: edit.agent, configPath: edit.configPath,
+                                        directory: parked)
+                }
+                do {
+                    try write(change, backups: backups, now: now)
+                } catch {
+                    for edit in movingIn { try? ParkedStore.remove(name: edit.name, agent: edit.agent, directory: parked) }
+                    throw error
+                }
+                // Back in its config: it leaves the folder.
+                for edit in change.parked where !edit.movesIn {
+                    try? ParkedStore.remove(name: edit.name, agent: edit.agent, directory: parked)
+                }
                 outcome.written.append(change.path)
             } catch let error as WriteError {
                 outcome.error = error

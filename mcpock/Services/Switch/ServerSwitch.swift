@@ -17,9 +17,14 @@ enum SwitchMechanism: Equatable, Sendable {
     case toml
     /// Goose (`extensions`) and Hermes (`mcp_servers`): `enabled: false`.
     case yaml(section: String)
-    /// Claude Desktop and Cursor have no flag: the entry moves from
-    /// `mcpServers` to `_mcpock_disabled` in the same file.
+    /// Cursor has no flag: the entry moves from `mcpServers` to
+    /// `_mcpock_disabled` in the same file. Cursor only reads that file, so
+    /// the parked entry stays (checked with the real app).
     case park
+    /// Claude Desktop has no flag either, and it rewrites its config at every
+    /// launch, dropping keys it does not know: the entry moves out of the
+    /// file into mcpock's own folder (`ParkedStore`).
+    case parkOutside
 }
 
 enum ServerSwitch {
@@ -48,7 +53,8 @@ enum ServerSwitch {
         case "Goose": return .yaml(section: "extensions")
         case "Hermes": return .yaml(section: "mcp_servers")
         case "OpenCode": return .openCode
-        case "Claude Desktop", "Cursor": return .park
+        case "Cursor": return .park
+        case "Claude Desktop": return .parkOutside
         default: return nil
         }
     }
@@ -70,7 +76,10 @@ enum ServerSwitch {
     /// `text` with `server` turned on or off the agent's way. `text` nil is a
     /// file that is not there yet (only Claude Code's settings may be made).
     /// The result is checked before it is returned.
-    static func edited(_ text: String?, mechanism: SwitchMechanism, server: String, turnOn: Bool) throws -> String {
+    /// `parkedValue`: the entry's JSON text from `ParkedStore`, needed to turn
+    /// a `.parkOutside` server on.
+    static func edited(_ text: String?, mechanism: SwitchMechanism, server: String, turnOn: Bool,
+                       parkedValue: String? = nil) throws -> String {
         let before: String
         if let text {
             before = text
@@ -84,6 +93,20 @@ enum ServerSwitch {
             case .claudeDeny: after = try claudeDeny(before, server: server, turnOn: turnOn)
             case .openCode: after = try openCode(before, server: server, turnOn: turnOn)
             case .park: after = try park(before, server: server, turnOn: turnOn)
+            case .parkOutside:
+                if turnOn {
+                    guard let parkedValue, jsonObject(parkedValue) is [String: Any],
+                          let root = JSONSpanEditor.parse(before), root.members != nil else { throw SwitchError.cannotEdit }
+                    if root.member("mcpServers")?.value.members != nil {
+                        after = try JSONSpanEditor.insertMember(in: before, objectPath: ["mcpServers"], key: server, valueText: parkedValue)
+                    } else {
+                        guard root.member("mcpServers") == nil else { throw SwitchError.cannotEdit }
+                        let entry = "{\(JSONSpanEditor.quoted(server)): \(parkedValue)}"
+                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [], key: "mcpServers", valueText: entry)
+                    }
+                } else {
+                    after = try JSONSpanEditor.removeMember(in: before, objectPath: ["mcpServers"], key: server).text
+                }
             case .toml:
                 guard let edited = TOMLSwitch.setEnabled(turnOn, server: server, in: before) else { throw SwitchError.cannotEdit }
                 after = edited
@@ -96,10 +119,18 @@ enum ServerSwitch {
         } catch is JSONSpanEditor.EditError {
             throw SwitchError.cannotEdit
         }
-        guard verify(before: before, after: after, mechanism: mechanism, server: server, turnOn: turnOn) else {
+        guard verify(before: before, after: after, mechanism: mechanism, server: server, turnOn: turnOn,
+                     parkedValue: parkedValue) else {
             throw SwitchError.failedCheck
         }
         return after
+    }
+
+    /// The entry of `server` under `mcpServers`, exactly as the file writes
+    /// it: what `ParkedStore` keeps while it is off.
+    static func entryText(in text: String, server: String) -> String? {
+        guard let value = JSONSpanEditor.parse(text)?.value(at: ["mcpServers", server]), value.members != nil else { return nil }
+        return JSONSpanEditor.text(Array(text.unicodeScalars)[value.start..<value.end])
     }
 
     private static func claudeDeny(_ text: String, server: String, turnOn: Bool) throws -> String {
@@ -206,12 +237,14 @@ enum ServerSwitch {
 
     /// True when `after` is `before` with exactly the intended change: the
     /// JSON files are compared as data, the TOML and YAML ones line by line.
-    static func verify(before: String, after: String, mechanism: SwitchMechanism, server: String, turnOn: Bool) -> Bool {
+    static func verify(before: String, after: String, mechanism: SwitchMechanism, server: String, turnOn: Bool,
+                       parkedValue: String? = nil) -> Bool {
         switch mechanism {
-        case .claudeDeny, .openCode, .park:
+        case .claudeDeny, .openCode, .park, .parkOutside:
             guard var expected = jsonObject(before) as? [String: Any],
                   let actual = jsonObject(after) as? [String: Any] else { return false }
-            guard applyExpected(&expected, mechanism: mechanism, server: server, turnOn: turnOn) else { return false }
+            guard applyExpected(&expected, mechanism: mechanism, server: server, turnOn: turnOn,
+                                parkedValue: parkedValue) else { return false }
             return NSDictionary(dictionary: expected).isEqual(to: actual)
         case .toml:
             guard changesAtMostOneLine(before: before, after: after) else { return false }
@@ -228,8 +261,19 @@ enum ServerSwitch {
         }
     }
 
-    private static func applyExpected(_ root: inout [String: Any], mechanism: SwitchMechanism, server: String, turnOn: Bool) -> Bool {
+    private static func applyExpected(_ root: inout [String: Any], mechanism: SwitchMechanism, server: String, turnOn: Bool,
+                                      parkedValue: String? = nil) -> Bool {
         switch mechanism {
+        case .parkOutside:
+            var servers = root["mcpServers"] as? [String: Any] ?? [:]
+            if turnOn {
+                guard servers[server] == nil, let entry = parkedValue.flatMap(jsonObject) as? [String: Any] else { return false }
+                servers[server] = entry
+            } else {
+                guard servers.removeValue(forKey: server) != nil else { return false }
+            }
+            root["mcpServers"] = servers
+            return true
         case .claudeDeny:
             var denied = root["deniedMcpServers"] as? [Any] ?? []
             let isIt: (Any) -> Bool = { ($0 as? [String: Any])?["serverName"] as? String == server }

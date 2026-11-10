@@ -30,7 +30,8 @@ enum ConfigDiscovery {
         registry: [KnownAgent],
         scanRoots: [String],
         knownScanFiles: [String]? = nil,
-        folderExists: (String) -> Bool = ConfigDiscovery.isExistingFolder
+        folderExists: (String) -> Bool = ConfigDiscovery.isExistingFolder,
+        parkedDirectory: URL? = ParkedStore.defaultDirectory
     ) -> [ServerConfig] {
         var servers: [ServerConfig] = []
         var claimedPaths = Set<String>()
@@ -44,8 +45,20 @@ enum ConfigDiscovery {
                 }
                 return (try? String(contentsOfFile: agent.path, encoding: .utf8)).flatMap(agent.shape.parse)
             }
-            guard let parsed else { continue }
-            let entries = droppingStaleProjects(parsed, folderExists: folderExists)
+            // Servers mcpock moved out of this agent's file (1.14, Claude
+            // Desktop): listed as turned off, from mcpock's own folder.
+            var parked: [DiscoveredEntry] = []
+            if let parkedDirectory, ServerSwitch.mechanism(agent: agent.label, configID: "reg:", builtin: false) == .parkOutside {
+                let active = Set((parsed ?? []).map(\.name))
+                for (name, raw) in ParkedStore.entries(agent: agent.label, configPath: agent.path, directory: parkedDirectory)
+                where !active.contains(name) {
+                    guard var entry = ServerSwitch.jsonObject(raw) as? [String: Any] else { continue }
+                    entry[ServerSwitch.offKey] = true
+                    parked.append(DiscoveredEntry(name: name, entry: entry))
+                }
+            }
+            guard parsed != nil || !parked.isEmpty else { continue }
+            let entries = droppingStaleProjects(parsed ?? [], folderExists: folderExists) + parked.sorted { $0.name < $1.name }
             claimedPaths.insert(canonical)
             let source = ServerSource(label: agent.label, path: agent.path)
             servers.append(contentsOf: configs(from: entries, source: source, idPrefix: "reg:\(agent.label)"))

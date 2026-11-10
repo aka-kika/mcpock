@@ -183,6 +183,108 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: change.path))
     }
 
+    // MARK: Claude Desktop: the entry waits in mcpock's own folder
+
+    private var parked: URL { home.appendingPathComponent("parked") }
+    private let desktopConfig = """
+    {
+      "mcpServers": {
+        "openrouter": {
+          "command": "npx",
+          "args": ["-y", "openrouter-mcp"],
+          "env": {
+            "OPENROUTER_API_KEY": "sk-or-v1-abcdefabcdefabcdefabcdef"
+          }
+        },
+        "stripe": {
+          "command": "stripe-mcp"
+        }
+      },
+      "preferences": {
+        "menuBarEnabled": false
+      }
+    }
+
+    """
+
+    private func desktop() -> [ServerConfig] {
+        ParsedFileCache.removeAll()
+        let registry = [KnownAgent(label: "Claude Desktop", path: path("Claude/claude_desktop_config.json"), shape: .json)]
+        return ConfigDiscovery.discover(registry: registry, scanRoots: [], parkedDirectory: parked)
+    }
+
+    private func desktopPlan(on: Bool) -> SwitchPlan {
+        SwitchPlanner.plan(server: "openrouter", configs: desktop().filter { $0.name == "openrouter" }, turnOn: on,
+                           claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
+    }
+
+    /// The real Claude Desktop rewrites its config at launch and keeps only
+    /// what it knows (seen 2026-11-10), so nothing may wait inside that file.
+    func testClaudeDesktopServerWaitsInMcpocksFolderAndComesBack() throws {
+        try put("Claude/claude_desktop_config.json", desktopConfig)
+        let off = desktopPlan(on: false)
+        XCTAssertEqual(off.changes.count, 1)
+        XCTAssertTrue(off.changes[0].what.hasPrefix("Moved out of its config into mcpock's own folder"), off.changes[0].what)
+        XCTAssertEqual(off.changes[0].diff, [
+            "- \"mcpServers\": { \"openrouter\": {\u{2026}} }",
+            "+ mcpock/parked/claude-desktop.json: \"openrouter\"",
+        ])
+        XCTAssertNil(SwitchWriter.apply(off, backups: backups, parked: parked).error)
+
+        let file = try XCTUnwrap(text("Claude/claude_desktop_config.json"))
+        XCTAssertFalse(file.contains("openrouter"))
+        XCTAssertFalse(file.contains(ServerSwitch.parkedKey), "nothing Claude Desktop would drop is left in its file")
+        XCTAssertTrue(file.contains("\"stripe\"") && file.contains("\"menuBarEnabled\": false"))
+        let store = parked.appendingPathComponent("claude-desktop.json")
+        let mode = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: store.path)[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(mode.intValue, 0o600)
+
+        // Claude Desktop rewrites its file its own way: the server is still listed as off.
+        try put("Claude/claude_desktop_config.json", #"{"mcpServers":{"stripe":{"command":"stripe-mcp"}},"preferences":{"menuBarEnabled":true}}"#)
+        let listed = try XCTUnwrap(desktop().first { $0.name == "openrouter" })
+        XCTAssertTrue(listed.turnedOff)
+        XCTAssertEqual(listed.source.label, "Claude Desktop")
+        XCTAssertEqual(listed.commandLine, "npx -y openrouter-mcp")
+        XCTAssertEqual(listed.env["OPENROUTER_API_KEY"], "sk-or-v1-abcdefabcdefabcdefabcdef")
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Claude Desktop", configID: listed.id, builtin: false), .parkOutside)
+
+        let on = desktopPlan(on: true)
+        XCTAssertEqual(on.changes.map(\.what), ["Moved back into its config from mcpock's folder."])
+        XCTAssertNil(SwitchWriter.apply(on, backups: backups, parked: parked).error)
+        let back = try XCTUnwrap(ServerSwitch.jsonObject(try XCTUnwrap(text("Claude/claude_desktop_config.json"))) as? [String: Any])
+        let original = try XCTUnwrap(ServerSwitch.jsonObject(desktopConfig) as? [String: Any])
+        XCTAssertEqual((back["mcpServers"] as? NSDictionary)?["openrouter"] as? NSDictionary,
+                       (original["mcpServers"] as? NSDictionary)?["openrouter"] as? NSDictionary)
+        XCTAssertEqual((back["preferences"] as? [String: Any])?["menuBarEnabled"] as? Bool, true, "Claude Desktop's own change stays")
+        XCTAssertEqual(ParkedStore.entries(agent: "Claude Desktop", configPath: path("Claude/claude_desktop_config.json"), directory: parked), [:])
+        XCTAssertEqual(desktop().filter(\.turnedOff).count, 0)
+    }
+
+    func testClaudeDesktopFileWithNoServersLeftStillListsTheParkedOne() throws {
+        try put("Claude/claude_desktop_config.json", #"{"mcpServers":{"only":{"command":"x"}}}"#)
+        let plan = SwitchPlanner.plan(server: "only", configs: desktop(), turnOn: false,
+                                      claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
+        XCTAssertNil(SwitchWriter.apply(plan, backups: backups, parked: parked).error)
+        XCTAssertEqual(text("Claude/claude_desktop_config.json"), #"{"mcpServers":{}}"#)
+        XCTAssertEqual(desktop().map(\.turnedOff), [true])
+        // The file is gone (the app was removed): the parked one is still listed, and on says why it can't.
+        try FileManager.default.removeItem(atPath: path("Claude/claude_desktop_config.json"))
+        XCTAssertEqual(desktop().map(\.name), ["only"])
+        let on = SwitchPlanner.plan(server: "only", configs: desktop(), turnOn: true,
+                                    claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
+        XCTAssertTrue(on.isEmpty)
+        XCTAssertEqual(on.problems.count, 1)
+    }
+
+    func testAFailedWriteLeavesNothingBehindInMcpocksFolder() throws {
+        try put("Claude/claude_desktop_config.json", desktopConfig)
+        let off = desktopPlan(on: false)
+        try put("Claude/claude_desktop_config.json", desktopConfig + "\n")
+        XCTAssertNotNil(SwitchWriter.apply(off, backups: backups, parked: parked).error)
+        XCTAssertEqual(ParkedStore.entries(agent: "Claude Desktop", configPath: path("Claude/claude_desktop_config.json"), directory: parked), [:])
+        XCTAssertEqual(desktop().filter(\.turnedOff).count, 0)
+    }
+
     func testServersSwitchedOffInTheirFileAreListedAndNeverStarted() throws {
         try seed()
         try put(".codex/config.toml", "[mcp_servers.openrouter]\ncommand = \"npx\"\nenabled = false\n")

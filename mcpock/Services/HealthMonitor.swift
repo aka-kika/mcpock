@@ -321,6 +321,8 @@ final class HealthMonitor {
         claudeJSON: (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json"))
     /// Where a config is copied before it is changed. Replaced in tests.
     @ObservationIgnored var switchBackups = SwitchWriter.backupDirectory
+    /// Where a server Claude Desktop can't keep in its file waits while off.
+    @ObservationIgnored var switchParked = ParkedStore.defaultDirectory
 
     /// What turning a row on or off would change: read, nothing written.
     /// `configIDs` nil is every declaration of the row ("everywhere").
@@ -328,16 +330,17 @@ final class HealthMonitor {
         let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
         let configs = servers.map(\.config).filter { ids.contains($0.id) }
         return SwitchPlanner.plan(server: groupName, configs: configs, turnOn: turnOn,
-                                  claudeSettingsPath: claudeSettingsPath, running: SwitchPlanner.isRunning)
+                                  claudeSettingsPath: claudeSettingsPath, running: SwitchPlanner.isRunning,
+                                  parkedDirectory: switchParked)
     }
 
     /// Writes a plan she confirmed, then reads the configs again; a server
     /// turned on is checked at once. The only write to another app's file.
     func applySwitch(_ plan: SwitchPlan) async -> SwitchWriter.Outcome {
         guard switchesEnabled else { return SwitchWriter.Outcome(error: .failed("")) }
-        let backups = switchBackups
+        let backups = switchBackups, parked = switchParked
         let outcome = await Task.detached(priority: .userInitiated) {
-            SwitchWriter.apply(plan, backups: backups)
+            SwitchWriter.apply(plan, backups: backups, parked: parked)
         }.value
         if plan.turnOn, !outcome.written.isEmpty {
             await refresh(groupName: plan.server)
