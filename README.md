@@ -29,18 +29,17 @@ server, and shows you what needs attention and why, so you (or your agent) can
 fix it. It changes a config only when you flip a switch: it shows you the
 change first and keeps a backup.
 
-## What's new in 1.14
+## What's new in 1.15
 
-- **Turn a server on or off:** a switch beside each agent on the server's card,
-  and **Turn off everywhere**. Off means the agent does not start it next time;
-  on puts it back as it was.
-- **You see it first:** a sheet says what happens in each agent and when it
-  counts, with the exact lines one click away. A backup is saved before every
-  change.
-- **Turned off, not gone:** servers that are off sit behind one line at the end
-  of the list, and agents can read what is off with `mcpock_switches`.
+- **Hide single tools:** a switch beside each tool on the server's card. Your
+  agents stop seeing that tool; nothing is deleted, and one click shows it again.
+- **See which tools you use:** with Usage counts on, each tool shows its calls
+  and when it was last used. Tools not used lately fold together, with one
+  **Hide all** button.
+- **Every agent, untick to keep:** the sheet lists each agent that has the
+  server; untick one to leave it alone. A backup is saved before every change.
 
-Full notes: [1.14.0](docs/release-notes/1.14.0.md). Earlier: [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md), [1.12.1](docs/release-notes/1.12.1.md).
+Full notes: [1.15.0](docs/release-notes/1.15.0.md). Earlier: [1.14.0](docs/release-notes/1.14.0.md) (the server switch), [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md).
 
 ## What it does
 
@@ -80,9 +79,9 @@ Full notes: [1.14.0](docs/release-notes/1.14.0.md). Earlier: [1.13.0](docs/relea
   stay listed below, faded.
 - **Usage counts, if you want them.** One switch in Settings > General, off for
   a new install. Then, next to each server under an agent: how many times that
-  agent called it in the last 30 days. Read from the agent's own history on your
-  Mac: Claude Code, Grok, Cursor and Hermes today. A dash means that agent keeps
-  no record mcpock can read yet.
+  agent called it in the last 30 days, and on a server's card, the same per tool.
+  Read from the agent's own history on your Mac: Claude Code, Grok, Cursor and
+  Hermes today. A dash means that agent keeps no record mcpock can read yet.
 - **Detail card.** Click a row: the full error (with **Ask an agent** and
   **Copy errors**), which agents use the server and where their config lives,
   its tools (name and short description; **+N more** lists them all), and
@@ -195,7 +194,7 @@ Then ask your agent to "check my mcpock". The tools it gets:
 | `mcpock_status` | Counts: how many servers are fine, broken, slow, need a sign-in or are set up differently, and when mcpock last checked |
 | `mcpock_problems` | Every server that needs attention, with the reason, the agents and the config files involved |
 | `mcpock_server` | Everything about one server, by name |
-| `mcpock_switches` | Which servers are turned off, and in which agents |
+| `mcpock_switches` | Which servers are turned off, and in which agents, and which tools are hidden |
 
 All four are read-only. Secrets are masked (see below). If mcpock isn't
 running, hasn't checked yet, or its results are old, the answer says so.
@@ -281,8 +280,12 @@ letters.
   Desktop and Cursor have none, and an app that rewrites its own file can drop
   what it does not know (Claude Desktop does), so for these two the entry
   waits in `~/Library/Application Support/mcpock/parked/` (readable only by
-  you) and moves back when you turn it on. Nothing is deleted, and agents
-  can't flip a switch. Everything else only reads: "Open Config…" asks first, with Cancel
+  you) and moves back when you turn it on. The switch beside a tool hides
+  that tool the same way, in the agent's own setting: Claude Code's deny list,
+  `disabled_tools` in Codex, Grok's `disabled_mcp_tools`, `tools: exclude` in
+  Hermes, `available_tools` in Goose, a deny rule in OpenCode (Cursor and
+  Claude Desktop have none). Nothing is deleted, and agents can't flip a
+  switch. Everything else only reads: "Open Config…" asks first, with Cancel
   as the default.
 - **What it runs.** To check a local server, mcpock starts the exact command
   from your config, with its arguments and environment, in its project folder

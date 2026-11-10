@@ -361,6 +361,9 @@ final class HealthMonitor {
         } else {
             await reloadConfigs(fullScan: false)
         }
+        // Hidden tools are no server state: the status file is written anew
+        // so mcpock_switches tells agents at once (seen in the VM).
+        if plan.tools != nil, !outcome.written.isEmpty { statusDidChange() }
         return outcome
     }
 

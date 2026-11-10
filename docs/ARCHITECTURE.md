@@ -150,11 +150,24 @@ The one place mcpock changes another app's file, and only on her click.
 | `Services/GlobalHotKey.swift` | The panel shortcut from any app (1.10; her own keys since 1.12, `PanelShortcut`, default Control-Option-M): a Carbon `RegisterEventHotKey` (no permission prompt), on/off and the recorder in Settings > General, let go while recording; `PanelToggle` opens the Glass panel directly (`toggleFromShortcut`, on the pointer's screen) or clicks the MenuBarExtra item |
 | `Theme/Theme.swift` | Colour tokens (Light semantic, Dark soft dark), fonts, `AppearanceApplier` |
 
+### Hiding single tools (1.15)
+
+Same sheet, writer, backups and checks as the server switch; only the edits are new.
+
+| File | Role |
+|------|------|
+| `Services/Switch/ToolSwitch.swift` | `ToolMechanism`: each agent's own per-tool setting (Claude Code `mcp__<server>__<tool>` in `permissions.deny` of `~/.claude/settings.json`; Codex `disabled_tools`; Grok `[disabled_mcp_tools]` `<server> = [...]`, keeping its own `__managed_gateway_connectors`; Hermes `tools.exclude`, refused when `include` is set; Goose `available_tools`, an allow list, so hiding writes the other tools and showing all writes `[]`; OpenCode v2 `permissions` deny rules, appended last). `hidden` reads, `edited` writes and `verify` checks: JSON compared as data with mcpock's own rules taken out, TOML and YAML as a short run of changed lines plus the reader. Lists are written on one line; a list over several lines is left alone. Showing everything again removes what mcpock added, so the file is as it was. `TOMLList` and `YAMLEntry` are the line editors |
+| `Services/Switch/ToolPlan.swift` | `ToolPlanner.plan` builds a `SwitchPlan` with `tools` set (plain words, when it counts); agents with no setting are `skipped` and shown as greyed rows. `hiddenTools` reads what each declaration hides |
+| `HealthMonitor.toolPlan` / `hiddenTools`, `PanelState.askToolSwitch` / `untickedPaths` / `ticked` | A tool switch, **Hide all** or **Show all** opens the sheet; unticked files are left out of the write. After a write the status file is written anew |
+| `CardText.toolSections` | The card's tools: used (most calls first), not used in the window, hidden in every agent that can hide tools; one hidden in only some stays in place with "Hidden in Codex" |
+| `UsageStore.toolUsage` | Calls per tool in the window and the last day on record, across every agent's records (usage.json version 4; files from before are read once more from the start for the tool counts only) |
+| `StatusSnapshot` `hiddenTools` | Per agent, in `status.json`, `mcpock_switches` and `mcpock_server` |
+
 ### Usage counts (1.7)
 
 | File | Role |
 |------|------|
-| `Services/Usage/UsageReader.swift` | The contract: `UsageEvent` (agent, server, date; nothing else), `UsageCursor` (where each source stopped, and the newest call counted from it: a source that starts over counts only newer calls), `UsageReader` |
+| `Services/Usage/UsageReader.swift` | The contract: `UsageEvent` (agent, server, date and, since 1.15, the tool name; nothing else), `UsageCursor` (where each source stopped, and the newest call counted from it: a source that starts over counts only newer calls), `UsageReader` |
 | `Services/Usage/UsageStore.swift` | Runs the readers off the main thread, daily buckets per (agent, normalized server), windows 7 / 30 days / all time, persists counts and cursors to `usage.json`; refresh at most every 10 min after a full cycle |
 | `Services/Usage/UsageReaders.swift` | `UsageReaders.all`: the readers in use |
 | `Services/Usage/ClaudeCodeUsageReader.swift` | `~/.claude/projects/**/*.jsonl`, `mcp__<server>__<tool>`, byte offsets per file |
@@ -341,12 +354,13 @@ falls back to streamable HTTP, because many configs label streamable servers
     **names** only; `SecretMask` masks the rest. `StatusSnapshotTests`,
     `SecretMaskTests`.
 12. **mcpock writes another app's config only through the server switch**
-    (1.14), on her click, after the sheet showed the change: `SwitchWriter`
+    (1.14) and the tool switch (1.15), on her click, after the sheet showed the
+    change: `SwitchWriter`
     is the single write path, every write is checked (`ServerSwitch.verify`),
     backed up and done in one rename, and a file that changed since the sheet
     is refused. No other feature writes a config, and the helper has no write
     tool. Open Config… asks first, with Cancel as the default button.
-    `ServerSwitchTests`, `SwitchPlanTests`, `SwitchPanelTests`.
+    `ServerSwitchTests`, `SwitchPlanTests`, `SwitchPanelTests`, `ToolSwitchTests`.
 13. **Sandbox off; the only entitlement is the App Group** the widgets read
     their snapshot from. No sandbox is needed to spawn servers and read configs
     under `~`. Hardened runtime is added only when `scripts/release.sh`
