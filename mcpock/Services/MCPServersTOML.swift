@@ -338,7 +338,7 @@ enum MCPServersTOML {
 
     /// Pull the quoted string elements out of a (possibly multi-line) TOML array.
     /// Brackets, commas and whitespace between elements are ignored.
-    private static func parseInlineArray(_ text: String) -> [String] {
+    static func parseInlineArray(_ text: String) -> [String] {
         var result: [String] = []
         let chars = Array(text)
         var i = 0

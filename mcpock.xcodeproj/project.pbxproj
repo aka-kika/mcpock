@@ -16,6 +16,7 @@
 		0A41870049B13CEB66950A47 /* SettingsAboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51409B6B9CE54C86326ADFCF /* SettingsAboutPane.swift */; };
 		0E503E64B07BC3A6234F8EA9 /* ErrorExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1358301F8039007A0DF843 /* ErrorExportTests.swift */; };
 		0E776620CA6DA492EE8BAE52 /* DemoDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5F772519B829DA2EB17D47 /* DemoDataTests.swift */; };
+		0E9F5EB4CDD14DF5E3826516 /* ToolSwitch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E26EB056FBA676AC684E1A /* ToolSwitch.swift */; };
 		0F099378C2C1DBA80BA3278A /* MenuBarPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0407473E88CD5EF716C90DA5 /* MenuBarPanelView.swift */; };
 		0F92F5D2FAFE7066F8DD8CEF /* ConfigVariables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FCC72828BAD8AA159BC1E3 /* ConfigVariables.swift */; };
 		0F92FECEA218FFB43FFF04B6 /* HealthMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F0FF81443366BED2D0CC60 /* HealthMonitor.swift */; };
@@ -57,6 +58,7 @@
 		3B6C03E564744FDCE503DD81 /* ListeningPortsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB8D8C1AA5DBFDBF7064BC3 /* ListeningPortsTests.swift */; };
 		3BE9C7DC1662E3BDD3512A09 /* HeadersHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354114E69A4A0C84DE5B5F31 /* HeadersHelperTests.swift */; };
 		3D22AAFDF6397CB3F96B87EF /* ConfigWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509359A528B9B8170C6E7A13 /* ConfigWatcherTests.swift */; };
+		3F48E3A3989805BDB50856AF /* ToolSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F612B526974F65765865FC /* ToolSwitchTests.swift */; };
 		3FB25A4BE17E4A9532FEE028 /* SettingsLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C66CF8F6F69F4C1BE60286 /* SettingsLauncher.swift */; };
 		409DA0DD72CDD8BB6FFB9148 /* WidgetReloadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA0422E4328AA172827BBD6 /* WidgetReloadPolicy.swift */; };
 		430DACDEC25AE3A3323A3513 /* PanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */; };
@@ -290,6 +292,7 @@
 		117C8C04C6CD01D7DE96E99A /* StaleRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaleRowTests.swift; sourceTree = "<group>"; };
 		11DB586624AD507321224BAC /* ServerGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerGroupingTests.swift; sourceTree = "<group>"; };
 		11F1D63302811307369E428E /* HealthSmoothingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSmoothingTests.swift; sourceTree = "<group>"; };
+		13E26EB056FBA676AC684E1A /* ToolSwitch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolSwitch.swift; sourceTree = "<group>"; };
 		14E4564224EC9F8C041E219F /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		14F98A52F49ACD8C24EA7164 /* MCPServersYAML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServersYAML.swift; sourceTree = "<group>"; };
 		1525200D17A26421B74345A5 /* StatusWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusWidgetView.swift; sourceTree = "<group>"; };
@@ -359,6 +362,7 @@
 		66025BFE9342F7F8A33E399E /* AgentBadgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBadgeTests.swift; sourceTree = "<group>"; };
 		6666A0C03AB65C936C6492BA /* ShortReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortReason.swift; sourceTree = "<group>"; };
 		668454E3E5795BEF3D1D37BC /* PanelStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateTests.swift; sourceTree = "<group>"; };
+		66F612B526974F65765865FC /* ToolSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolSwitchTests.swift; sourceTree = "<group>"; };
 		672DC5F12110874E7195153A /* HealthMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthMark.swift; sourceTree = "<group>"; };
 		6766AE0FF7F136B82DFFF6B5 /* AgentSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSections.swift; sourceTree = "<group>"; };
 		67AD38447840BE0147930A9F /* WidgetColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetColors.swift; sourceTree = "<group>"; };
@@ -618,6 +622,7 @@
 				8D354EF49B4DADDD58F07225 /* ThemeTests.swift */,
 				C3BB31AE1CFFF0A3EE0A2F59 /* TimerRoundTests.swift */,
 				F2CE608C22C1FB8E72A9DB85 /* TinycastConfigTests.swift */,
+				66F612B526974F65765865FC /* ToolSwitchTests.swift */,
 				604C66D104D046D2409E3E5F /* UpdateControllerTests.swift */,
 				878B863EF5565076330EEE51 /* UsageTests.swift */,
 				6A98661598453A5D2CB19FEA /* WhatsNewTests.swift */,
@@ -720,6 +725,7 @@
 				F640ADF34093CC39B7AF00A5 /* ParkedStore.swift */,
 				8F4DC7CB6CDAA1B907C5270F /* ServerSwitch.swift */,
 				F9188CF7C79B6B730E1BFC65 /* SwitchPlan.swift */,
+				13E26EB056FBA676AC684E1A /* ToolSwitch.swift */,
 			);
 			path = Switch;
 			sourceTree = "<group>";
@@ -1083,6 +1089,7 @@
 				BD5312C84A2BAC5D502E7C7D /* StdioProbe.swift in Sources */,
 				A29A7467A0919B5BA4DEEC3D /* SwitchPlan.swift in Sources */,
 				667AC602C4A0F0D46A664024 /* Theme.swift in Sources */,
+				0E9F5EB4CDD14DF5E3826516 /* ToolSwitch.swift in Sources */,
 				D63A6D7D84C1CF1D62351E59 /* UpdateController.swift in Sources */,
 				A31B855F8817AD399A5EE9D7 /* UsageReader.swift in Sources */,
 				281BCB20DEF741A405C611BD /* UsageReaders.swift in Sources */,
@@ -1199,6 +1206,7 @@
 				E470A52B4097D0404D38E355 /* ThemeTests.swift in Sources */,
 				8A92AF8A3F70489FDE858965 /* TimerRoundTests.swift in Sources */,
 				F00A62EAD7E861ED7C0CA1EE /* TinycastConfigTests.swift in Sources */,
+				3F48E3A3989805BDB50856AF /* ToolSwitchTests.swift in Sources */,
 				52B50363CFA9EFFBF5D3FC93 /* UpdateControllerTests.swift in Sources */,
 				614771CBE72D3933C1C4A91A /* UsageTests.swift in Sources */,
 				28337570805DE4FEEFD1BD3F /* WhatsNewTests.swift in Sources */,
