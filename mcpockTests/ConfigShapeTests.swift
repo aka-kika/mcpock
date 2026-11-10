@@ -36,7 +36,8 @@ final class ConfigShapeTests: XCTestCase {
         XCTAssertEqual(byName["cbm"]?.entry["args"] as? [String], ["--serve"])
         XCTAssertEqual((byName["cbm"]?.entry["env"] as? [String: String])?["K"], "v", "`environment` becomes `env`")
         XCTAssertEqual(byName["remote"]?.entry["url"] as? String, "https://x/mcp")
-        XCTAssertNil(byName["off"], "enabled: false is dropped, as in the TOML/YAML readers")
+        XCTAssertEqual(byName["off"]?.entry[ServerSwitch.offKey] as? Bool, true, "enabled: false is kept and marked off (1.14)")
+        XCTAssertNil(byName["cbm"]?.entry[ServerSwitch.offKey])
 
         let configs = ConfigDiscovery.configs(from: entries, source: ServerSource(label: "OpenCode"), idPrefix: "oc")
         XCTAssertEqual(configs.first { $0.name == "cbm" }?.commandLine, "/usr/local/bin/cbm --serve")
@@ -54,9 +55,10 @@ final class ConfigShapeTests: XCTestCase {
         XCTAssertEqual(settings?.first?.entry["url"] as? String, "https://api.example/mcp")
     }
 
-    func testJSONShapeDropsDisabledMcpServersEntries() {
-        let entries = JSONConfigShape.parse(#"{"mcpServers":{"on":{"command":"a","enabled":true},"off":{"command":"b","enabled":false}}}"#)!
-        XCTAssertEqual(entries.map(\.name), ["on"])
+    func testJSONShapeMarksDisabledAndParkedEntriesOff() {
+        let entries = JSONConfigShape.parse(#"{"mcpServers":{"on":{"command":"a","enabled":true},"off":{"command":"b","enabled":false}},"_mcpock_disabled":{"parked":{"command":"c"}}}"#)!
+        XCTAssertEqual(entries.filter { $0.entry[ServerSwitch.offKey] == nil }.map(\.name), ["on"])
+        XCTAssertEqual(Set(entries.filter { $0.entry[ServerSwitch.offKey] as? Bool == true }.map(\.name)), ["off", "parked"])
     }
 
     func testConfigsBuilderProducesServerConfigs() {
@@ -144,7 +146,8 @@ final class ConfigShapeTests: XCTestCase {
     /// with `"disabled": true`; Claude Code with a project's `disabledMcpServers`.
     func testDisabledEntriesAreDropped() throws {
         let cline = #"{"mcpServers":{"on":{"command":"a"},"off":{"command":"b","disabled":true},"kept":{"command":"c","disabled":false}}}"#
-        XCTAssertEqual(Set(try XCTUnwrap(JSONConfigShape.parse(cline)).map(\.name)), ["on", "kept"])
+        // 1.14: `disabled` entries stay, marked off; a project's own are still dropped.
+        XCTAssertEqual(Set(try XCTUnwrap(JSONConfigShape.parse(cline)).filter { $0.entry[ServerSwitch.offKey] == nil }.map(\.name)), ["on", "kept"])
 
         let claude = #"{"mcpServers":{"vera":{"command":"v"}},"projects":{"/repo":{"mcpServers":{"local":{"command":"l"},"quiet":{"command":"q"}},"disabledMcpServers":["quiet","vera"]}}}"#
         let entries = try XCTUnwrap(JSONConfigShape.parse(claude))

@@ -60,7 +60,7 @@ struct HealthMark: View {
                 .fill(theme.statusBroken)
                 .frame(width: Self.diamondSide, height: Self.diamondSide)
                 .rotationEffect(.degrees(45))
-        case .selfManaged, .paused:
+        case .selfManaged, .paused, .off:
             Capsule()
                 .fill(theme.textTertiary)
                 .frame(width: 7, height: 2)
@@ -90,6 +90,7 @@ struct HealthMark: View {
         case .selfManaged: return "Runs inside its app"
         case .paused: return "Paused"
         case .needsApp: return "Needs its app open"
+        case .off: return "Turned off"
         }
     }
 

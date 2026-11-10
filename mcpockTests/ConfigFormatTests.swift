@@ -381,9 +381,11 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertNil(servers["memory"], "type: builtin is internal")
     }
 
-    func testGooseSkipsDisabledServer() {
+    /// 1.14: kept and marked off (dropped before), so the switch can turn it on.
+    func testGooseMarksDisabledServerOff() {
         let servers = GooseConfig.servers(fromYAML: gooseSample)
-        XCTAssertNil(servers["supabase"], "enabled: false servers must be dropped")
+        XCTAssertEqual(servers["supabase"]?[ServerSwitch.offKey] as? Bool, true)
+        XCTAssertNil(servers["pieces"]?[ServerSwitch.offKey])
     }
 
     func testGooseIgnoresContentOutsideExtensionsBlock() {
@@ -391,7 +393,7 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertNil(servers["providers"])
         XCTAssertNil(servers["ollama"])
         XCTAssertEqual(Set(servers.keys),
-                       ["xcodebuildmcp", "notes_vault", "pieces", "dev_to", "reed_md", "playwright"])
+                       ["xcodebuildmcp", "notes_vault", "pieces", "dev_to", "reed_md", "playwright", "supabase"])
     }
 
     func testGooseDiscoveryEndToEnd() {
@@ -457,8 +459,9 @@ final class ConfigFormatTests: XCTestCase {
         let yaml = ["False", "no", "OFF", "false"].enumerated().map { i, word in
             "  s\(i):\n    command: /bin/true\n    enabled: \(word)\n"
         }.joined()
-        XCTAssertEqual(MCPServersYAML.servers(fromYAML: "mcp_servers:\n" + yaml + "  on:\n    command: /bin/true\n    enabled: True\n").keys.sorted(),
-                       ["on"])
+        let servers = MCPServersYAML.servers(fromYAML: "mcp_servers:\n" + yaml + "  on:\n    command: /bin/true\n    enabled: True\n")
+        XCTAssertEqual(servers.filter { $0.value[ServerSwitch.offKey] == nil }.keys.sorted(), ["on"])
+        XCTAssertEqual(servers.filter { $0.value[ServerSwitch.offKey] as? Bool == true }.keys.sorted(), ["s0", "s1", "s2", "s3"])
     }
 
     // MARK: - Hermes / YAML `mcp_servers:`
@@ -532,8 +535,8 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertNil(servers["default"])
     }
 
-    func testHermesSkipsDisabledServer() {
-        XCTAssertNil(MCPServersYAML.servers(fromYAML: hermesSample)["working-agents"])
+    func testHermesMarksDisabledServerOff() {
+        XCTAssertEqual(MCPServersYAML.servers(fromYAML: hermesSample)["working-agents"]?[ServerSwitch.offKey] as? Bool, true)
     }
 
     func testHermesDiscoveryEndToEnd() {
@@ -543,7 +546,8 @@ final class ConfigFormatTests: XCTestCase {
         XCTAssertEqual(byName["reed-md"]?.transport, .http)
         XCTAssertEqual(byName["reed-md"]?.headers["Authorization"], "Bearer abc:def")
         XCTAssertEqual(byName["desktop-commander"]?.commandLine, "npx -y @wonderwhy-er/desktop-commander@latest")
-        XCTAssertNil(byName["working-agents"])
+        XCTAssertEqual(byName["working-agents"]?.turnedOff, true)
+        XCTAssertEqual(byName["reed-md"]?.turnedOff, false)
     }
 
     /// The Goose shape and the Hermes shape must not claim each other's files.

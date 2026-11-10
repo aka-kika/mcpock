@@ -21,16 +21,19 @@ enum PanelText {
         guard !groups.isEmpty else { return "No servers found" }
         let needs = groups.filter(PanelSections.needsYou).count
         let notChecked = groups.filter { !PanelSections.needsYou($0) && $0.isNotCheckedByMcpock }.count
-        return twoNumbers(count(groups.count, "server", "servers"), needs: needs, notChecked: notChecked)
+        let off = groups.filter(\.isOffEverywhere).count
+        return twoNumbers(count(groups.count, "server", "servers"), needs: needs, notChecked: notChecked, off: off)
     }
 
     /// "41 servers · 4 need you · 5 not checked", "41 servers, all fine". The
     /// Agents tab says the same about its agents.
-    static func twoNumbers(_ total: String, needs: Int, notChecked: Int) -> String {
-        guard needs > 0 || notChecked > 0 else { return total + ", all fine" }
+    /// 1.14: "· 2 off" for servers switched off in every agent that has them.
+    static func twoNumbers(_ total: String, needs: Int, notChecked: Int, off: Int = 0) -> String {
+        guard needs > 0 || notChecked > 0 || off > 0 else { return total + ", all fine" }
         var parts = [total]
         if needs > 0 { parts.append("\(needs) \(needs == 1 ? "needs" : "need") you") }
         if notChecked > 0 { parts.append("\(notChecked) not checked") }
+        if off > 0 { parts.append("\(off) off") }
         return parts.joined(separator: " \u{00B7} ")
     }
 
@@ -68,6 +71,7 @@ enum PanelText {
         if c.differs > 0 { parts.append("\(c.differs) set up differently") }
         if c.lost > 0 { parts.append("\(c.lost) lost in a session") }
         if c.needsApp > 0 { parts.append("\(c.needsApp) \(c.needsApp == 1 ? "needs its app" : "need their app")") }
+        if c.off > 0 { parts.append("\(c.off) turned off") }
         if firstPass {
             parts.insert("Checking\u{2026}", at: 0)
         } else {
@@ -108,6 +112,7 @@ enum PanelText {
         let waiting: Int
         let lost: Int
         let incomplete: Int
+        let off: Int
 
         init(_ groups: [ServerGroup]) {
             broken = groups.filter { $0.state == .broken }.count
@@ -120,6 +125,7 @@ enum PanelText {
             checking = groups.filter { $0.state == .unknown }.count
             waiting = groups.filter(\.waitsForFileOK).count
             lost = groups.filter(\.droppedInSession).count
+            off = groups.filter(\.isOffEverywhere).count
         }
     }
 

@@ -29,14 +29,16 @@ enum GooseConfig {
         return servers.map { DiscoveredEntry(name: $0.key, entry: $0.value) }
     }
 
-    /// One extension's fields → its entry, or nil if it's disabled, Goose-internal,
+    /// One extension's fields → its entry (marked off when disabled), or nil if it's Goose-internal
     /// or missing its endpoint.
     private static func entry(fromFields fields: [String: YAMLBlock.Value]) -> [String: Any]? {
-        if let enabled = fields["enabled"]?.scalar, enabled.lowercased() != "true" { return nil }
+        let off = fields["enabled"]?.scalar.map { $0.lowercased() != "true" } ?? false
         let type = fields["type"]?.scalar ?? ""
         guard type == "stdio" || type == "sse" || type == "streamable_http" else { return nil }
 
         var entry: [String: Any] = [:]
+        // Switched off in Goose: listed as turned off, never started (1.14).
+        if off { entry[ServerSwitch.offKey] = true }
         if type == "stdio" {
             guard let cmd = fields["cmd"]?.scalar, !cmd.isEmpty else { return nil }
             entry["command"] = cmd

@@ -33,16 +33,29 @@ enum ShortReason {
             return group.state == .broken ? "Broken" : "Slow"
         case .healthy:
             if group.droppedInSession { return sessionDropLine(group.sessionDrops) }
-            return group.differsNeedsAttention ? differs(group.differs) : nil
+            return group.differsNeedsAttention ? differs(group.differs) : offNote(for: group)
         // Unknown rows sit in their normal section with the unknown ring (they
         // never need you), so they get no second line.
         case .paused:
             return group.waitsForFileOK ? waitingNote : nil
-        case .unknown, .selfManaged:
+        case .unknown, .selfManaged, .off:
             return nil
         case .needsApp:
             return group.needsAppName.map { "Needs \($0) open" } ?? "Needs its app open"
         }
+    }
+
+    /// Beside a switched-off server on the Agents tab (1.14).
+    static let offWord = "Off"
+
+    /// "Off in Cursor": under a row that runs in some agents and is switched
+    /// off in others (1.14). Quiet: it is her choice, not a problem. Nil when
+    /// it is off nowhere, or everywhere (that row sits under Turned off).
+    static func offNote(for group: ServerGroup) -> String? {
+        guard !group.isOffEverywhere else { return nil }
+        var agents: [String] = []
+        for label in group.offLabels.map(AgentBadge.displayLabel) where !agents.contains(label) { agents.append(label) }
+        return agents.isEmpty ? nil : clip("Off in \(CardText.list(agents))")
     }
 
     /// Map one `failureReason` to a short line. `state` only changes the wording of

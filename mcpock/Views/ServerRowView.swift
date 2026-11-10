@@ -121,8 +121,9 @@ struct ServerRowView: View {
         switch group.state {
         case .broken: return theme.statusBroken
         case .degraded: return theme.statusDegraded
-        case .healthy: return theme.statusDegraded
-        case .unknown, .selfManaged, .paused: return theme.textTertiary
+        // "Off in Cursor" is her choice, not a warning.
+        case .healthy: return group.attentionWhileHealthy ? theme.statusDegraded : theme.textTertiary
+        case .unknown, .selfManaged, .paused, .off: return theme.textTertiary
         case .needsApp: return theme.textSecondary
         }
     }

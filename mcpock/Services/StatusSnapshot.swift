@@ -79,6 +79,9 @@ enum StatusSnapshot {
     /// panel, so never a problem here (review 2026-10-30, fe94); only counted.
     static let notCheckedStatus = "not checked"
 
+    /// Switched off in every agent that has it (1.14).
+    static let offStatus = "turned off"
+
     /// A config entry with no command or url.
     static let badConfigStatus = "bad config"
 
@@ -101,6 +104,7 @@ enum StatusSnapshot {
         case .paused: return "paused"
         case .selfManaged: return "managed by its app"
         case .needsApp: return "needs \(group.needsAppName ?? "its app") open"
+        case .off: return offStatus
         }
     }
 

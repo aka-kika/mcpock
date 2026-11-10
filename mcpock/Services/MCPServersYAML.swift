@@ -30,8 +30,9 @@ enum MCPServersYAML {
         for (name, fields) in YAMLBlock.entries(in: text, under: "mcp_servers") {
             // Every YAML false word, any case: `False`, `no`, `off` started the
             // server anyway (r3 cdf6).
-            if let enabled = fields["enabled"]?.scalar, Self.isYAMLFalse(enabled) { continue }
             var entry: [String: Any] = [:]
+            // Kept and marked off since 1.14 (dropped before).
+            if let enabled = fields["enabled"]?.scalar, Self.isYAMLFalse(enabled) { entry[ServerSwitch.offKey] = true }
             if let command = fields["command"]?.scalar, !command.isEmpty { entry["command"] = command }
             if let url = fields["url"]?.scalar, !url.isEmpty { entry["url"] = url }
             if let type = fields["type"]?.scalar, !type.isEmpty { entry["type"] = type }

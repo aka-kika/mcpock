@@ -69,9 +69,10 @@ struct ConfigShape {
 /// - `{"mcp": {<name>: {...}}}` — OpenCode, whose `command` is an argv array and
 ///   whose env map is called `environment`.
 ///
-/// `"enabled": false` and `"disabled": true` entries are dropped, matching the
-/// TOML and YAML readers, and so are a Claude Code project's own servers named
-/// in its `disabledMcpServers`.
+/// `"enabled": false` and `"disabled": true` entries are kept and marked off
+/// (`ServerSwitch.offKey`), like the TOML and YAML readers' and the ones
+/// mcpock parked under `_mcpock_disabled`. A Claude Code project's own
+/// servers named in its `disabledMcpServers` are dropped.
 ///
 /// `genericKeys: false` reads only `mcpServers`: the scan uses it for files whose
 /// name is not a known MCP config name (see `ConfigScanner.scanShapes`).
@@ -86,6 +87,14 @@ enum JSONConfigShape {
         var entries: [DiscoveredEntry] = []
         if let global = root["mcpServers"] as? [String: Any] {
             entries.append(contentsOf: extract(global, projectPath: nil))
+        }
+        // Parked by mcpock's own switch (1.14): listed as turned off.
+        if let parked = root[ServerSwitch.parkedKey] as? [String: Any] {
+            entries.append(contentsOf: extract(parked, projectPath: nil).map {
+                var entry = $0.entry
+                entry[ServerSwitch.offKey] = true
+                return DiscoveredEntry(name: $0.name, entry: entry, projectPath: nil)
+            })
         }
         if let projects = root["projects"] as? [String: Any] {
             for (projectPath, value) in projects {
@@ -115,9 +124,11 @@ enum JSONConfigShape {
     private static func extract(_ dict: [String: Any], projectPath: String?) -> [DiscoveredEntry] {
         dict.compactMap { name, value in
             guard var entry = value as? [String: Any] else { return nil }
-            if (entry["enabled"] as? Bool) == false { return nil }
-            // Cline, Roo Code and Windsurf say it the other way round.
-            if (entry["disabled"] as? Bool) == true { return nil }
+            // Switched off in the file: kept, marked off, never started (1.14;
+            // dropped before). Cline, Roo Code and Windsurf say `disabled`.
+            if (entry["enabled"] as? Bool) == false || (entry["disabled"] as? Bool) == true {
+                entry[ServerSwitch.offKey] = true
+            }
             normalize(&entry)
             return DiscoveredEntry(name: name, entry: entry, projectPath: projectPath)
         }

@@ -298,7 +298,7 @@ final class HealthMonitor {
         AppPreferences.savePausedServers(pausedNames, to: defaults)
         statusDidChange()
         for index in servers.indices where Self.normalizedName(servers[index].config.name) == key {
-            if servers[index].awaitingFileOK { continue }
+            if servers[index].awaitingFileOK || servers[index].config.turnedOff { continue }
             if paused {
                 servers[index].state = .paused
                 servers[index].failureReason = nil
@@ -378,7 +378,7 @@ final class HealthMonitor {
         // Self-managed servers are their host app's business, and paused servers
         // aren't being probed at all — neither must ever color the menu-bar icon,
         // so an all-self-managed or all-paused set reads as healthy.
-        case .healthy, .selfManaged, .paused, .needsApp: return anyDiffers ? .attention : .allHealthy
+        case .healthy, .selfManaged, .paused, .needsApp, .off: return anyDiffers ? .attention : .allHealthy
         }
     }
 
@@ -725,7 +725,15 @@ final class HealthMonitor {
         return configs.compactMap { config in
             guard seenIDs.insert(config.id).inserted else { return nil }
             let awaiting = allowedScanFiles.map { awaitsFileOK(config, allowed: $0) } ?? false
-            if let prev = byID[config.id], probeSpec(prev.config) == probeSpec(config), prev.awaitingFileOK == awaiting {
+            // Switched off in its agent (1.14): listed, never started. It keeps
+            // the tools it last reported, for the card.
+            if config.turnedOff {
+                var snap = ServerSnapshot(config: config, state: .off, tools: byID[config.id]?.tools ?? [])
+                snap.awaitingFileOK = awaiting
+                return snap
+            }
+            if let prev = byID[config.id], probeSpec(prev.config) == probeSpec(config), prev.awaitingFileOK == awaiting,
+               !prev.config.turnedOff {
                 var snap = prev
                 snap.config = config
                 return snap
@@ -848,7 +856,7 @@ final class HealthMonitor {
             let ids = Set(Self.instanceIDs(forGroup: groupName, in: self.servers))
             guard !ids.isEmpty else { return }
 
-            let targets = self.servers.filter { ids.contains($0.id) && !$0.awaitingFileOK }
+            let targets = self.servers.filter { ids.contains($0.id) && !$0.awaitingFileOK && !$0.config.turnedOff }
             let specGroups = Dictionary(grouping: targets, by: { Self.probeSpec($0.config) })
             let probe = self.probeWithHostApp()
             let results = await withTaskGroup(of: ([String], (ProbeResult, HostLookup)).self) { group in
@@ -886,7 +894,7 @@ final class HealthMonitor {
         record(lookup, for: servers[index].config)
         // A pause issued while this probe was in flight wins: never overwrite
         // `.paused` with a stale result.
-        guard !isPaused(servers[index].config.name) else { return }
+        guard !isPaused(servers[index].config.name), !servers[index].config.turnedOff else { return }
         // Failed while the app it belongs to is closed: waiting, not broken.
         // No backoff, so it turns fine at the next check once the app runs.
         if result.state != .healthy, result.state != .selfManaged,
@@ -987,7 +995,8 @@ final class HealthMonitor {
                     awaitingFileOK: v.awaitingFileOK
                 )
             }
-            let configs = variants.map(\.config)
+            // A switched-off declaration is not compared: nothing starts it.
+            let configs = variants.map(\.config).filter { !$0.turnedOff }
             let notes = Differs.split(Differs.detect(configs), configs: configs, saved: acknowledged[key])
             return ServerGroup(
                 name: name,
@@ -1224,7 +1233,7 @@ final class HealthMonitor {
         _ snapshot: ServerSnapshot, pausedNames: Set<String>, force: Bool, now: Date
     ) -> Bool {
         if pausedNames.contains(normalizedName(snapshot.config.name)) { return false }
-        if snapshot.awaitingFileOK { return false }
+        if snapshot.awaitingFileOK || snapshot.config.turnedOff { return false }
         return force || isDue(snapshot, now: now)
     }
 

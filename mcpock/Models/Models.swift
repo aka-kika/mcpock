@@ -39,6 +39,8 @@ enum HealthState: String, Sendable, Hashable {
     /// `wake-mcp`, Reed's local port): "Needs Wake open", not broken. Calm:
     /// never red, never counted as broken (2026-10-16).
     case needsApp
+    /// Switched off in its agent's config: listed, never started (1.14).
+    case off
 
     var sortRank: Int {
         switch self {
@@ -51,6 +53,8 @@ enum HealthState: String, Sendable, Hashable {
         case .needsApp: return 4
         case .selfManaged: return 5
         case .paused: return 6
+        // Last: a row reads "turned off" only when every agent has it off.
+        case .off: return 7
         }
     }
 }
@@ -99,6 +103,9 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
     /// stdout is a JSON object of HTTP headers (usually a fresh token). Only the
     /// command lives here; what it prints is run per probe and never stored.
     var headersHelper: String?
+    /// Switched off in its agent's own config (or parked by mcpock): the agent
+    /// does not start it, so mcpock doesn't either (1.14).
+    var turnedOff = false
 
     /// The same config with other static headers (the helper's output merged in
     /// for one probe). Never stored back into the monitor.
@@ -108,6 +115,7 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
             command: command, args: args, env: env, url: url, headers: newHeaders, builtin: builtin
         )
         copy.headersHelper = headersHelper
+        copy.turnedOff = turnedOff
         return copy
     }
 
@@ -291,8 +299,14 @@ struct ServerGroup: Identifiable, Sendable, Hashable {
     /// self-managed row is the user's (or its host app's) business, so it never
     /// lands in "Needs you" or rings the menu-bar icon for differing.
     var differsNeedsAttention: Bool {
-        isDiffering && state != .paused && state != .selfManaged
+        isDiffering && state != .paused && state != .selfManaged && state != .off
     }
+
+    /// The agents (display labels) that have it switched off.
+    var offLabels: [String] { sources.filter { $0.state == .off }.map(\.label) }
+
+    /// Off in every agent that has it.
+    var isOffEverywhere: Bool { state == .off }
     var sourceSummary: String { sourceLabels.joined(separator: " · ") }
 
     /// True when a declaration behind the row comes from a scan-only file she

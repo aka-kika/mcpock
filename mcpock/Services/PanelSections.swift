@@ -24,6 +24,9 @@ struct PanelSection: Identifiable, Hashable, Sendable {
         case needsYou
         case pinned
         case everythingElse
+        /// Switched off in every agent that has them (1.14): one folded line
+        /// at the end of the list, opened on a click.
+        case turnedOff
     }
 
     let kind: Kind
@@ -38,6 +41,7 @@ struct PanelSection: Identifiable, Hashable, Sendable {
         case .needsYou: return "Needs you"
         case .pinned: return "Pinned"
         case .everythingElse: return "Everything else"
+        case .turnedOff: return "Turned off"
         }
     }
 }
@@ -63,7 +67,7 @@ enum PanelSections {
         case .degraded: return group.notCheckedHere ? nil : 1
         case .healthy: return group.attentionWhileHealthy ? 2 : nil
         // Waiting for a closed app is calm: not a problem to fix (2026-10-16).
-        case .unknown, .selfManaged, .paused, .needsApp: return nil
+        case .unknown, .selfManaged, .paused, .needsApp, .off: return nil
         }
     }
 
@@ -77,7 +81,8 @@ enum PanelSections {
         groups.compactMap(needsYouRank).min()
     }
 
-    /// Build the sections, in order: **Needs you**, **Pinned**, **Everything else**.
+    /// Build the sections, in order: **Needs you**, **Pinned**, **Everything else**,
+    /// **Turned off** (1.14: rows switched off in every agent, pinned or not).
     /// Empty sections are left out.
     ///
     /// - `groups`: the rows to show (the caller passes the visible, un-hidden ones;
@@ -98,8 +103,10 @@ enum PanelSections {
         var needs: [ServerGroup] = []
         var pins: [ServerGroup] = []
         var rest: [ServerGroup] = []
+        var off: [ServerGroup] = []
         for group in candidates {
-            if needsYou(group) { needs.append(group) }
+            if group.isOffEverywhere { off.append(group) }
+            else if needsYou(group) { needs.append(group) }
             else if isPinned(group) { pins.append(group) }
             else { rest.append(group) }
         }
@@ -120,6 +127,7 @@ enum PanelSections {
         if filter != .problems {
             sections.append(PanelSection(kind: .pinned, groups: pins))
             sections.append(PanelSection(kind: .everythingElse, groups: rest))
+            sections.append(PanelSection(kind: .turnedOff, groups: off.sorted(by: byName)))
         }
         return sections.filter { $0.count > 0 }
     }

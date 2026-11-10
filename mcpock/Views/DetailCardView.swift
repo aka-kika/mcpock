@@ -129,7 +129,7 @@ struct DetailCardView: View {
         case .broken: return theme.statusBroken
         case .degraded: return theme.statusDegraded
         case .healthy: return group.attentionWhileHealthy ? theme.statusDegraded : theme.statusHealthy
-        case .unknown, .selfManaged, .paused, .needsApp: return theme.textSecondary
+        case .unknown, .selfManaged, .paused, .needsApp, .off: return theme.textSecondary
         }
     }
 
@@ -165,6 +165,8 @@ struct DetailCardView: View {
             }
             let host = CardText.list(group.agents.map(AgentBadge.displayLabel))
             return "Built into \(host). It runs inside that app, so mcpock doesn't check it."
+        case .off:
+            return "Turned off in every agent that has it, so nothing starts it and mcpock doesn't check it."
         case .unknown:
             return "Waiting for the first check."
         case .needsApp:

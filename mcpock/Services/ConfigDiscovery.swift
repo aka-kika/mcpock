@@ -59,10 +59,12 @@ enum ConfigDiscovery {
                 (try? String(contentsOfFile: path, encoding: .utf8)).map { ClaudeProjectApproval.projects(claudeJSON: $0) }
             }
         } ?? [:]
-        let userSettings = claudeJSON
-            .map { (($0 as NSString).deletingLastPathComponent as NSString).appendingPathComponent(".claude/settings.json") }
+        let settingsText = claudeJSON
+            .map(ServerSwitch.claudeSettingsPath(claudeJSON:))
             .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
-            .flatMap(ClaudeProjectApproval.object)
+        let userSettings = settingsText.flatMap(ClaudeProjectApproval.object)
+        // On Claude Code's blocked list: off in every project (1.14).
+        let denied = settingsText.map(ServerSwitch.deniedNames(inClaudeSettings:)) ?? []
 
         // 2. Scan: everything else, deduped against the registry.
         let hits = knownScanFiles.map(ConfigScanner.scan(files:)) ?? ConfigScanner.scan(roots: scanRoots)
@@ -82,6 +84,13 @@ enum ConfigDiscovery {
                 idPrefix: "scan:\(hit.path)",
                 projectPath: folder
             ))
+        }
+
+        if !denied.isEmpty {
+            for index in servers.indices
+            where servers[index].source.label == AgentRegistry.claudeCodeLabel && denied.contains(servers[index].name) {
+                servers[index].turnedOff = true
+            }
         }
 
         return servers.sorted {
@@ -180,6 +189,7 @@ enum ConfigDiscovery {
         let env = stringifyEnv(entry["env"])
         let headers = stringifyEnv(entry["headers"])
         let builtin = (entry["builtin"] as? Bool) ?? false
+        let turnedOff = (entry[ServerSwitch.offKey] as? Bool) ?? false
 
         let transport: TransportKind
         if let typeString {
@@ -203,7 +213,7 @@ enum ConfigDiscovery {
             // No command (and no url): kept as a row that says so, instead of
             // vanishing while the agent still lists it (r3 e412).
             let command = command.flatMap { $0.isEmpty ? nil : $0 }
-            return ServerConfig(
+            var config = ServerConfig(
                 id: "\(idPrefix):\(name)",
                 name: name,
                 source: source,
@@ -216,6 +226,8 @@ enum ConfigDiscovery {
                 headers: [:],
                 builtin: builtin
             )
+            config.turnedOff = turnedOff
+            return config
         }
 
         guard let urlString, !urlString.isEmpty else { return nil }
@@ -236,6 +248,7 @@ enum ConfigDiscovery {
             builtin: builtin
         )
         if let helper, !helper.isEmpty { config.headersHelper = helper }
+        config.turnedOff = turnedOff
         return config
     }
 

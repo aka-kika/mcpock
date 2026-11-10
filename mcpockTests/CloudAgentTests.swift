@@ -102,7 +102,8 @@ final class CloudAgentTests: XCTestCase {
             }}
             """)
         let configs = discover([KnownAgent(label: "Antigravity", path: file.path, shape: .json)])
-        XCTAssertEqual(configs.map(\.name), ["my-remote-server", "sqlite-explorer"], "a disabled server is left out")
+        XCTAssertEqual(configs.map(\.name), ["my-remote-server", "off-one", "sqlite-explorer"])
+        XCTAssertEqual(configs.filter(\.turnedOff).map(\.name), ["off-one"], "a disabled server is listed as turned off (1.14)")
         let remote = try XCTUnwrap(configs.first { $0.name == "my-remote-server" })
         XCTAssertEqual(remote.transport, .http)
         XCTAssertEqual(remote.url, "https://api.example.com/mcp/")

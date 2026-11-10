@@ -173,7 +173,7 @@ enum AgentSections {
     /// `differs` is empty).
     static func server(_ group: ServerGroup, agent: String, sources: [GroupSource]) -> AgentServer {
         let state = HealthMonitor.aggregateState(sources.map(\.state))
-        let differs = state != .paused && state != .selfManaged
+        let differs = state != .paused && state != .selfManaged && state != .off
             && isOddOneOut(group, sources: sources)
         let rank: Int?
         let note: String?
@@ -209,6 +209,9 @@ enum AgentSections {
         case .needsApp:
             rank = nil
             note = group.needsAppName.map { "Needs \($0) open" }
+        case .off:
+            rank = nil
+            note = ShortReason.offWord
         }
         return AgentServer(name: group.name, state: state, note: note, rank: rank, mark: mark)
     }

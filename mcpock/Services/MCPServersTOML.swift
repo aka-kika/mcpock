@@ -13,8 +13,9 @@ import Foundation
 /// `ConfigDiscovery` parsing pipeline as Claude Code / Cursor.
 enum MCPServersTOML {
     /// Parse `[mcp_servers.*]` tables into a `name → entry` map. `enabled = false`
-    /// servers are dropped. Non-`mcp_servers` sections are ignored.
-    static func servers(fromTOML text: String) -> [String: [String: Any]] {
+    /// servers are dropped, or with `includingOff` kept and marked
+    /// (`ServerSwitch.offKey`). Non-`mcp_servers` sections are ignored.
+    static func servers(fromTOML text: String, includingOff: Bool = false) -> [String: [String: Any]] {
         var entries: [String: [String: Any]] = [:]
         var enabledFlags: [String: Bool] = [:]
 
@@ -130,12 +131,14 @@ enum MCPServersTOML {
         }
         if pendingArrayKey != nil { flushArray() }
 
-        return entries.filter { enabledFlags[$0.key] != false }
+        guard includingOff else { return entries.filter { enabledFlags[$0.key] != false } }
+        for (name, enabled) in enabledFlags where !enabled { entries[name]?[ServerSwitch.offKey] = true }
+        return entries
     }
 
     /// Shape adapter: TOML text → discovered entries, or nil if not the Grok shape.
     static func shapeEntries(_ text: String) -> [DiscoveredEntry]? {
-        let servers = servers(fromTOML: text)
+        let servers = servers(fromTOML: text, includingOff: true)
         guard !servers.isEmpty else { return nil }
         return servers.map { DiscoveredEntry(name: $0.key, entry: $0.value) }
     }
@@ -153,7 +156,7 @@ enum MCPServersTOML {
     }
 
     /// `[` minus `]` in a line, skipping both inside quoted strings.
-    private static func bracketDepth(_ line: String) -> Int {
+    static func bracketDepth(_ line: String) -> Int {
         var depth = 0
         forEachUnquoted(line) { c, _ in
             if c == "[" { depth += 1 } else if c == "]" { depth -= 1 }
@@ -228,7 +231,7 @@ enum MCPServersTOML {
 
     /// Drop an unquoted `#` comment (and everything after it) from a line.
     /// Respects single/double quotes and backslash escapes inside basic strings.
-    private static func stripComment(_ line: String) -> String {
+    static func stripComment(_ line: String) -> String {
         var quote: Character?
         var escaped = false
         for idx in line.indices {
@@ -253,7 +256,7 @@ enum MCPServersTOML {
     }
 
     /// Split a table-header path on `.`, respecting quoted segments.
-    private static func splitKey(_ s: String) -> [String] {
+    static func splitKey(_ s: String) -> [String] {
         var parts: [String] = []
         var cur = ""
         var quote: Character?
@@ -273,7 +276,7 @@ enum MCPServersTOML {
     }
 
     /// Index of the first `target` character not inside a quoted string.
-    private static func firstUnquotedIndex(of target: Character, in s: String) -> String.Index? {
+    static func firstUnquotedIndex(of target: Character, in s: String) -> String.Index? {
         var found: String.Index?
         forEachUnquoted(s) { c, idx in
             if c == target { found = idx; return true }

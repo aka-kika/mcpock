@@ -16,7 +16,7 @@ enum NextStep {
         case .healthy:
             guard !group.droppedInSession, group.differsNeedsAttention else { return nil }
             return "Compare the setups, then fix the odd one or Mark as intended."
-        case .unknown, .paused, .selfManaged, .needsApp:
+        case .unknown, .paused, .selfManaged, .needsApp, .off:
             return nil
         }
     }

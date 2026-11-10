@@ -149,7 +149,8 @@ final class YAMLBlockTests: XCTestCase {
 
     func testGooseRealShape() {
         let servers = GooseConfig.servers(fromYAML: gooseReal)
-        XCTAssertEqual(Set(servers.keys), ["personal-ops-manual", "safari-mcp-stp", "reed-md"])
+        XCTAssertEqual(Set(servers.filter { $0.value[ServerSwitch.offKey] == nil }.keys), ["personal-ops-manual", "safari-mcp-stp", "reed-md"])
+        XCTAssertEqual(servers["playwright"]?[ServerSwitch.offKey] as? Bool, true)
         XCTAssertEqual(servers["personal-ops-manual"]?["args"] as? [String],
                        ["/Users/k/_INFRA/apps/ops-manual/mcp/server.mjs"])
         XCTAssertEqual(servers["safari-mcp-stp"]?["command"] as? String,
