@@ -161,6 +161,7 @@ targets:
       # which the widget has no reason to compile).
       - path: Shared/AppGroup.swift
       - path: Shared/MCPockStatus.swift
+      - path: Shared/AgentAsk.swift
       - path: Shared/StatusReport.swift
       - path: Shared/WidgetSnapshot.swift
       - path: Shared/WidgetSnapshotStore.swift

@@ -157,7 +157,8 @@ enum StatusReport {
     // MARK: - mcpock_switches
 
     static let switchesFooter = "You can't switch a server or a tool from here. Only the user turns a server on or off, "
-        + "or hides a tool, in the mcpock app (the switches on the server's card)."
+        + "or hides a tool, in the mcpock app (the switches on the server's card). To suggest one, ask the user "
+        + "with mcpock_ask: nothing changes unless they say yes in mcpock."
 
     /// Which servers are off in which agent (1.14). Read-only, like the rest.
     static func switchesText(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
@@ -195,9 +196,29 @@ enum StatusReport {
                 }
             }
         }
+        lines.append(contentsOf: askLines(status.asks, now: now))
         lines.append("")
         lines.append(switchesFooter)
         return lines.joined(separator: "\n")
+    }
+
+    /// The asks agents made with mcpock_ask (1.16) and what became of them.
+    static func askLines(_ asks: [AskRecord]?, now: Date) -> [String] {
+        guard let asks, !asks.isEmpty else { return [] }
+        var lines = ["", "Asks to the user (made with mcpock_ask), newest first:"]
+        for ask in asks.sorted(by: { $0.asked > $1.asked }) {
+            let what = ask.action.words(server: ask.server, tool: ask.tool.map { oneLine($0) })
+            let state: String
+            switch ask.state {
+            case .waiting: state = "waiting for the user's answer"
+            case .done: state = "the user said yes; it is done"
+            case .no: state = "the user said no"
+            case .expired: state = "ended with no answer after a day; nothing changed"
+            }
+            let when = ask.answered.map { ", " + RelativeAge.text(since: $0, now: now) } ?? ""
+            lines.append("- \(ask.agent) asked to \(what) (\(RelativeAge.text(since: ask.asked, now: now))): \(state)\(when). id \(ask.id)")
+        }
+        return lines
     }
 
     // MARK: - mcpock_server
@@ -329,7 +350,7 @@ enum StatusReport {
 
     /// A tool name without line breaks or other control characters, so it
     /// can't start a line of its own.
-    private static func oneLine(_ name: String) -> String {
+    static func oneLine(_ name: String) -> String {
         String(name.map { $0.isNewline || $0.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) ? " " : $0 })
     }
 
@@ -376,4 +397,57 @@ enum StatusReport {
         default: return 3
         }
     }
+
+    // MARK: - mcpock_ask (1.16)
+
+    enum AskCheck: Equatable {
+        case ok(server: String, tool: String?)
+        case refused(String)
+    }
+
+    /// Checks an ask against what mcpock knows: the server must be listed,
+    /// a tool must be one of its tools, and it must not be that way already.
+    static func checkAsk(_ status: MCPockStatus, server name: String, tool: String?, action: AgentAsk.Action) -> AskCheck {
+        let key = normalized(name)
+        guard !key.isEmpty, let server = status.servers.first(where: { normalized($0.name) == key }) else {
+            let names = status.servers.map(\.name)
+            return .refused("No server named \"\(name)\" in mcpock. Known servers: \(names.isEmpty ? "none yet" : names.joined(separator: ", ")).")
+        }
+        if action.needsTool {
+            guard let tool, !tool.isEmpty else { return .refused("Name the tool to \(action == .hideTool ? "hide" : "show") in \(server.name).") }
+            guard let match = server.tools.first(where: { $0 == tool }) ?? server.tools.first(where: { normalized($0) == normalized(tool) }) else {
+                return .refused("\(server.name) has no tool named \"\(oneLine(tool))\". Its tools are listed by mcpock_server.")
+            }
+            let hiddenIn = (server.hiddenTools ?? [:]).filter { $0.value.contains(match) }.keys.sorted()
+            if action == .showTool, hiddenIn.isEmpty {
+                return .refused("\(match) is not hidden in any agent, so there is nothing to ask.")
+            }
+            return .ok(server: server.name, tool: match)
+        }
+        guard tool == nil || tool?.isEmpty == true else { return .refused("Leave out the tool to turn the whole server off or on.") }
+        if action == .turnOff, server.status == StatusWords.turnedOff {
+            return .refused("\(server.name) is already off in every agent that has it.")
+        }
+        if action == .turnOn, (server.offIn ?? []).isEmpty, server.status != StatusWords.turnedOff {
+            return .refused("\(server.name) is already on in every agent that has it.")
+        }
+        return .ok(server: server.name, tool: nil)
+    }
+
+    /// What the agent reads after asking, and what to tell the user.
+    static func askedText(_ ask: AgentAsk, running: Bool) -> String {
+        let what = ask.action.words(server: ask.server, tool: ask.tool)
+        var lines = [
+            "Asked. mcpock shows the user your request to \(what); nothing changes unless they say yes in mcpock.",
+            "Tell the user now, in your own words: \"I asked mcpock to \(what) (\(ask.reason)). Open mcpock to say Yes or No.\"",
+            "The request ends by itself after one day with no answer. Read the answer later with mcpock_switches (request id \(ask.id)).",
+        ]
+        if !running { lines.append("mcpock isn't running right now: the user sees the request once it opens.") }
+        return lines.joined(separator: "\n")
+    }
+}
+
+/// The plain-words statuses the status file uses, shared with the helper.
+enum StatusWords {
+    static let turnedOff = "turned off"
 }

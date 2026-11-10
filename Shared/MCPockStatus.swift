@@ -35,6 +35,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
     /// The Usage window the tool counts cover ("30 days", "7 days", "all
     /// time"), 1.16. Absent when Usage counts are off and in older files.
     var usageWindow: String? = nil
+    /// What agents asked the user (1.16): waiting, and the answers of the
+    /// last 7 days (done, no, expired). Absent in older files.
+    var asks: [AskRecord]? = nil
 
     struct Counts: Codable, Equatable, Sendable {
         var total: Int

@@ -1,8 +1,10 @@
 import Foundation
 
 /// The MCP side of the `mcpock-mcp` helper (round 7): one newline-delimited
-/// JSON-RPC message in, at most one out. Read-only by design: its four tools
-/// only read mcpock's status file, never probe a server, never write anything.
+/// JSON-RPC message in, at most one out. Its tools read mcpock's status file
+/// and never probe a server. The one that writes, `mcpock_ask` (1.16), only
+/// leaves a request in mcpock's own `asks` folder for the user to answer; it
+/// never touches an agent's config.
 ///
 /// Lives in `Shared/` (compiled into the app too) so `MCPStatusServerTests`
 /// drives it without spawning the helper; `main.swift` is only the stdin loop.
@@ -17,13 +19,25 @@ struct MCPStatusServer {
         Call mcpock_problems when the user says "check my mcpock" (or asks what is wrong with their \
         MCP servers), then tell the user what it reports and ask before changing any config file. \
         mcpock changes a config only when the user flips a switch in the app. Only the user turns servers on or \
-        off, or hides single tools, there; do not edit a config unless the user says yes. These tools only read.
+        off, or hides single tools, there; do not edit a config unless the user says yes. To suggest hiding or \
+        showing a tool, or turning a server off or on, call mcpock_ask with a short reason: it changes nothing, \
+        mcpock asks the user, and only their Yes runs the switch. Then tell the user you asked and that they \
+        answer in mcpock. Read the answer later with mcpock_switches. The other tools only read.
         """
+
+    /// Who is asking: the MCP client's own name from `initialize`.
+    final class Session: @unchecked Sendable {
+        var client: String?
+    }
 
     var loadStatus: () -> StatusLoad
     var now: () -> Date = Date.init
     var isRunning: (MCPockStatus) -> Bool = { MCPStatusServer.mcpockIsRunning($0) }
     var version: String = MCPJSONRPC.clientVersion
+    /// Where `mcpock_ask` leaves requests; tests point it at a temp folder.
+    var askFolder: URL = AskBox.directory()
+    var newID: () -> String = { UUID().uuidString }
+    let session = Session()
 
     /// Handle one line. Returns the response line (no trailing newline), or nil
     /// for notifications and blank lines.
@@ -45,6 +59,7 @@ struct MCPStatusServer {
 
         switch method {
         case "initialize":
+            session.client = (params["clientInfo"] as? [String: Any])?["name"] as? String
             let asked = params["protocolVersion"] as? String
             let version = asked.flatMap { Self.supportedVersions.contains($0) ? $0 : nil }
                 ?? Self.supportedVersions[0]
@@ -87,9 +102,44 @@ struct MCPStatusServer {
             let server = (arguments["name"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             guard !server.isEmpty else { return "Pass the server's name, e.g. {\"name\": \"firecrawl\"}." }
             return StatusReport.serverText(loadStatus(), name: server, now: now(), isRunning: isRunning)
+        case "mcpock_ask":
+            return ask(arguments)
         default:
             return nil
         }
+    }
+
+    /// `mcpock_ask`: checks the request, then leaves it for the user. Never
+    /// changes a config.
+    private func ask(_ arguments: [String: Any]) -> String {
+        guard let actionName = arguments["action"] as? String, let action = AgentAsk.Action(rawValue: actionName) else {
+            return "Pass an action: hide_tool, show_tool, turn_off or turn_on."
+        }
+        let server = (arguments["server"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let tool = (arguments["tool"] as? String)?.trimmingCharacters(in: .whitespaces)
+        let reason = AgentAsk.oneLine(arguments["reason"] as? String ?? "", limit: AgentAsk.maxReason)
+        guard !server.isEmpty else { return "Pass the server's name, e.g. {\"server\": \"github\"}." }
+        guard !reason.isEmpty else { return "Pass a short reason the user will read, e.g. \"never used in 30 days\"." }
+        guard case .loaded(let status) = loadStatus() else { return StatusReport.notRunningYet }
+        let checked = StatusReport.checkAsk(status, server: server, tool: tool.flatMap { $0.isEmpty ? nil : $0 }, action: action)
+        guard case .ok(let name, let match) = checked else {
+            if case .refused(let why) = checked { return why }
+            return StatusReport.notRunningYet
+        }
+        let waiting = AskBox.read(from: askFolder, now: now()).asks
+        if let same = waiting.first(where: { $0.server == name && $0.tool == match && $0.action == action }) {
+            return "Already asked: the user hasn't answered request \(same.id) yet. Read the answer later with mcpock_switches."
+        }
+        let ask = AgentAsk(id: newID(), server: name, tool: match, action: action, reason: reason,
+                           agent: AgentAsk.agentLabel(session.client), asked: now())
+        do {
+            try AskBox.write(ask, to: askFolder)
+        } catch AskBox.Refusal.full {
+            return "\(AgentAsk.maxWaiting) requests already wait for the user. Ask again once they have answered some."
+        } catch {
+            return "mcpock couldn't save the request (its folder \(askFolder.path) can't be written). Nothing changed."
+        }
+        return StatusReport.askedText(ask, running: isRunning(status))
     }
 
     static let tools: [[String: Any]] = [
@@ -111,8 +161,25 @@ struct MCPStatusServer {
              required: ["name"]),
         tool("mcpock_switches",
              title: "mcpock on and off",
-             description: "Which MCP servers are turned off, and in which agents, and which single tools are hidden. "
-                + "Read-only: only the user turns a server on or off or hides a tool, in the mcpock app."),
+             description: "Which MCP servers are turned off, and in which agents, which single tools are hidden, and "
+                + "what became of requests made with mcpock_ask (waiting, yes, no, or ended after a day). Read-only: "
+                + "only the user turns a server on or off or hides a tool, in the mcpock app."),
+        tool("mcpock_ask",
+             title: "Ask the user in mcpock",
+             description: "Ask the user to hide or show one tool of an MCP server, or to turn a server off or on. "
+                + "Changes nothing: mcpock shows the user your request with your reason, and only their Yes runs "
+                + "the switch (they see every file first). Then tell the user you asked and that they answer in "
+                + "mcpock. A request with no answer ends after one day. Read the answer with mcpock_switches.",
+             properties: [
+                "server": ["type": "string", "description": "The server's name as mcpock shows it, e.g. \"github\"."],
+                "tool": ["type": "string", "description": "The tool's name, for hide_tool and show_tool only."],
+                "action": ["type": "string", "enum": AgentAsk.Action.allCases.map(\.rawValue),
+                           "description": "hide_tool, show_tool, turn_off or turn_on."],
+                "reason": ["type": "string", "maxLength": AgentAsk.maxReason,
+                           "description": "One short line the user reads, e.g. \"never used in 30 days\"."],
+             ],
+             required: ["server", "action", "reason"],
+             readOnly: false),
     ]
 
     private static func tool(
@@ -120,7 +187,8 @@ struct MCPStatusServer {
         title: String,
         description: String,
         properties: [String: Any] = [:],
-        required: [String] = []
+        required: [String] = [],
+        readOnly: Bool = true
     ) -> [String: Any] {
         var schema: [String: Any] = ["type": "object", "properties": properties, "additionalProperties": false]
         if !required.isEmpty { schema["required"] = required }
@@ -129,7 +197,10 @@ struct MCPStatusServer {
             "title": title,
             "description": description,
             "inputSchema": schema,
-            "annotations": ["readOnlyHint": true, "idempotentHint": true, "openWorldHint": false],
+            // mcpock_ask leaves a request and nothing else: not read-only, never destructive.
+            "annotations": readOnly
+                ? ["readOnlyHint": true, "idempotentHint": true, "openWorldHint": false]
+                : ["readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false],
         ]
     }
 

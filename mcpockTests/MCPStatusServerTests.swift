@@ -166,7 +166,7 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(text.contains("ask before changing any config file"), text)
         // 1.14: the switch changed the promise; agents still only read.
         XCTAssertTrue(text.contains("only when the user flips a switch"), text)
-        XCTAssertTrue(text.contains("These tools only read"), text)
+        XCTAssertTrue(text.contains("The other tools only read"), text)
         XCTAssertFalse(text.contains("never edits configs"), text)
     }
 
@@ -292,9 +292,11 @@ final class MCPStatusServerTests: XCTestCase {
         let list = try reply(s, #"{"jsonrpc":"2.0","id":"a","method":"tools/list"}"#)
         XCTAssertEqual(list["id"] as? String, "a")
         let tools = try XCTUnwrap((list["result"] as? [String: Any])?["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.compactMap { $0["name"] as? String }, ["mcpock_status", "mcpock_problems", "mcpock_server", "mcpock_switches"])
+        XCTAssertEqual(tools.compactMap { $0["name"] as? String },
+                       ["mcpock_status", "mcpock_problems", "mcpock_server", "mcpock_switches", "mcpock_ask"])
         for tool in tools {
-            XCTAssertEqual((tool["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool, true)
+            // 1.16: mcpock_ask only leaves a request; the rest read.
+            XCTAssertEqual((tool["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool, tool["name"] as? String != "mcpock_ask")
             XCTAssertEqual((tool["inputSchema"] as? [String: Any])?["type"] as? String, "object")
         }
 

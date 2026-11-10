@@ -1,9 +1,10 @@
 import Foundation
 
-// mcpock-mcp: mcpock's read-only MCP server (round 7). Speaks MCP over stdio
+// mcpock-mcp: mcpock's MCP server (round 7). Speaks MCP over stdio
 // (newline-delimited JSON-RPC) and answers from the status file the app writes,
 // ~/Library/Application Support/mcpock/status.json. It never probes a server and
-// never writes a file. `MCPOCK_STATUS_FILE` points it at another file (tests);
+// never writes an agent's config: mcpock_ask (1.16) only leaves a request in
+// ~/Library/Application Support/mcpock/asks/ for the user to answer. `MCPOCK_STATUS_FILE` points it at another file (tests);
 // the old `MCPBAR_STATUS_FILE` (1.6.0 transition) is still read as a fallback.
 //
 // Bundled at mcpock.app/Contents/Helpers/mcpock-mcp; Settings > Connect copies
@@ -16,9 +17,10 @@ let statusURL: URL = (environment["MCPOCK_STATUS_FILE"] ?? environment["MCPBAR_S
 
 if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-h") {
     print("""
-        mcpock-mcp: mcpock's read-only MCP server (stdio).
+        mcpock-mcp: mcpock's MCP server (stdio).
         Add it to an agent's MCP config as a stdio server with this file's path as the command.
-        Tools: mcpock_status, mcpock_problems, mcpock_server, mcpock_switches.
+        Tools: mcpock_status, mcpock_problems, mcpock_server, mcpock_switches (read only), and
+        mcpock_ask (asks the user in mcpock; changes nothing on its own).
         Reads: \(statusURL.path)
         """)
     exit(0)

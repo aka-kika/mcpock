@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		06668AE8E7A4A28C3B3CE2BC /* AgentAsk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CB1AEC1E1350D5F6AF1443A /* AgentAsk.swift */; };
 		06BE8D52628193FB7DEDB58F /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1803A1ACE989D529368A2497 /* UsageStore.swift */; };
 		084B9A1C38F00ACB2181DEC5 /* PanelSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA6EB1467B930D7C6AC16EF /* PanelSections.swift */; };
 		09F6AF8D2A5042B8030A654D /* HTTPProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4F4EB16496D1D088B350C30 /* HTTPProbe.swift */; };
@@ -23,6 +24,7 @@
 		108E6B24D1F8D8B638DD8A21 /* ConfigShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83EAE760B3AD36CAEFF67C0D /* ConfigShape.swift */; };
 		11CCAAD14CC8A4C5BDFDAEFD /* PinnedServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9F671AA474D522512E93E33 /* PinnedServerTests.swift */; };
 		11D557A7AA8A7494ECEABAA8 /* SecretMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F1AD044E3456D407A552D7F /* SecretMask.swift */; };
+		12E130EB0266B04A94975D75 /* AgentAsk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CB1AEC1E1350D5F6AF1443A /* AgentAsk.swift */; };
 		13DF8BBF8AFF5FF5DFFB9877 /* ServerReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDA247B9C3B4895795AD580 /* ServerReportTests.swift */; };
 		18255138E8AAB20586C7F9E5 /* PanelShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3EA7CC6E427D9F1D032453 /* PanelShortcut.swift */; };
 		189A7EDD12C711D3B931BACC /* AgentRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2765FD4CC69069DC4E60598 /* AgentRegistry.swift */; };
@@ -64,6 +66,7 @@
 		430DACDEC25AE3A3323A3513 /* PanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D21231DA637BB9C07F24A /* PanelLayoutTests.swift */; };
 		4311E7BF670C3693C63D59F8 /* WhatsNewLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D89F96A074E838EED87470 /* WhatsNewLauncher.swift */; };
 		44AA87D383D211114F0EEA77 /* StatusWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1525200D17A26421B74345A5 /* StatusWidgetView.swift */; };
+		47122981B62B6C80DAD83700 /* AgentAskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07285100069F30C37983EF3F /* AgentAskTests.swift */; };
 		484302CB2582CB4C1304E8F7 /* MCPServersYAML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F98A52F49ACD8C24EA7164 /* MCPServersYAML.swift */; };
 		4869EFF844EC6D807189D654 /* AgentRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4F324ECFEDA81271EA73A9 /* AgentRegistryTests.swift */; };
 		4AA9FE23943F599F441D094D /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B421B565393E5EA0385A7D /* AppPreferences.swift */; };
@@ -78,6 +81,7 @@
 		524B0DD17BE7DD409B1F3D35 /* ConfigVariablesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FACD9F75F069F1D5FC8EBFA /* ConfigVariablesTests.swift */; };
 		525E3878D3D25234D8EC58DA /* SwitchPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E22E6E9FE59A1974DCC7D8 /* SwitchPlanTests.swift */; };
 		52B50363CFA9EFFBF5D3FC93 /* UpdateControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604C66D104D046D2409E3E5F /* UpdateControllerTests.swift */; };
+		5346BBF1F50C9EE904D534F8 /* AgentAsk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CB1AEC1E1350D5F6AF1443A /* AgentAsk.swift */; };
 		542B730AE01630D240A5ADBA /* AgentConnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FBA742B71F4B99F3D379E6 /* AgentConnectTests.swift */; };
 		5486A7CB5BE930114ED37E81 /* SettingsAgentsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F26542625F7F8EAFF4D18D2 /* SettingsAgentsPane.swift */; };
 		549FF22F35B142728C509E85 /* MCPJSONRPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4248253AF4A25404D99670 /* MCPJSONRPC.swift */; };
@@ -283,6 +287,7 @@
 		04F1EF8E0ECFC9342ECAFAF6 /* PathResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathResolver.swift; sourceTree = "<group>"; };
 		052AF522F55D8592F1E9EE44 /* WhatsNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNew.swift; sourceTree = "<group>"; };
 		05AB1301367B07B1C9A2B721 /* ServerReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerReport.swift; sourceTree = "<group>"; };
+		07285100069F30C37983EF3F /* AgentAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAskTests.swift; sourceTree = "<group>"; };
 		084053D17945570F9E70B29D /* ConfigDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigDiscovery.swift; sourceTree = "<group>"; };
 		093499F646978DF81B60D197 /* StdioBannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdioBannerTests.swift; sourceTree = "<group>"; };
 		0B3EA7CC6E427D9F1D032453 /* PanelShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelShortcut.swift; sourceTree = "<group>"; };
@@ -326,6 +331,7 @@
 		3967C24AB1E0E568D407EA7F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3AE3CD0BBF282D307F840C1A /* GrokUsageReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrokUsageReaderTests.swift; sourceTree = "<group>"; };
 		3AFA50062B8689AE0474AA0F /* MCPStatusServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPStatusServerTests.swift; sourceTree = "<group>"; };
+		3CB1AEC1E1350D5F6AF1443A /* AgentAsk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAsk.swift; sourceTree = "<group>"; };
 		3D2D788CA7C6366A9B3189C8 /* UsageReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageReader.swift; sourceTree = "<group>"; };
 		3E48BCAA4C53E9F11C659DC1 /* StatusReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusReport.swift; sourceTree = "<group>"; };
 		3F26542625F7F8EAFF4D18D2 /* SettingsAgentsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAgentsPane.swift; sourceTree = "<group>"; };
@@ -525,6 +531,7 @@
 		48019358367518687ECB40BB /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				3CB1AEC1E1350D5F6AF1443A /* AgentAsk.swift */,
 				5CC2D9DE193DB838D652DFE6 /* AppGroup.swift */,
 				9E52D088F73F7C15B2E72066 /* MCPockStatus.swift */,
 				6016F282B85807123025DA19 /* MCPStatusServer.swift */,
@@ -547,6 +554,7 @@
 		739033C965F33920F3403060 /* mcpockTests */ = {
 			isa = PBXGroup;
 			children = (
+				07285100069F30C37983EF3F /* AgentAskTests.swift */,
 				66025BFE9342F7F8A33E399E /* AgentBadgeTests.swift */,
 				A8FBA742B71F4B99F3D379E6 /* AgentConnectTests.swift */,
 				8E4F324ECFEDA81271EA73A9 /* AgentRegistryTests.swift */,
@@ -1010,6 +1018,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				12E130EB0266B04A94975D75 /* AgentAsk.swift in Sources */,
 				65F29C6DC0E9AEC763AE2F4C /* AgentBadgeView.swift in Sources */,
 				2C63EB6A490E00D7BA855EB3 /* AgentHost.swift in Sources */,
 				189A7EDD12C711D3B931BACC /* AgentRegistry.swift in Sources */,
@@ -1115,6 +1124,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				06668AE8E7A4A28C3B3CE2BC /* AgentAsk.swift in Sources */,
 				8269FCED013B1233C62DF35F /* AgentsWidgetView.swift in Sources */,
 				27057821ECDB4190C8961E78 /* AppGroup.swift in Sources */,
 				C6C0715B9DD9D9EFA233D0FC /* MCPockStatus.swift in Sources */,
@@ -1134,6 +1144,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				47122981B62B6C80DAD83700 /* AgentAskTests.swift in Sources */,
 				77F36E33D5AF1B3782C2C8B3 /* AgentBadgeTests.swift in Sources */,
 				542B730AE01630D240A5ADBA /* AgentConnectTests.swift in Sources */,
 				4869EFF844EC6D807189D654 /* AgentRegistryTests.swift in Sources */,
@@ -1229,6 +1240,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5346BBF1F50C9EE904D534F8 /* AgentAsk.swift in Sources */,
 				F8257BEA4F98EB46B58FAF93 /* MCPJSONRPC.swift in Sources */,
 				6B7ACABBB33F3A82308A52CF /* MCPStatusServer.swift in Sources */,
 				67B9A119FB7509414A8FA784 /* MCPockStatus.swift in Sources */,
