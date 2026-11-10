@@ -26,14 +26,31 @@ enum ParkedStore {
         directory.appendingPathComponent(fileName(forAgent: agent))
     }
 
-    private static func load(agent: String, directory: URL) -> (file: String, servers: [String: String]) {
-        guard let data = try? Data(contentsOf: url(agent: agent, directory: directory)),
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return ("", [:]) }
+    enum StoreError: Error, Equatable {
+        /// The store is there but can't be read as one: it may still hold
+        /// parked servers, so it is never started over.
+        case unreadable
+        /// The store holds servers parked from another config file.
+        case otherFile(String)
+    }
+
+    /// The store, or an empty one when there is none yet. A store that is
+    /// there but can't be read throws: reading it as empty and saving over
+    /// it lost every server parked in it (review 10 Nov, fable-1).
+    private static func read(agent: String, directory: URL) throws -> (file: String, servers: [String: String]) {
+        let file = url(agent: agent, directory: directory)
+        guard FileManager.default.fileExists(atPath: file.path) else { return ("", [:]) }
+        guard let data = try? Data(contentsOf: file),
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { throw StoreError.unreadable }
         var servers: [String: String] = [:]
         for (name, value) in root["servers"] as? [String: Any] ?? [:] {
             if let raw = (value as? [String: Any])?["raw"] as? String { servers[name] = raw }
         }
         return (root["file"] as? String ?? "", servers)
+    }
+
+    private static func load(agent: String, directory: URL) -> (file: String, servers: [String: String]) {
+        (try? read(agent: agent, directory: directory)) ?? ("", [:])
     }
 
     /// The servers parked for `agent`, name to the entry's JSON text. Only
@@ -44,15 +61,21 @@ enum ParkedStore {
         return stored.file == configPath ? stored.servers : [:]
     }
 
+    /// Parks one entry. Refused, with nothing written, when the store can't
+    /// be read or still holds servers parked from another config file: those
+    /// would be lost (fable-1). An empty store from another file starts over.
     static func add(name: String, raw: String, agent: String, configPath: String, directory: URL) throws {
-        var stored = load(agent: agent, directory: directory)
-        if stored.file != configPath { stored = (configPath, [:]) }
+        var stored = try read(agent: agent, directory: directory)
+        if stored.file != configPath {
+            guard stored.servers.isEmpty else { throw StoreError.otherFile(stored.file) }
+            stored = (configPath, [:])
+        }
         stored.servers[name] = raw
         try save(stored, agent: agent, directory: directory)
     }
 
     static func remove(name: String, agent: String, directory: URL) throws {
-        var stored = load(agent: agent, directory: directory)
+        var stored = try read(agent: agent, directory: directory)
         guard stored.servers.removeValue(forKey: name) != nil else { return }
         try save(stored, agent: agent, directory: directory)
     }
@@ -63,7 +86,14 @@ enum ParkedStore {
         let file = url(agent: agent, directory: directory)
         let root: [String: Any] = ["file": stored.file, "servers": stored.servers.mapValues { ["raw": $0] }]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-        try data.write(to: file, options: .atomic)
-        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        // 0600 from the first byte: it holds what the config held, keys included.
+        let temp = directory.appendingPathComponent(".\(file.lastPathComponent).mcpock-\(UUID().uuidString)")
+        do {
+            try SwitchWriter.writeNew(data, to: temp, mode: 0o600)
+            guard rename(temp.path, file.path) == 0 else { throw CocoaError(.fileWriteUnknown) }
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw error
+        }
     }
 }

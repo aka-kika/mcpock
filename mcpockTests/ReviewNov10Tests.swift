@@ -104,4 +104,36 @@ final class ReviewNov10Tests: XCTestCase {
         XCTAssertTrue(fm.fileExists(atPath: fresh.path))
         XCTAssertTrue(fm.fileExists(atPath: other.path))
     }
+
+    // MARK: 6d0a (fable-1): the parked store is never started over
+
+    func testParkedStoreRefusesAStoreItCannotRead() throws {
+        let folder = try tempFolder()
+        let store = folder.appendingPathComponent(ParkedStore.fileName(forAgent: "Cursor"))
+        try Data("{ not json".utf8).write(to: store)
+        XCTAssertThrowsError(try ParkedStore.add(name: "a", raw: "{}", agent: "Cursor", configPath: "/x/mcp.json", directory: folder)) {
+            XCTAssertEqual($0 as? ParkedStore.StoreError, .unreadable)
+        }
+        XCTAssertEqual(try String(contentsOf: store, encoding: .utf8), "{ not json", "left as it was")
+    }
+
+    func testParkedStoreRefusesServersParkedFromAnotherFile() throws {
+        let folder = try tempFolder()
+        try ParkedStore.add(name: "a", raw: "{\"command\":\"x\"}", agent: "Cursor", configPath: "/old/mcp.json", directory: folder)
+        XCTAssertThrowsError(try ParkedStore.add(name: "b", raw: "{}", agent: "Cursor", configPath: "/new/mcp.json", directory: folder)) {
+            XCTAssertEqual($0 as? ParkedStore.StoreError, .otherFile("/old/mcp.json"))
+        }
+        XCTAssertEqual(ParkedStore.entries(agent: "Cursor", configPath: "/old/mcp.json", directory: folder), ["a": "{\"command\":\"x\"}"])
+    }
+
+    func testParkedStoreFromAnotherFileWithNothingInItStartsOver() throws {
+        let folder = try tempFolder()
+        try ParkedStore.add(name: "a", raw: "{}", agent: "Cursor", configPath: "/old/mcp.json", directory: folder)
+        try ParkedStore.remove(name: "a", agent: "Cursor", directory: folder)
+        try ParkedStore.add(name: "b", raw: "{}", agent: "Cursor", configPath: "/new/mcp.json", directory: folder)
+        XCTAssertEqual(ParkedStore.entries(agent: "Cursor", configPath: "/new/mcp.json", directory: folder), ["b": "{}"])
+        let store = folder.appendingPathComponent(ParkedStore.fileName(forAgent: "Cursor"))
+        let mode = try FileManager.default.attributesOfItem(atPath: store.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o600)
+    }
 }
