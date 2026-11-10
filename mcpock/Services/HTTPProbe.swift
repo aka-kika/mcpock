@@ -297,14 +297,19 @@ enum HTTPProbe {
     /// The answer on an event stream, returned as soon as its `data:` line
     /// arrives, the same way `parseSSEJSON` reads a finished body. Data lines
     /// that only make JSON together (one event split over lines) are joined.
-    private static func answer(
+    static func answer(
         in bytes: URLSession.AsyncBytes, id: Int?, deadline: ContinuousClock.Instant
     ) async throws -> [String: Any] {
         var pending = ""
         var lastJSON: [String: Any]?
         var sawLine = false
-        for try await line in bytes.lines {
+        var lines = SSELineSplitter()
+        for try await byte in bytes {
+            // Every byte, as `collect` does: `bytes.lines` only came back at a
+            // line break, so a server dripping a line that never ended held
+            // the probe, and the whole check, until mcpock quit (ds-1).
             if ContinuousClock.now > deadline { throw URLError(.timedOut) }
+            guard let line = lines.feed(byte) else { continue }
             sawLine = true
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard trimmed.hasPrefix("data:") else { continue }
@@ -322,6 +327,24 @@ enum HTTPProbe {
             }
             if obj["result"] != nil || obj["error"] != nil { return obj }
             lastJSON = obj
+        }
+        // The last line, when the stream ended without a line break.
+        if let line = lines.finish() {
+            sawLine = true
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("data:") {
+                let payload = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                let joined = pending.isEmpty ? payload : pending + "\n" + payload
+                if let obj = (try? JSONSerialization.jsonObject(with: Data(joined.utf8))) as? [String: Any] {
+                    if let id {
+                        if MCPJSONRPC.isResponse(obj, to: id) { return obj }
+                    } else if obj["result"] != nil || obj["error"] != nil {
+                        return obj
+                    } else {
+                        lastJSON = obj
+                    }
+                }
+            }
         }
         if let lastJSON { return lastJSON }
         if !sawLine { throw ProbeError.noData }
@@ -367,5 +390,46 @@ enum HTTPProbe {
         }
         if let lastJSON { return lastJSON }
         throw ProbeError.protocolError(id == nil ? "No JSON in SSE stream" : "No answer to request \(id!) in SSE stream")
+    }
+}
+
+/// Splits an event stream into lines one byte at a time, so the caller can
+/// check its deadline between bytes. A line ends at "\n", "\r\n" or "\r"
+/// (the SSE rule). A line longer than an MCP message can be is dropped.
+struct SSELineSplitter {
+    private var buffer: [UInt8] = []
+    private var afterCR = false
+    private var overLimit = false
+
+    /// The finished line when `byte` ends one, else nil.
+    mutating func feed(_ byte: UInt8) -> String? {
+        if afterCR {
+            afterCR = false
+            if byte == 0x0A { return nil }
+        }
+        if byte == 0x0A || byte == 0x0D {
+            afterCR = byte == 0x0D
+            return take()
+        }
+        if overLimit { return nil }
+        buffer.append(byte)
+        if buffer.count > MCPMessageBuffer.maxBodyBytes {
+            buffer.removeAll(keepingCapacity: false)
+            overLimit = true
+        }
+        return nil
+    }
+
+    /// What is left when the stream ends: a last line with no break, or nil.
+    mutating func finish() -> String? {
+        if buffer.isEmpty { overLimit = false; return nil }
+        return take()
+    }
+
+    private mutating func take() -> String {
+        let line = overLimit ? "" : String(decoding: buffer, as: UTF8.self)
+        buffer.removeAll(keepingCapacity: true)
+        overLimit = false
+        return line
     }
 }
