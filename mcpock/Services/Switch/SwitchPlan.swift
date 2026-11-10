@@ -130,7 +130,8 @@ enum SwitchPlanner {
                     after: after,
                     what: what(first.mechanism, turnOn: turnOn),
                     when: when(agent: first.agent, turnOn: turnOn, running: running(first.agent)),
-                    diff: diff(before: before, after: after, mechanism: first.mechanism, server: first.name, turnOn: turnOn),
+                    diff: diff(before: before, after: after, mechanism: first.mechanism, server: first.name, turnOn: turnOn,
+                               agent: first.agent),
                     parked: parked
                 ))
             } catch {
@@ -151,7 +152,7 @@ enum SwitchPlanner {
             return turnOn ? "Moved back to where it was." : "Parked inside its config, keys and all."
         case .parkOutside:
             return turnOn ? "Moved back into its config from mcpock's folder."
-                : "Moved out of its config into mcpock's own folder, keys and all. Claude Desktop removes what it does not know from its file."
+                : "Moved out of its config into mcpock's own folder, keys and all, so the app can't lose it when it rewrites its file."
         }
     }
 
@@ -175,7 +176,8 @@ enum SwitchPlanner {
 
     /// The changed lines, for "Show the exact change". A parked entry is
     /// shown folded: its lines hold the server's keys.
-    static func diff(before: String?, after: String, mechanism: SwitchMechanism, server: String, turnOn: Bool) -> [String] {
+    static func diff(before: String?, after: String, mechanism: SwitchMechanism, server: String, turnOn: Bool,
+                     agent: String = "") -> [String] {
         if mechanism == .park {
             let name = JSONSpanEditor.quoted(server)
             let active = "\"mcpServers\": { \(name): {\u{2026}} }"
@@ -185,7 +187,7 @@ enum SwitchPlanner {
         if mechanism == .parkOutside {
             let name = JSONSpanEditor.quoted(server)
             let active = "\"mcpServers\": { \(name): {\u{2026}} }"
-            let kept = "mcpock/parked/\(ParkedStore.fileName(forAgent: "Claude Desktop")): \(name)"
+            let kept = "mcpock/parked/\(ParkedStore.fileName(forAgent: agent)): \(name)"
             return turnOn ? ["- " + kept, "+ " + active] : ["- " + active, "+ " + kept]
         }
         let old = (before ?? "").components(separatedBy: "\n")

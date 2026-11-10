@@ -1,11 +1,11 @@
 import Foundation
 
-/// Where a switched-off server waits when its agent keeps nothing it does not
-/// know in its own config (1.14). Claude Desktop rewrites
-/// `claude_desktop_config.json` on every launch and drops unknown keys (seen
-/// with the real app, 2026-11-10), so an entry parked inside that file was
-/// gone after one launch. Such an entry is moved here instead, exactly as it
-/// was written, and moved back on Turn On.
+/// Where a switched-off server waits when its agent has no off flag (1.14:
+/// Claude Desktop and Cursor). Claude Desktop rewrites
+/// `claude_desktop_config.json` at launch and drops unknown keys (seen with
+/// the real app, 2026-11-10), so an entry parked inside that file was gone
+/// after one launch; a logged-in Cursor may rewrite `mcp.json` too. The entry
+/// is moved here instead, exactly as it was written, and moved back on Turn On.
 ///
 /// One small file per agent in `~/Library/Application Support/mcpock/parked/`,
 /// readable only by the user (it holds what the config held, keys included):

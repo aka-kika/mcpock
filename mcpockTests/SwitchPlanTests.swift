@@ -51,15 +51,17 @@ final class SwitchPlanTests: XCTestCase {
 
     private func discover() -> [ServerConfig] {
         ParsedFileCache.removeAll()
-        return ConfigDiscovery.discover(registry: registry, scanRoots: [])
+        return ConfigDiscovery.discover(registry: registry, scanRoots: [], parkedDirectory: parked)
     }
 
     private func plan(_ configs: [ServerConfig], on: Bool, running: Bool = false) -> SwitchPlan {
         SwitchPlanner.plan(server: "openrouter", configs: configs.filter { $0.name == "openrouter" }, turnOn: on,
-                           claudeSettingsPath: path(".claude/settings.json"), running: { _ in running })
+                           claudeSettingsPath: path(".claude/settings.json"), running: { _ in running },
+                           parkedDirectory: parked)
     }
 
     private var backups: URL { home.appendingPathComponent("backups") }
+    private var parked: URL { home.appendingPathComponent("parked") }
 
     func testOffEverywhereThenOnAgain() throws {
         try seed()
@@ -83,25 +85,29 @@ final class SwitchPlanTests: XCTestCase {
         // Nothing is written until she says so.
         XCTAssertEqual(discover().filter(\.turnedOff).count, 0)
 
-        let outcome = SwitchWriter.apply(off, backups: backups, now: Date(timeIntervalSince1970: 1_800_000_000))
+        let outcome = SwitchWriter.apply(off, backups: backups, parked: parked, now: Date(timeIntervalSince1970: 1_800_000_000))
         XCTAssertNil(outcome.error)
         XCTAssertEqual(outcome.written.count, 4)
 
         let after = discover().filter { $0.name == "openrouter" }
         XCTAssertEqual(after.count, 5)
         XCTAssertEqual(Set(after.filter(\.turnedOff).map(\.source.label)), ["Code", "Codex", "Cursor", "Goose"])
-        // Other servers are untouched, and the parked one keeps its key.
+        // Other servers are untouched. Cursor's entry left its file whole (nothing
+        // a rewrite by Cursor could lose) and waits in mcpock's folder with its key.
         XCTAssertEqual(discover().first { $0.name == "notion" }?.turnedOff, false)
-        XCTAssertTrue(text(".cursor/mcp.json")?.contains("sk-or-v1-abcdefabcdefabcdefabcdef") == true)
+        XCTAssertEqual(text(".cursor/mcp.json"), "{\n  \"mcpServers\": {}\n}\n")
+        XCTAssertEqual(after.first { $0.source.label == "Cursor" }?.env["OPENROUTER_API_KEY"], "sk-or-v1-abcdefabcdefabcdefabcdef")
         XCTAssertNil(text(".claude.json").flatMap { $0.contains("denied") ? $0 : nil })
 
         let on = plan(discover(), on: true)
         XCTAssertEqual(on.changes.count, 4)
         XCTAssertEqual(on.changes[2].when, "On the next time Cursor opens")
-        XCTAssertNil(SwitchWriter.apply(on, backups: backups).error)
+        XCTAssertNil(SwitchWriter.apply(on, backups: backups, parked: parked).error)
         XCTAssertEqual(discover().filter(\.turnedOff).count, 0)
         // The list mcpock added stays, empty: it never removes a key it may not own.
         XCTAssertEqual(text(".claude/settings.json"), "{\n  \"theme\": \"dark\",\n  \"deniedMcpServers\": []\n}\n")
+        XCTAssertTrue(text(".cursor/mcp.json")?.contains("sk-or-v1-abcdefabcdefabcdefabcdef") == true, "back in Cursor's file, key and all")
+        XCTAssertEqual(ParkedStore.entries(agent: "Cursor", configPath: path(".cursor/mcp.json"), directory: parked), [:])
         XCTAssertEqual(text(".config/goose/config.yaml"), "extensions:\n  openrouter:\n    enabled: true\n    type: stdio\n    cmd: npx\n    args: []\n")
     }
 
@@ -113,8 +119,10 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(off.changes.count, 1)
         XCTAssertEqual(off.changes[0].diff, [
             "- \"mcpServers\": { \"openrouter\": {\u{2026}} }",
-            "+ \"_mcpock_disabled\": { \"openrouter\": {\u{2026}} }",
+            "+ mcpock/parked/cursor.json: \"openrouter\"",
         ])
+        XCTAssertEqual(off.changes[0].what,
+                       "Moved out of its config into mcpock's own folder, keys and all, so the app can't lose it when it rewrites its file.")
     }
 
     func testEveryWriteIsBackedUpFirst() throws {
@@ -185,7 +193,6 @@ final class SwitchPlanTests: XCTestCase {
 
     // MARK: Claude Desktop: the entry waits in mcpock's own folder
 
-    private var parked: URL { home.appendingPathComponent("parked") }
     private let desktopConfig = """
     {
       "mcpServers": {

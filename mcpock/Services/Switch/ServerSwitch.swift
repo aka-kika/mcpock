@@ -17,13 +17,16 @@ enum SwitchMechanism: Equatable, Sendable {
     case toml
     /// Goose (`extensions`) and Hermes (`mcp_servers`): `enabled: false`.
     case yaml(section: String)
-    /// Cursor has no flag: the entry moves from `mcpServers` to
-    /// `_mcpock_disabled` in the same file. Cursor only reads that file, so
-    /// the parked entry stays (checked with the real app).
+    /// The entry moves from `mcpServers` to `_mcpock_disabled` in the same
+    /// file. No agent is switched this way since 2026-11-10 (an app that
+    /// rewrites its file can drop the key); the reader still lists such
+    /// entries as turned off, and this turns them back on.
     case park
-    /// Claude Desktop has no flag either, and it rewrites its config at every
-    /// launch, dropping keys it does not know: the entry moves out of the
-    /// file into mcpock's own folder (`ParkedStore`).
+    /// Claude Desktop and Cursor have no flag. Claude Desktop rewrites its
+    /// config at launch and drops keys it does not know (seen with the real
+    /// app), and a logged-in Cursor may rewrite `mcp.json` too: the entry
+    /// moves out of the file into mcpock's own folder (`ParkedStore`), where
+    /// no app can lose it.
     case parkOutside
 }
 
@@ -53,8 +56,7 @@ enum ServerSwitch {
         case "Goose": return .yaml(section: "extensions")
         case "Hermes": return .yaml(section: "mcp_servers")
         case "OpenCode": return .openCode
-        case "Cursor": return .park
-        case "Claude Desktop": return .parkOutside
+        case "Claude Desktop", "Cursor": return .parkOutside
         default: return nil
         }
     }

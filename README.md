@@ -277,12 +277,12 @@ letters.
   `~/Library/Application Support/mcpock/backups/` (the newest 60; they hold
   what the config holds, keys included, readable only by you), then replaces
   the file in one step. It uses the agent's own way: Claude Code's blocked
-  list, the `enabled` line in Codex, Grok, Goose, Hermes and OpenCode. Cursor
-  has none, so the entry is parked in the same file under `_mcpock_disabled`.
-  Claude Desktop has none either and removes what it does not know from its
-  file, so there the entry waits in `~/Library/Application
-  Support/mcpock/parked/` (readable only by you) and moves back when you turn
-  it on. Nothing is deleted, and agents can't flip a switch. Everything else only reads: "Open Config…" asks first, with Cancel
+  list, the `enabled` line in Codex, Grok, Goose, Hermes and OpenCode. Claude
+  Desktop and Cursor have none, and an app that rewrites its own file can drop
+  what it does not know (Claude Desktop does), so for these two the entry
+  waits in `~/Library/Application Support/mcpock/parked/` (readable only by
+  you) and moves back when you turn it on. Nothing is deleted, and agents
+  can't flip a switch. Everything else only reads: "Open Config…" asks first, with Cancel
   as the default.
 - **What it runs.** To check a local server, mcpock starts the exact command
   from your config, with its arguments and environment, in its project folder
@@ -436,9 +436,8 @@ tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
 
 1. In each agent's MCP config, remove the `mcpock` entry you added in
    **Connect your agents** (mcpock did not add it for you). If you turned a
-   server off with mcpock, turn it back on first: one parked for Cursor waits
-   under `_mcpock_disabled` in Cursor's file, one turned off for Claude Desktop
-   waits in `~/Library/Application Support/mcpock/parked/`.
+   server off with mcpock, turn it back on first: one turned off for Claude
+   Desktop or Cursor waits in `~/Library/Application Support/mcpock/parked/`.
 2. In mcpock, open Settings > General and turn **Open at Login** off.
 3. Quit mcpock from its menu bar icon.
 4. Delete `mcpock.app` from Applications.

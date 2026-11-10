@@ -124,7 +124,9 @@ final class SwitchPanelTests: XCTestCase {
             KnownAgent(label: "Cursor", path: path(".cursor/mcp.json"), shape: .json),
         ]
         let monitor = HealthMonitor(defaults: defaults)
-        monitor.discover = { ConfigDiscovery.discover(registry: registry, scanRoots: []) }
+        let parked = home.appendingPathComponent("parked")
+        monitor.discover = { ConfigDiscovery.discover(registry: registry, scanRoots: [], parkedDirectory: parked) }
+        monitor.switchParked = parked
         monitor.probe = { _, _ in ProbeResult(state: .healthy, failureReason: nil, tools: []) }
         monitor.claudeSettingsPath = path(".claude/settings.json")
         monitor.switchBackups = home.appendingPathComponent("backups")
