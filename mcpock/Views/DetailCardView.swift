@@ -441,7 +441,8 @@ struct DetailCardView: View {
                     if showsUnusedTools { toolRows(sections.unused, canHide: canHide) }
                 }
                 if !sections.hidden.isEmpty {
-                    toolFold(title: "Hidden \u{00B7} \(sections.hidden.count)", expanded: showsHiddenTools, hideAll: nil) {
+                    toolFold(title: "Hidden \u{00B7} \(sections.hidden.count)", expanded: showsHiddenTools,
+                             showAll: canHide ? sections.hidden.map(\.tool.name) : nil) {
                         showsHiddenTools.toggle()
                     }
                     if showsHiddenTools { toolRows(sections.hidden, canHide: canHide) }
@@ -467,7 +468,8 @@ struct DetailCardView: View {
 
     /// "Not used in 30 days · 22   [Hide all 22…]" / "Hidden · 1", a line
     /// that opens its tools in place.
-    private func toolFold(title: String, expanded: Bool, hideAll: [String]?, toggle: @escaping () -> Void) -> some View {
+    private func toolFold(title: String, expanded: Bool, hideAll: [String]? = nil, showAll: [String]? = nil,
+                          toggle: @escaping () -> Void) -> some View {
         VStack(spacing: 6) {
             Rectangle().fill(theme.divider).frame(height: 1)
             HStack(spacing: 8) {
@@ -476,6 +478,12 @@ struct DetailCardView: View {
                 if let hideAll {
                     CardButton(title: "Hide all \(hideAll.count)\u{2026}", help: "Hide every tool in this group", theme: theme) {
                         state.askToolSwitch(group.name, hide: hideAll)
+                    }
+                    .fixedSize()
+                }
+                if let showAll {
+                    CardButton(title: "Show all \(showAll.count)\u{2026}", help: "Show every hidden tool again", theme: theme) {
+                        state.askToolSwitch(group.name, show: showAll)
                     }
                     .fixedSize()
                 }
@@ -1099,6 +1107,8 @@ struct SwitchSheet: View {
             }
             Spacer(minLength: 0)
         }
+        // Unticked: left as it is, so it reads quieter.
+        .opacity(plan.tools != nil && state.untickedPaths.contains(change.path) ? 0.45 : 1)
     }
 }
 

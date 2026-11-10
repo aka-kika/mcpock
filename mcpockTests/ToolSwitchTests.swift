@@ -78,6 +78,8 @@ final class ToolSwitchTests: XCTestCase {
         let root = try XCTUnwrap(ServerSwitch.jsonObject(off) as? [String: Any])
         XCTAssertEqual((root["permissions"] as? [String: Any])?["deny"] as? [String], ["mcp__github__create_issue"])
         XCTAssertEqual(root["theme"] as? String, "dark")
+        XCTAssertEqual(try edit(off, .claudeDeny, show: ["create_issue"]), "{\n  \"theme\": \"dark\"\n}\n",
+                       "shown again: the empty list and permissions go")
         let made = try edit(nil, .claudeDeny, hide: ["create_issue"])
         XCTAssertEqual(hidden(made, .claudeDeny), ["create_issue"], "no settings file yet: one is made")
     }
@@ -185,8 +187,7 @@ final class ToolSwitchTests: XCTestCase {
         let more = try edit(off, .hermes, hide: ["delete_repository"])
         XCTAssertTrue(more.contains("      exclude: [create_issue, delete_repository]\n"), more)
         let none = try edit(more, .hermes, show: ["create_issue", "delete_repository"])
-        XCTAssertTrue(none.contains("      exclude: []\n"))
-        XCTAssertEqual(hidden(none, .hermes), [])
+        XCTAssertEqual(none, hermesConfig, "all shown: the lines mcpock added go again")
     }
 
     func testHermesWithAnIncludeListIsLeftAlone() {
@@ -241,8 +242,7 @@ final class ToolSwitchTests: XCTestCase {
         XCTAssertEqual(rules, [["action": "github_create_issue", "resource": "*", "effect": "deny"]])
         XCTAssertEqual(hidden(off, .openCode), ["create_issue"])
         let on = try edit(off, .openCode, show: ["create_issue"])
-        XCTAssertEqual(hidden(on, .openCode), [])
-        XCTAssertNotNil(ServerSwitch.jsonObject(on))
+        XCTAssertEqual(on, openCodeConfig, "the empty list goes too")
     }
 
     func testOpenCodeKeepsOtherRulesInOrder() throws {

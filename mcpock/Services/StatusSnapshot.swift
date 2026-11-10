@@ -16,6 +16,9 @@ enum StatusSnapshot {
         firstCheckDone: Bool,
         interval: ProbeInterval,
         now: Date,
+        /// Per row: the tools each declaration's agent hides (Part 2). Nil
+        /// leaves them out (tests, demo).
+        hiddenTools: ((ServerGroup) -> [String: Set<String>])? = nil,
         pid: Int32 = ProcessInfo.processInfo.processIdentifier,
         appVersion: String = MCPJSONRPC.clientVersion
     ) -> MCPockStatus {
@@ -28,7 +31,9 @@ enum StatusSnapshot {
         let visible = groups.filter { !staysHidden($0) }
 
         let entries = groups.map { group in
-            server(group, byID: byID, hidden: staysHidden(group), pinned: isPinned(group.name))
+            var entry = server(group, byID: byID, hidden: staysHidden(group), pinned: isPinned(group.name))
+            entry.hiddenTools = hiddenTools.flatMap { Self.hiddenByAgent(group, $0(group)) }
+            return entry
         }
         // Counts and per-agent rows cover what the panel lists, so they agree
         // with the problems list and the widgets (Argon 2026-10-16 #6).
@@ -112,6 +117,17 @@ enum StatusSnapshot {
     /// One row as the status file holds it, secrets masked. Also what the
     /// ⌘C on a fine row and "Ask an Agent" build on (1.5.3), so the
     /// clipboard gets exactly the status file's masking.
+    /// Declaration id -> tools, as agent display name -> sorted tools; nil
+    /// when nothing is hidden.
+    static func hiddenByAgent(_ group: ServerGroup, _ hidden: [String: Set<String>]) -> [String: [String]]? {
+        var result: [String: Set<String>] = [:]
+        for source in group.sources {
+            guard let tools = hidden[source.configID], !tools.isEmpty else { continue }
+            result[AgentBadge.displayLabel(source.label), default: []].formUnion(tools)
+        }
+        return result.isEmpty ? nil : result.mapValues { $0.sorted() }
+    }
+
     static func server(
         _ group: ServerGroup,
         byID: [String: ServerSnapshot],

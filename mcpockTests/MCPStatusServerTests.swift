@@ -176,7 +176,8 @@ final class MCPStatusServerTests: XCTestCase {
         let s = server(at: try fixtureFile())
         let allOn = try XCTUnwrap(s.callTool("mcpock_switches", arguments: [:]))
         XCTAssertTrue(allOn.contains("Every one of the 5 servers is on in each agent that has it."), allOn)
-        XCTAssertTrue(allOn.contains("Only the user turns one on or off"), allOn)
+        XCTAssertTrue(allOn.contains("Only the user turns a server on or off, or hides a tool"), allOn)
+        XCTAssertFalse(allOn.contains("Tools hidden"), "an older file has no hidden tools")
 
         var status = try loadedStatus()
         status.servers[0].sources[0].state = "off"
@@ -189,6 +190,17 @@ final class MCPStatusServerTests: XCTestCase {
         XCTAssertTrue(text.contains("The other 3 are on in each agent that has them."), text)
         let details = StatusReport.serverLines(status.servers[0], number: nil, full: true, now: status.generated).joined(separator: "\n")
         XCTAssertTrue(details.contains("Turned off in: Cursor (the user's choice, not a problem)"), details)
+
+        // Part 2: hidden tools, per agent.
+        status.servers[1].hiddenTools = ["Codex": ["delete_repo"], "Claude Code": ["create_gist", "delete_repo"]]
+        let hidden = StatusReport.switchesText(.loaded(status), now: status.generated, isRunning: { _ in true })
+        let name = status.servers[1].name
+        XCTAssertTrue(hidden.contains("Tools hidden (in the agent's own settings"), hidden)
+        XCTAssertTrue(hidden.contains("- \(name) in Claude Code: create_gist, delete_repo\n- \(name) in Codex: delete_repo"), hidden)
+        let one = StatusReport.serverLines(status.servers[1], number: nil, full: true, now: status.generated).joined(separator: "\n")
+        XCTAssertTrue(one.contains("Tools hidden in Codex: delete_repo (the user's choice)"), one)
+        let back = try JSONDecoder().decode(MCPockStatus.self, from: JSONEncoder().encode(status))
+        XCTAssertEqual(back.servers[1].hiddenTools?["Codex"], ["delete_repo"], "it travels in the status file")
     }
 
     private func loadedStatus() throws -> MCPockStatus {

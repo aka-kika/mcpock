@@ -346,8 +346,7 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(text(".config/goose/config.yaml"),
                        before[3]?.replacingOccurrences(of: "openrouter:\n", with: "openrouter:\n    available_tools: []\n"),
                        "all shown: the list is empty again, which Goose reads as every tool")
-        let settings = try XCTUnwrap(ServerSwitch.jsonObject(text(".claude/settings.json") ?? "") as? [String: Any])
-        XCTAssertEqual((settings["permissions"] as? [String: Any])?["deny"] as? [String], [])
+        XCTAssertEqual(text(".claude/settings.json"), before[0], "shown again: as it was")
     }
 
     func testHidingInOneAgentLeavesTheOthers() throws {

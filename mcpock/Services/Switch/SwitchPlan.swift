@@ -75,6 +75,11 @@ struct SwitchPlan: Equatable, Sendable {
 
     var reassuranceText: String {
         guard let tools else { return Self.reassurance }
+        let names = tools.hide.isEmpty ? tools.show : tools.hide
+        if names.count > 1 {
+            let lead = tools.hide.isEmpty ? "Your agents see them again" : "Nothing is deleted. Your agents just stop seeing them"
+            return lead + ": " + CardText.list(names) + "."
+        }
         return tools.hide.isEmpty ? "Your agents see \(tools.show.count == 1 ? "it" : "them") again."
             : "Nothing is deleted. Your agents just stop seeing \(tools.hide.count == 1 ? "it" : "them"). Show \(tools.hide.count == 1 ? "it" : "them") again with one click."
     }

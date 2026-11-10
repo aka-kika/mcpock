@@ -98,6 +98,10 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// own `state` reads "off" too. Optional: absent in older files and
         /// on servers that are on everywhere.
         var offIn: [String]? = nil
+        /// Tools the user hid, per agent ("Claude Code" -> ["delete_repo"]),
+        /// in the agent's own settings (Part 2, 2026-11-10). Optional: absent
+        /// in older files and when nothing is hidden.
+        var hiddenTools: [String: [String]]? = nil
         var sources: [Source]
     }
 

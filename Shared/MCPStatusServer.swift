@@ -17,7 +17,7 @@ struct MCPStatusServer {
         Call mcpock_problems when the user says "check my mcpock" (or asks what is wrong with their \
         MCP servers), then tell the user what it reports and ask before changing any config file. \
         mcpock changes a config only when the user flips a switch in the app. Only the user turns servers on or \
-        off, there; do not edit a config unless the user says yes. These tools only read.
+        off, or hides single tools, there; do not edit a config unless the user says yes. These tools only read.
         """
 
     var loadStatus: () -> StatusLoad
@@ -110,8 +110,8 @@ struct MCPStatusServer {
              required: ["name"]),
         tool("mcpock_switches",
              title: "mcpock on and off",
-             description: "Which MCP servers are turned off, and in which agents. Read-only: only the user turns "
-                + "a server on or off, in the mcpock app."),
+             description: "Which MCP servers are turned off, and in which agents, and which single tools are hidden. "
+                + "Read-only: only the user turns a server on or off or hides a tool, in the mcpock app."),
     ]
 
     private static func tool(

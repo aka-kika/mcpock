@@ -195,7 +195,19 @@ enum ToolSwitch {
         }
         let existing = Set(JSONSpanEditor.parse(result)?.value(at: ["permissions", "deny"])?.elements?.compactMap(\.string) ?? [])
         let add = hide.subtracting(show).sorted().map { claudeRule(server: server, tool: $0) }.filter { !existing.contains($0) }
-        guard !add.isEmpty else { return result }
+        guard !add.isEmpty else {
+            // The last rule went: an empty list (and then an empty
+            // "permissions") goes too, so showing everything again leaves
+            // the file as it was.
+            guard result != text, JSONSpanEditor.parse(result)?.value(at: ["permissions", "deny"])?.elements?.isEmpty == true else {
+                return result
+            }
+            result = try JSONSpanEditor.removeMember(in: result, objectPath: ["permissions"], key: "deny").text
+            if JSONSpanEditor.parse(result)?.member("permissions")?.value.members?.isEmpty == true {
+                result = try JSONSpanEditor.removeMember(in: result, objectPath: [], key: "permissions").text
+            }
+            return result
+        }
 
         let scalars = Array(result.unicodeScalars)
         let newline = result.contains("\r\n") ? "\r\n" : "\n"
@@ -249,7 +261,13 @@ enum ToolSwitch {
                 ? span.member("action")?.value.string : nil
         })
         let add = hide.subtracting(show).sorted().map { openCodeAction(server: server, tool: $0) }.filter { !existing.contains($0) }
-        guard !add.isEmpty else { return result }
+        guard !add.isEmpty else {
+            // The last rule went: the empty list goes too.
+            if result != text, parsed?.member("permissions")?.value.elements?.isEmpty == true {
+                result = try JSONSpanEditor.removeMember(in: result, objectPath: [], key: "permissions").text
+            }
+            return result
+        }
         func rule(_ action: String) -> String {
             "{ \"action\": \(JSONSpanEditor.quoted(action)), \"resource\": \"*\", \"effect\": \"deny\" }"
         }
@@ -311,7 +329,7 @@ enum ToolSwitch {
         case .hermes, .goose:
             let section = mechanism == .hermes ? "mcp_servers" : "extensions"
             let key = mechanism == .hermes ? "tools" : "available_tools"
-            guard changedLines(before: before, after: after, maxOld: 1, maxNew: 2),
+            guard changedLines(before: before, after: after, maxOld: 2, maxNew: 2),
                   let old = YAMLBlock.parse(before), let new = YAMLBlock.parse(after) else { return false }
             return dropping(key, old, section: section, entry: server) == dropping(key, new, section: section, entry: server)
         }
@@ -616,6 +634,17 @@ struct YAMLEntry {
     func settingExclude(_ items: [String]) -> String? {
         guard let tools = toolsField(), tools.include == nil else { return nil }
         var out = lines
+        if let line = tools.exclude?.line, items.isEmpty {
+            // Nothing hidden any more: the line goes, and `tools:` with it
+            // when it held nothing else.
+            out.remove(at: line)
+            if let (fields, _) = children(of: entryLine, parentIndent: entryIndent),
+               let toolsLine = fields.first(where: { split($0)?.key == "tools" }),
+               children(of: toolsLine, parentIndent: fieldIndent)?.lines == [line] {
+                out.remove(at: toolsLine)
+            }
+            return out.joined(separator: "\n")
+        }
         if let line = tools.exclude?.line {
             let indent = YAMLBlock.indent(body(line))
             out[line] = YAMLEntry.keepingComment(of: out[line],

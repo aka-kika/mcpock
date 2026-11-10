@@ -61,7 +61,17 @@ final class HealthMonitor {
 
     /// What `status.json` holds right now.
     func statusSnapshot(now: Date = Date()) -> MCPockStatus {
-        StatusSnapshot.build(
+        // Each agent file read once per snapshot, however many rows use it.
+        var cache: [String: String?] = [:]
+        let read = { (path: String) -> String? in
+            if let hit = cache[path] { return hit }
+            let text = try? String(contentsOfFile: path, encoding: .utf8)
+            cache[path] = .some(text)
+            return text
+        }
+        let configs = Dictionary(servers.map { ($0.id, $0.config) }, uniquingKeysWith: { first, _ in first })
+        let settings = claudeSettingsPath
+        return StatusSnapshot.build(
             servers: servers,
             isHidden: { [hiddenNames] in Self.isHidden($0, in: hiddenNames) },
             isPinned: { [pinnedNames] in pinnedNames.contains(Self.normalizedName($0)) },
@@ -70,7 +80,11 @@ final class HealthMonitor {
             checking: isRefreshing,
             firstCheckDone: hasCompletedFirstPass,
             interval: AppPreferences.loadProbeInterval(from: defaults),
-            now: now
+            now: now,
+            hiddenTools: switchesEnabled ? { group in
+                ToolPlanner.hiddenTools(configs: group.sources.compactMap { configs[$0.configID] },
+                                        allTools: group.tools.map(\.name), claudeSettingsPath: settings, read: read)
+            } : nil
         )
     }
     private var hiddenNames: Set<String>

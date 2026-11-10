@@ -156,8 +156,8 @@ enum StatusReport {
 
     // MARK: - mcpock_switches
 
-    static let switchesFooter = "You can't switch a server from here. Only the user turns one on or off, "
-        + "in the mcpock app (the switch beside each agent on the server's card)."
+    static let switchesFooter = "You can't switch a server or a tool from here. Only the user turns a server on or off, "
+        + "or hides a tool, in the mcpock app (the switches on the server's card)."
 
     /// Which servers are off in which agent (1.14). Read-only, like the rest.
     static func switchesText(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
@@ -184,6 +184,16 @@ enum StatusReport {
             }
             let rest = status.servers.count - partly.count
             if rest > 0 { lines.append("The other \(rest) are on in each agent that has them.") }
+        }
+        let withHidden = status.servers.filter { !($0.hiddenTools ?? [:]).isEmpty }
+        if !withHidden.isEmpty {
+            lines.append("")
+            lines.append("Tools hidden (in the agent's own settings, so that agent does not see them):")
+            for server in withHidden {
+                for (agent, tools) in (server.hiddenTools ?? [:]).sorted(by: { $0.key < $1.key }) {
+                    lines.append("- \(server.name) in \(agent): \(tools.joined(separator: ", "))")
+                }
+            }
         }
         lines.append("")
         lines.append(switchesFooter)
@@ -228,6 +238,9 @@ enum StatusReport {
         lines.append(indent + "Used by: \(s.agents.joined(separator: ", "))")
         if let off = s.offIn, !off.isEmpty {
             lines.append(indent + "Turned off in: \(off.joined(separator: ", ")) (the user's choice, not a problem)")
+        }
+        for (agent, tools) in (s.hiddenTools ?? [:]).sorted(by: { $0.key < $1.key }) {
+            lines.append(indent + "Tools hidden in \(agent): \(tools.joined(separator: ", ")) (the user's choice)")
         }
         if !s.configPaths.isEmpty {
             lines.append(indent + "Config files:")

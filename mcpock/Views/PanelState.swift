@@ -734,7 +734,9 @@ final class PanelState {
             let outcome = await monitor.applySwitch(plan)
             isApplyingSwitch = false
             let whenByPath = Dictionary(plan.changes.map { ($0.path, $0.when) }, uniquingKeysWith: { first, _ in first })
-            for source in monitor.groups.first(where: { $0.name == plan.server })?.sources ?? [] {
+            // A tool write: the agent's row says "1 tool hidden" instead (seen in the VM:
+            // "Hidden in new sessions" there read like the server was off).
+            for source in plan.tools == nil ? monitor.groups.first(where: { $0.name == plan.server })?.sources ?? [] : [] {
                 let path = source.agent == AgentRegistry.claudeCodeLabel ? monitor.claudeSettingsPath : source.path
                 if outcome.written.contains(path), let when = whenByPath[path] { switchNotes[source.configID] = when }
             }

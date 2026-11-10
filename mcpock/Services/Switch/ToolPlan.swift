@@ -63,7 +63,9 @@ enum ToolPlanner {
                 problems.append("\(agent): mcpock can't change its file safely, so it is left alone.")
             }
         }
-        return SwitchPlan(server: server, turnOn: hide.isEmpty, changes: changes, skipped: skipped, problems: problems,
+        // Showing changes nothing where nothing could be hidden: no rows for them.
+        return SwitchPlan(server: server, turnOn: hide.isEmpty, changes: changes, skipped: hide.isEmpty ? [] : skipped,
+                          problems: problems,
                           tools: ToolEdit(hide: hide, show: show))
     }
 
@@ -75,7 +77,7 @@ enum ToolPlanner {
         case .codex, .grok, .hermes:
             return hiding ? "Goes on the server's hidden-tools list." : "Comes off the server's hidden-tools list."
         case .openCode:
-            return hiding ? "A deny rule for it goes in OpenCode's permissions." : "Its deny rule leaves OpenCode's permissions."
+            return hiding ? "Goes in OpenCode's permissions as a deny rule." : "Its deny rule leaves OpenCode's permissions."
         case .goose:
             return hiding
                 ? "Leaves the list of tools Goose may use. A tool \(server) adds later stays hidden in Goose until you show it."
