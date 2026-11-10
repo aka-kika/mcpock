@@ -136,4 +136,25 @@ final class ReviewNov10Tests: XCTestCase {
         let mode = try FileManager.default.attributesOfItem(atPath: store.path)[.posixPermissions] as? NSNumber
         XCTAssertEqual(mode?.intValue, 0o600)
     }
+
+    // MARK: ec5a (mcode-7): removing the first member keeps the next one's comment
+
+    func testRemovingTheFirstMemberKeepsTheCommentAboveTheNext() throws {
+        let text = "{\n  \"a\": 1,\n  // about b\n  \"b\": 2\n}\n"
+        let out = try JSONSpanEditor.removeMember(in: text, objectPath: [], key: "a")
+        XCTAssertEqual(out.text, "{\n  // about b\n  \"b\": 2\n}\n")
+        XCTAssertEqual(out.valueText, "1")
+    }
+
+    func testRemovingTheFirstMemberWithNoCommentLeavesTheNextInPlace() throws {
+        let text = "{\n  \"a\": 1,\n  \"b\": 2\n}\n"
+        XCTAssertEqual(try JSONSpanEditor.removeMember(in: text, objectPath: [], key: "a").text, "{\n  \"b\": 2\n}\n")
+        XCTAssertEqual(try JSONSpanEditor.removeMember(in: "{\"a\": 1, \"b\": 2}", objectPath: [], key: "a").text, "{\"b\": 2}")
+    }
+
+    func testRemovingTheFirstElementKeepsTheCommentAboveTheNext() throws {
+        let text = "{\"d\": [\n  \"x\",\n  // keep\n  \"y\"\n]}"
+        XCTAssertEqual(try JSONSpanEditor.removeElement(in: text, arrayPath: ["d"], index: 0),
+                       "{\"d\": [\n  // keep\n  \"y\"\n]}")
+    }
 }

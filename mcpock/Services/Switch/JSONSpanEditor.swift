@@ -205,7 +205,8 @@ enum JSONSpanEditor {
             index: index,
             starts: members.map(\.keyStart),
             ends: members.map(\.value.end),
-            container: object.start..<object.end
+            container: object.start..<object.end,
+            scalars: scalars
         )
         return (splice(scalars, range, ""), valueText)
     }
@@ -255,7 +256,7 @@ enum JSONSpanEditor {
             throw EditError.missing(arrayPath.joined(separator: "."))
         }
         let range = removalRange(index: index, starts: elements.map(\.start), ends: elements.map(\.end),
-                                 container: array.start..<array.end)
+                                 container: array.start..<array.end, scalars: scalars)
         return splice(scalars, range, "")
     }
 
@@ -263,10 +264,22 @@ enum JSONSpanEditor {
 
     /// What to cut so the neighbours and their commas still read right: a
     /// later item goes with the comma before it, the first one with the comma
-    /// after it, an only item with everything between the brackets (`{}`).
-    private static func removalRange(index: Int, starts: [Int], ends: [Int], container: Range<Int>) -> Range<Int> {
+    /// after it and the space up to what comes next, an only item with
+    /// everything between the brackets (`{}`). A comment between the first
+    /// item and the second stays: it belongs to the second (review 10 Nov,
+    /// mcode-7).
+    private static func removalRange(index: Int, starts: [Int], ends: [Int], container: Range<Int>,
+                                     scalars: [Unicode.Scalar]) -> Range<Int> {
         if index > 0 { return ends[index - 1]..<ends[index] }
-        if starts.count > 1 { return starts[0]..<starts[1] }
+        if starts.count > 1 {
+            var i = ends[0]
+            while i < starts[1], scalars[i] == " " || scalars[i] == "\t" || scalars[i] == "\n" || scalars[i] == "\r" { i += 1 }
+            // A comment before the comma: the old cut, up to the next item.
+            guard i < starts[1], scalars[i] == "," else { return starts[0]..<starts[1] }
+            i += 1
+            while i < starts[1], scalars[i] == " " || scalars[i] == "\t" || scalars[i] == "\n" || scalars[i] == "\r" { i += 1 }
+            return starts[0]..<i
+        }
         return (container.lowerBound + 1)..<(container.upperBound - 1)
     }
 
