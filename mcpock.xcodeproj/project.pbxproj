@@ -159,6 +159,7 @@
 		AE85151EF0F429A11DE05749 /* AgentsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870F4877A7CBC485C7B57693 /* AgentsListView.swift */; };
 		AEA7D341A5848AB19C6F3050 /* ClaudeCodeUsageReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2528228B55C2A5A2021BC3D4 /* ClaudeCodeUsageReader.swift */; };
 		AEE5DB8050059EE4A67D0CA5 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E3E403CD0E1393D314118B /* WidgetSnapshotStore.swift */; };
+		AF86B5E8A486A4CD2F56CEA3 /* ToolPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F55EC035F40B7D5F237C1781 /* ToolPlan.swift */; };
 		AF8B3954F1A8256426F8FC16 /* WidgetColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67AD38447840BE0147930A9F /* WidgetColors.swift */; };
 		B1663EB3DCB3F27A206BEB0C /* Round8SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372F87873A61B8A0864AD991 /* Round8SettingsTests.swift */; };
 		B423FA01DB8C125348849AE7 /* SettingsTabStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCA439EC63464024DCA8C51 /* SettingsTabStrip.swift */; };
@@ -471,6 +472,7 @@
 		F3171A9482FDF03BF28CF039 /* MenuText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuText.swift; sourceTree = "<group>"; };
 		F393572D1E0AD89065FD2171 /* ConnectSnippets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSnippets.swift; sourceTree = "<group>"; };
 		F4F4EB16496D1D088B350C30 /* HTTPProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPProbe.swift; sourceTree = "<group>"; };
+		F55EC035F40B7D5F237C1781 /* ToolPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolPlan.swift; sourceTree = "<group>"; };
 		F640ADF34093CC39B7AF00A5 /* ParkedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkedStore.swift; sourceTree = "<group>"; };
 		F8FBD6D68E36379FD7BFB717 /* SettingsWindowSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowSizingTests.swift; sourceTree = "<group>"; };
 		F8FE37D1861BBF6370C0519F /* SSEProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEProbe.swift; sourceTree = "<group>"; };
@@ -725,6 +727,7 @@
 				F640ADF34093CC39B7AF00A5 /* ParkedStore.swift */,
 				8F4DC7CB6CDAA1B907C5270F /* ServerSwitch.swift */,
 				F9188CF7C79B6B730E1BFC65 /* SwitchPlan.swift */,
+				F55EC035F40B7D5F237C1781 /* ToolPlan.swift */,
 				13E26EB056FBA676AC684E1A /* ToolSwitch.swift */,
 			);
 			path = Switch;
@@ -1089,6 +1092,7 @@
 				BD5312C84A2BAC5D502E7C7D /* StdioProbe.swift in Sources */,
 				A29A7467A0919B5BA4DEEC3D /* SwitchPlan.swift in Sources */,
 				667AC602C4A0F0D46A664024 /* Theme.swift in Sources */,
+				AF86B5E8A486A4CD2F56CEA3 /* ToolPlan.swift in Sources */,
 				0E9F5EB4CDD14DF5E3826516 /* ToolSwitch.swift in Sources */,
 				D63A6D7D84C1CF1D62351E59 /* UpdateController.swift in Sources */,
 				A31B855F8817AD399A5EE9D7 /* UsageReader.swift in Sources */,

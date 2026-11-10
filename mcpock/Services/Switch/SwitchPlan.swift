@@ -21,6 +21,12 @@ struct SwitchChange: Identifiable, Equatable, Sendable {
     var parked: [ParkedEdit] = []
 }
 
+/// The tools a plan hides or shows.
+struct ToolEdit: Equatable, Sendable {
+    let hide: [String]
+    let show: [String]
+}
+
 /// One server moving into `ParkedStore` (off) or out of it (on).
 struct ParkedEdit: Equatable, Sendable {
     /// The agent's label ("Claude Desktop").
@@ -42,14 +48,35 @@ struct SwitchPlan: Equatable, Sendable {
     let skipped: [String]
     /// Agents whose file mcpock would not change, and why.
     let problems: [String]
+    /// Set when the plan hides or shows single tools (Part 2) instead of
+    /// turning the server off or on.
+    var tools: ToolEdit? = nil
 
     var isEmpty: Bool { changes.isEmpty }
 
-    /// "Turn off openrouter everywhere?" / "Turn on openrouter in Cursor?"
+    /// "Turn off openrouter everywhere?" / "Turn on openrouter in Cursor?" /
+    /// "Hide delete_repository in github?" / "Show 3 tools of github?"
     var title: String {
+        if let tools {
+            let names = tools.hide.isEmpty ? tools.show : tools.hide
+            let what = names.count == 1 ? names[0] : "\(names.count) tools"
+            return tools.hide.isEmpty ? "Show \(what) of \(server) again?" : "Hide \(what) in \(server)?"
+        }
         let names = changes.flatMap(\.agents)
         let scope = names.count == 1 ? "in \(names[0])" : "everywhere"
         return "Turn \(turnOn ? "on" : "off") \(server) \(scope)?"
+    }
+
+    /// The sheet's button.
+    var confirmTitle: String {
+        if let tools { return tools.hide.isEmpty ? "Show" : "Hide" }
+        return turnOn ? "Turn On" : "Turn Off"
+    }
+
+    var reassuranceText: String {
+        guard let tools else { return Self.reassurance }
+        return tools.hide.isEmpty ? "Your agents see \(tools.show.count == 1 ? "it" : "them") again."
+            : "Nothing is deleted. Your agents just stop seeing \(tools.hide.count == 1 ? "it" : "them"). Show \(tools.hide.count == 1 ? "it" : "them") again with one click."
     }
 
     static let reassurance = "Nothing is deleted. Turning it on puts it back as it was."

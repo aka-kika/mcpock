@@ -282,6 +282,14 @@ enum CardText {
     /// The sheet's small print: agents with no switch, files left alone.
     static func switchNotes(for plan: SwitchPlan) -> [String] {
         var lines = plan.problems
+        if plan.tools != nil {
+            if !plan.skipped.isEmpty {
+                let agents = list(plan.skipped)
+                lines.append("\(agents) can't hide single tools from \(plan.skipped.count == 1 ? "its file" : "their files"). Use \(plan.skipped.count == 1 ? "its" : "their") own tool list, or turn \(plan.server) off there.")
+            }
+            if plan.isEmpty, lines.isEmpty { lines.append("Nothing to change there.") }
+            return lines
+        }
         if !plan.skipped.isEmpty {
             let agents = list(plan.skipped)
             lines.append("No switch for \(agents) yet: turn it \(plan.turnOn ? "on" : "off") there by hand.")

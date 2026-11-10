@@ -306,4 +306,56 @@ final class SwitchPlanTests: XCTestCase {
         on.turnedOff = false
         XCTAssertEqual(HealthMonitor.merged([on], into: snapshots, pausedNames: []).map(\.state), [.unknown])
     }
+
+    // MARK: Hiding single tools (Part 2)
+
+    private let orTools = ["chat_completion", "list_models", "delete_key"]
+
+    private func toolPlan(_ configs: [ServerConfig], hide: [String] = [], show: [String] = []) -> SwitchPlan {
+        ToolPlanner.plan(server: "openrouter", configs: configs.filter { $0.name == "openrouter" }, hide: hide, show: show,
+                         allTools: orTools, claudeSettingsPath: path(".claude/settings.json"))
+    }
+
+    func testHidingAToolEverywhereWritesEachAgentsOwnSettingAndShowPutsItBack() throws {
+        try seed()
+        let configs = discover()
+        let hide = toolPlan(configs, hide: ["delete_key"])
+        XCTAssertEqual(hide.title, "Hide delete_key in openrouter?")
+        XCTAssertEqual(hide.confirmTitle, "Hide")
+        XCTAssertEqual(Set(hide.changes.flatMap(\.agents)), ["Claude Code", "Codex", "Goose"])
+        XCTAssertEqual(Set(hide.skipped), ["Cursor", "VS Code"], "no setting for single tools there")
+        XCTAssertTrue(CardText.switchNotes(for: hide).first?.contains("can't hide single tools") == true)
+        let before = [".claude/settings.json", ".cursor/mcp.json", ".codex/config.toml", ".config/goose/config.yaml"].map(text)
+
+        let backups = home.appendingPathComponent("backups")
+        XCTAssertNil(SwitchWriter.apply(hide, backups: backups, parked: parked).error)
+        XCTAssertTrue(text(".claude/settings.json")?.contains("mcp__openrouter__delete_key") == true)
+        XCTAssertTrue(text(".codex/config.toml")?.contains("disabled_tools = [\"delete_key\"]") == true)
+        XCTAssertTrue(text(".config/goose/config.yaml")?.contains("available_tools: [chat_completion, list_models]") == true)
+        XCTAssertEqual(text(".cursor/mcp.json"), before[1], "Cursor's file is never touched")
+
+        let hidden = ToolPlanner.hiddenTools(configs: configs.filter { $0.name == "openrouter" }, allTools: orTools,
+                                             claudeSettingsPath: path(".claude/settings.json"))
+        XCTAssertEqual(Set(hidden.values), [["delete_key"]])
+        XCTAssertEqual(hidden.count, 3)
+
+        let show = toolPlan(discover(), show: ["delete_key"])
+        XCTAssertEqual(show.confirmTitle, "Show")
+        XCTAssertNil(SwitchWriter.apply(show, backups: backups, parked: parked).error)
+        XCTAssertEqual(text(".codex/config.toml"), before[2])
+        XCTAssertEqual(text(".config/goose/config.yaml"),
+                       before[3]?.replacingOccurrences(of: "openrouter:\n", with: "openrouter:\n    available_tools: []\n"),
+                       "all shown: the list is empty again, which Goose reads as every tool")
+        let settings = try XCTUnwrap(ServerSwitch.jsonObject(text(".claude/settings.json") ?? "") as? [String: Any])
+        XCTAssertEqual((settings["permissions"] as? [String: Any])?["deny"] as? [String], [])
+    }
+
+    func testHidingInOneAgentLeavesTheOthers() throws {
+        try seed()
+        let codexOnly = discover().filter { $0.source.label == "Codex" }
+        let plan = toolPlan(codexOnly, hide: ["delete_key"])
+        XCTAssertEqual(plan.changes.map(\.agents), [["Codex"]])
+        XCTAssertTrue(plan.skipped.isEmpty)
+    }
+
 }

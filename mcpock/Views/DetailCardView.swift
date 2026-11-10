@@ -860,7 +860,7 @@ struct SwitchSheet: View {
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             if !plan.isEmpty {
-                Text(SwitchPlan.reassurance)
+                Text(plan.reassuranceText)
                     .font(Theme.caption)
                     .foregroundStyle(theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -952,7 +952,7 @@ struct SwitchSheetButtons: View {
             HStack(spacing: 6) {
                 CardButton(title: plan.isEmpty ? "Close" : "Cancel", fillsWidth: true, theme: theme) { state.cancelSwitch() }
                 if !plan.isEmpty {
-                    CardButton(title: plan.turnOn ? "Turn On" : "Turn Off", fillsWidth: true, theme: theme) {
+                    CardButton(title: plan.confirmTitle, fillsWidth: true, theme: theme) {
                         state.confirmSwitch()
                     }
                     .disabled(state.isApplyingSwitch)
