@@ -33,7 +33,7 @@ final class Round8SettingsTests: XCTestCase {
             XCTAssertTrue(prompt.contains(step), step)
         }
         XCTAssertTrue(prompt.contains("- command: \(path)"))
-        XCTAssertTrue(prompt.contains("mcpock never edits agent configs itself"))
+        XCTAssertTrue(prompt.contains("mcpock doesn't add itself to agent configs"))
         XCTAssertTrue(prompt.contains("claude mcp add --scope user mcpock -- \(path)"))
         XCTAssertTrue(prompt.contains("claude mcp get mcpock"))
         XCTAssertTrue(prompt.contains("call mcpock_status"))

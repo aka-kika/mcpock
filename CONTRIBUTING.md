@@ -71,7 +71,8 @@ monitor and panel persist into a throwaway `UserDefaults` suite instead).
 2. **Keep the rules** in [docs/ARCHITECTURE.md §6](docs/ARCHITECTURE.md#6-rules-that-must-not-regress):
    no orphan processes, NDJSON over stdio, session replay over HTTP, discovery
    off the main thread, the scan stays out of Documents/Desktop/Downloads,
-   no secret leaves the app, mcpock never writes another app's config.
+   no secret leaves the app, mcpock writes another app's config only through
+   the server switch (on the user's click, shown first, backed up).
 3. **No new dependencies without asking first.** JSON-RPC, TOML and YAML stay
    hand-rolled. Sparkle (round 10, in-app updates) is the one approved
    exception, added on purpose; see [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).

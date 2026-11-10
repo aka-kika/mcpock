@@ -18,7 +18,7 @@ if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-
     print("""
         mcpock-mcp: mcpock's read-only MCP server (stdio).
         Add it to an agent's MCP config as a stdio server with this file's path as the command.
-        Tools: mcpock_status, mcpock_problems, mcpock_server.
+        Tools: mcpock_status, mcpock_problems, mcpock_server, mcpock_switches.
         Reads: \(statusURL.path)
         """)
     exit(0)

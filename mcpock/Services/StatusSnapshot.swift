@@ -46,7 +46,8 @@ enum StatusSnapshot {
             hidden: groups.count - visible.count,
             needsAppOpen: shown.filter { $0.needsApp != nil }.count,
             lostInSession: shown.filter { $0.status == lostStatus }.count,
-            notChecked: shown.filter { $0.status == notCheckedStatus }.count
+            notChecked: shown.filter { $0.status == notCheckedStatus }.count,
+            turnedOff: shown.filter { $0.status == offStatus }.count
         )
         // Round 8 (widgets): the Agents tab's own rows, same order it uses
         // (worst first, aka last) — `AgentSections.build` is already pure and
@@ -154,7 +155,9 @@ enum StatusSnapshot {
             state: group.state.rawValue,
             status: status,
             needsAttention: ["broken", "slow", "needs sign-in", "set up differently", badConfigStatus, lostStatus].contains(status),
-            reason: ShortReason.line(for: group).map { SecretMask.scrub($0, known: allKnown) },
+            // "Off in Cursor" is not a reason: it travels as `offIn`.
+            reason: ShortReason.line(for: group).flatMap { $0 == ShortReason.offNote(for: group) ? nil : $0 }
+                .map { SecretMask.scrub($0, known: allKnown) },
             nextStep: NextStep.line(for: group),
             hidden: hidden,
             pinned: pinned,
@@ -169,6 +172,7 @@ enum StatusSnapshot {
                 ? SecretMask.scrub(CardText.onPurposeSentence(for: group), known: allKnown) : nil,
             note: group.state == .healthy ? CardText.slowStartNote(group.slowStartSeconds) : nil,
             needsApp: group.state == .needsApp ? (group.needsAppName ?? "its app") : nil,
+            offIn: group.offLabels.isEmpty ? nil : group.offLabels.map { AgentBadge.displayLabel($0) },
             sources: sources
         )
     }

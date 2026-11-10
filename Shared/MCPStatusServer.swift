@@ -1,7 +1,7 @@
 import Foundation
 
 /// The MCP side of the `mcpock-mcp` helper (round 7): one newline-delimited
-/// JSON-RPC message in, at most one out. Read-only by design: its three tools
+/// JSON-RPC message in, at most one out. Read-only by design: its four tools
 /// only read mcpock's status file, never probe a server, never write anything.
 ///
 /// Lives in `Shared/` (compiled into the app too) so `MCPStatusServerTests`
@@ -16,7 +16,8 @@ struct MCPStatusServer {
         mcpock is a macOS menu bar app that checks the MCP servers the user's agents use. \
         Call mcpock_problems when the user says "check my mcpock" (or asks what is wrong with their \
         MCP servers), then tell the user what it reports and ask before changing any config file. \
-        mcpock never edits configs, so do not edit one unless the user says yes. Everything here is read-only.
+        mcpock changes a config only when the user flips a switch in the app. Only the user turns servers on or \
+        off, there; do not edit a config unless the user says yes. These tools only read.
         """
 
     var loadStatus: () -> StatusLoad
@@ -80,6 +81,8 @@ struct MCPStatusServer {
             return StatusReport.statusText(loadStatus(), now: now(), isRunning: isRunning)
         case "mcpock_problems":
             return StatusReport.problemsText(loadStatus(), now: now(), isRunning: isRunning)
+        case "mcpock_switches":
+            return StatusReport.switchesText(loadStatus(), now: now(), isRunning: isRunning)
         case "mcpock_server":
             let server = (arguments["name"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
             guard !server.isEmpty else { return "Pass the server's name, e.g. {\"name\": \"firecrawl\"}." }
@@ -105,6 +108,10 @@ struct MCPStatusServer {
                 + "file, command or URL (secrets masked), env and header names, errors and tools.",
              properties: ["name": ["type": "string", "description": "The server's name as mcpock shows it, e.g. \"firecrawl\"."]],
              required: ["name"]),
+        tool("mcpock_switches",
+             title: "mcpock on and off",
+             description: "Which MCP servers are turned off, and in which agents. Read-only: only the user turns "
+                + "a server on or off, in the mcpock app."),
     ]
 
     private static func tool(

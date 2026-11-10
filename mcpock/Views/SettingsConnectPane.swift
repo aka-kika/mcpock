@@ -39,7 +39,7 @@ struct SettingsConnectPane: View {
     static let claudeText = "Paste it into Claude Code. It finds your agents\u{2019} configs and, one file at a "
         + "time, backs each one up, adds mcpock where it\u{2019}s missing and checks the file still reads. "
         + "The backups sit next to each config and hold the same keys: delete them once all is well."
-    static let footerText = "mcpock never edits your agents\u{2019} configs. The server only reads mcpock\u{2019}s own status file."
+    static let footerText = "mcpock doesn\u{2019}t add itself to your agents\u{2019} configs: you do. The server only reads mcpock\u{2019}s own status file."
     static let statusFileHelp = "The helper answers from this file. mcpock updates it after every check."
 
     /// Under the status file when its last write failed.

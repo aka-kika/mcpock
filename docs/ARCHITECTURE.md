@@ -1,6 +1,6 @@
 # mcpock — Architecture
 
-How the app is put together (v1.13), how one health check flows end to end, and
+How the app is put together (v1.14), how one health check flows end to end, and
 the rules that must not regress. For what the app does from a user's point of
 view, see the [README](../README.md); for build and test steps, see
 [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -74,13 +74,26 @@ card is open).
 | `Services/AgentRegistry.swift` | `AgentRegistry.known`: exact config paths and labels of the agents mcpock knows. Also `AgentBadge` (logo lookup, monograms, display names) |
 | `Services/ConfigScanner.swift` | Bounded, TCC-safe sweep of `~/.config/*`, `~/Library/Application Support/*` and home dot-folders. Never Documents, Desktop or Downloads; skips symlinks and files no agent loads (`excludedFileSuffixes`: `~/.minimax/mcp/mcp.json`, since MiniMax reads only `~/.minimax/mcp.json`) |
 | `Services/ConfigShape.swift` | Recognises a config by its shape (JSON `mcpServers` / `servers` / `mcp`, TOML `[mcp_servers.*]`, YAML `extensions:` / `mcp_servers:`); a file counts only if one entry has a `command` or `url` |
-| `Services/ConfigDiscovery.swift` | Merges registry and scan, dedupes by canonical path, drops `enabled: false` entries and projects whose folder is gone; a command given as a list runs, an entry with no command keeps a Not checked row; `ParsedFileCache` parses a file again only when its mtime, size or inode change (1.11) |
+| `Services/ConfigDiscovery.swift` | Merges registry and scan, dedupes by canonical path, keeps `enabled: false` / `disabled: true` / parked entries as turned off (`ServerConfig.turnedOff`, 1.14; a Claude Code name in `deniedMcpServers` too), drops projects whose folder is gone; a command given as a list runs, an entry with no command keeps a Not checked row; `ParsedFileCache` parses a file again only when its mtime, size or inode change (1.11) |
 | `Services/ClaudeProjectApproval.swift` | A scanned `.mcp.json` server (only files the scan reaches: inside `~/.config`, `~/Library/Application Support` or a home dot-folder; a `.mcp.json` in an ordinary project folder is not scanned) runs only when Claude Code approved it for that folder (`enabledMcpjsonServers`, `enableAllProjectMcpServers`; project settings only in a trusted folder; disabled wins) |
 | `Services/MCPServersTOML.swift`, `GooseConfig.swift`, `MCPServersYAML.swift`, `YAMLBlock.swift` | Small parsers for the TOML/YAML shapes agents write (no third-party TOML/YAML). `YAMLBlock` builds a node tree and reads YAML's multi-line scalars: wrapped plain text (Hermes wraps long paths), multi-line quoted text, `|` / `>` blocks, flow `[]` / `{}` |
 | `Services/AkaSource.swift` | aka keeps servers in a database, not a file: `GET http://127.0.0.1:6464/api/mcp/servers`, then launches each the way aka does (`bun x`, `python`, `bun run`). Asked only when `AkaListener` finds aka itself on the port (the user's process, inside an app validly signed as `ai.pipali`, or an aka source folder) |
 | `Services/ConfigShape.swift` (`GrokBotConfig`) | 1.12: Grok Bot's `~/.grokbot/settings.json` `mcpBoxServers` names become `builtin` rows with no command (they run in xAI's cloud); `AgentRegistry.cloudHosts` gives the row's "Runs in xAI's cloud" wording |
 | `AgentRegistry.installedEmptyAgents` / `HealthMonitor.serverlessAgents` | 1.12.1: Grok Bot is listed once installed (its app or `~/.grokbot`), with no servers: `AgentSections.build(emptyAgents:)` and `SettingsAgentsPane.entries(emptyAgents:)` add it with `AgentRegistry.listedWhenEmpty`'s line. 1.13: `settingsOnlyWhenEmpty` keeps Grok Bot's empty row off the panel (`serverlessAgentsOnPanel`), in Settings only |
 | `AkaSource.answer` / `AkaSource.needsAccess` | 1.12.2: a 401 or 403 from aka's sidecar lists aka without servers as "Needs access" (calm), through the same serverless-agent path; token handling waits for aka's read-only token (`docs/inbox/2026-10-24-aka-needs-access.md`) |
+
+### The server switch (1.14)
+
+The one place mcpock changes another app's file, and only on her click.
+
+| File | Role |
+|------|------|
+| `Services/Switch/ServerSwitch.swift` | `SwitchMechanism`: how each agent says off (Claude Code's `deniedMcpServers` in `~/.claude/settings.json`, never `~/.claude.json`; `enabled` in TOML and YAML; OpenCode's two shapes; parking under `_mcpock_disabled` for Claude Desktop and Cursor). `edited` returns the new text, `verify` checks it is the old one with exactly that change (JSON compared as data, TOML and YAML line by line and through the readers) |
+| `Services/Switch/JSONSpanEditor.swift` | Span-level JSON / JSONC edits: one member or element in or out, every other character kept (comments, order, indentation) |
+| `Services/Switch/LineSwitch.swift` | `TOMLSwitch`, `YAMLSwitch`: one line changed or added; a layout they can't change safely returns nil, never a guess |
+| `Services/Switch/SwitchPlan.swift` | `SwitchPlanner` builds a `SwitchPlan` (per file: plain words, when it counts, masked changed lines) without writing; `SwitchWriter` checks the file is still what the sheet showed, copies it to `backups/` (0600, newest 60), writes a temp file beside it and renames. A symlinked config is written where it really is. While hosting tests only the temporary folder may be written |
+| `HealthMonitor.switchPlan` / `applySwitch`, `PanelState.askSwitch` / `confirmSwitch` | A flip opens the sheet (`SwitchSheet` in `DetailCardView`, in place of the card's details); only its button writes. Off in demo mode (`switchesEnabled`) |
+| `HealthState.off`, `PanelSection.Kind.turnedOff` | A declaration switched off is listed and never started; a row off in every agent sits in the Turned off fold (`TurnedOffFold`), a row off in some says "Off in Cursor" |
 
 ### Probing
 
@@ -171,7 +184,7 @@ per-agent widget; it's the same rows `AgentSections.build` gives the tab.
 | `mcpock-mcp/main.swift` | stdin loop: one JSON-RPC line in, at most one out |
 | `Shared/MCPockStatus.swift` | The status file's model (schema 1). Compiled into the app and the helper |
 | `Shared/MCPStatusServer.swift` | `initialize`, `ping`, `tools/list`, `tools/call`, empty resources/prompts |
-| `Shared/StatusReport.swift` | The text answers of `mcpock_status`, `mcpock_problems`, `mcpock_server`, including "isn't running" and "results are old" |
+| `Shared/StatusReport.swift` | The text answers of `mcpock_status`, `mcpock_problems`, `mcpock_server` and `mcpock_switches` (1.14: what is off, and where), including "isn't running" and "results are old" |
 
 The helper also compiles `MCPJSONRPC.swift` and `Models.swift` from the app
 (see `project.yml`). It is embedded at `mcpock.app/Contents/Helpers/mcpock-mcp`
@@ -326,8 +339,13 @@ falls back to streamable HTTP, because many configs label streamable servers
 11. **Nothing secret leaves the app.** The status file carries env and header
     **names** only; `SecretMask` masks the rest. `StatusSnapshotTests`,
     `SecretMaskTests`.
-12. **mcpock never writes another app's config.** Open Config… asks first,
-    with Cancel as the default button.
+12. **mcpock writes another app's config only through the server switch**
+    (1.14), on her click, after the sheet showed the change: `SwitchWriter`
+    is the single write path, every write is checked (`ServerSwitch.verify`),
+    backed up and done in one rename, and a file that changed since the sheet
+    is refused. No other feature writes a config, and the helper has no write
+    tool. Open Config… asks first, with Cancel as the default button.
+    `ServerSwitchTests`, `SwitchPlanTests`, `SwitchPanelTests`.
 13. **Sandbox off; the only entitlement is the App Group** the widgets read
     their snapshot from. No sandbox is needed to spawn servers and read configs
     under `~`. Hardened runtime is added only when `scripts/release.sh`

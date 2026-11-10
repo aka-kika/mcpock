@@ -86,6 +86,7 @@ enum StatusReport {
         if c.checking > 0 { lines.append("- not checked yet: \(c.checking)") }
         if let calm = c.notChecked, calm > 0 { lines.append("- not checked by mcpock, nothing to fix: \(calm)") }
         if c.paused > 0 { lines.append("- paused in mcpock: \(c.paused)") }
+        if let off = c.turnedOff, off > 0 { lines.append("- turned off by the user in every agent that has them: \(off)") }
         if c.selfManaged > 0 { lines.append("- managed by their own app: \(c.selfManaged)") }
         if c.hidden > 0 { lines.append("- hidden in mcpock: \(c.hidden)") }
         let needs = problems(in: status).count
@@ -153,6 +154,42 @@ enum StatusReport {
         return lines
     }
 
+    // MARK: - mcpock_switches
+
+    static let switchesFooter = "You can't switch a server from here. Only the user turns one on or off, "
+        + "in the mcpock app (the switch beside each agent on the server's card)."
+
+    /// Which servers are off in which agent (1.14). Read-only, like the rest.
+    static func switchesText(_ load: StatusLoad, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
+        let (status, head) = preamble(load, now: now, isRunning: isRunning)
+        guard let status else { return head.joined(separator: "\n") }
+        var lines = head
+        func agents(_ server: MCPockStatus.Server, off: Bool) -> [String] {
+            var names: [String] = []
+            for source in server.sources where (source.state == "off") == off && !names.contains(source.agent) {
+                names.append(source.agent)
+            }
+            return names
+        }
+        let partly = status.servers.filter { !agents($0, off: true).isEmpty }
+        if partly.isEmpty {
+            lines.append("Every one of the \(status.servers.count) servers is on in each agent that has it.")
+        } else {
+            lines.append("Turned off (in the agent's own config, so that agent does not start it):")
+            for server in partly {
+                let off = agents(server, off: true)
+                let on = agents(server, off: false)
+                let onPart = on.isEmpty ? "" : "; on in \(on.joined(separator: ", "))"
+                lines.append("- \(server.name): off in \(off.joined(separator: ", "))\(onPart)")
+            }
+            let rest = status.servers.count - partly.count
+            if rest > 0 { lines.append("The other \(rest) are on in each agent that has them.") }
+        }
+        lines.append("")
+        lines.append(switchesFooter)
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - mcpock_server
 
     static func serverText(_ load: StatusLoad, name: String, now: Date, isRunning: (MCPockStatus) -> Bool) -> String {
@@ -189,6 +226,9 @@ enum StatusReport {
         }
         lines.append(indent + "Transport: \(s.transports.joined(separator: " / "))")
         lines.append(indent + "Used by: \(s.agents.joined(separator: ", "))")
+        if let off = s.offIn, !off.isEmpty {
+            lines.append(indent + "Turned off in: \(off.joined(separator: ", ")) (the user's choice, not a problem)")
+        }
         if !s.configPaths.isEmpty {
             lines.append(indent + "Config files:")
             lines.append(contentsOf: s.configPaths.map { indent + "- \($0)" })

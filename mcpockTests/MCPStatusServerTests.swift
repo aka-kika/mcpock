@@ -164,7 +164,31 @@ final class MCPStatusServerTests: XCTestCase {
         let text = MCPStatusServer.instructions
         XCTAssertFalse(text.contains("then fix what it reports"), text)
         XCTAssertTrue(text.contains("ask before changing any config file"), text)
-        XCTAssertTrue(text.contains("never edits configs"), text)
+        // 1.14: the switch changed the promise; agents still only read.
+        XCTAssertTrue(text.contains("only when the user flips a switch"), text)
+        XCTAssertTrue(text.contains("These tools only read"), text)
+        XCTAssertFalse(text.contains("never edits configs"), text)
+    }
+
+    /// 1.14: on and off per agent, read-only. An older status file (no off
+    /// state anywhere) reads as all on.
+    func testSwitchesToolSaysWhatIsOffAndThatAgentsCanNotFlipIt() throws {
+        let s = server(at: try fixtureFile())
+        let allOn = try XCTUnwrap(s.callTool("mcpock_switches", arguments: [:]))
+        XCTAssertTrue(allOn.contains("Every one of the 5 servers is on in each agent that has it."), allOn)
+        XCTAssertTrue(allOn.contains("Only the user turns one on or off"), allOn)
+
+        var status = try loadedStatus()
+        status.servers[0].sources[0].state = "off"
+        status.servers[0].offIn = ["Cursor"]
+        status.servers[2].sources[0].state = "off"
+        status.servers[2].sources[1].state = "off"
+        let text = StatusReport.switchesText(.loaded(status), now: status.generated, isRunning: { _ in true })
+        XCTAssertTrue(text.contains("- firecrawl: off in Cursor; on in Claude Code"), text)
+        XCTAssertTrue(text.contains("- wake: off in Cursor, Grok\n"), text)
+        XCTAssertTrue(text.contains("The other 3 are on in each agent that has them."), text)
+        let details = StatusReport.serverLines(status.servers[0], number: nil, full: true, now: status.generated).joined(separator: "\n")
+        XCTAssertTrue(details.contains("Turned off in: Cursor (the user's choice, not a problem)"), details)
     }
 
     private func loadedStatus() throws -> MCPockStatus {
@@ -226,7 +250,7 @@ final class MCPStatusServerTests: XCTestCase {
         let list = try reply(s, #"{"jsonrpc":"2.0","id":"a","method":"tools/list"}"#)
         XCTAssertEqual(list["id"] as? String, "a")
         let tools = try XCTUnwrap((list["result"] as? [String: Any])?["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.compactMap { $0["name"] as? String }, ["mcpock_status", "mcpock_problems", "mcpock_server"])
+        XCTAssertEqual(tools.compactMap { $0["name"] as? String }, ["mcpock_status", "mcpock_problems", "mcpock_server", "mcpock_switches"])
         for tool in tools {
             XCTAssertEqual((tool["annotations"] as? [String: Any])?["readOnlyHint"] as? Bool, true)
             XCTAssertEqual((tool["inputSchema"] as? [String: Any])?["type"] as? String, "object")

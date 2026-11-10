@@ -179,7 +179,7 @@ enum ConnectSnippets {
         return """
             Please connect mcpock to the AI agents on this Mac. mcpock is a menu bar app that checks MCP servers. \
             Its small read-only MCP server, "\(serverName)", lets an agent ask what needs attention. \
-            mcpock never edits agent configs itself, so you make the edits. Go step by step and don't skip the backups.
+            mcpock doesn't add itself to agent configs, so you make the edits. Go step by step and don't skip the backups.
 
             The server to add
             - name: \(serverName)

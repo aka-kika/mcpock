@@ -53,11 +53,14 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// A `${VAR}` mcpock can't fill, or a sign-in its agent holds (review
         /// 2026-10-30, fe94). Calm, never a problem. Optional: older files have none.
         var notChecked: Int? = nil
+        /// Switched off in every agent that has them (1.14). Her choice, never
+        /// a problem. Optional: older files have none.
+        var turnedOff: Int? = nil
     }
 
     struct Server: Codable, Equatable, Sendable {
         var name: String
-        /// mcpock's raw state: unknown, healthy, degraded, broken, selfManaged, paused.
+        /// mcpock's raw state: unknown, healthy, degraded, broken, selfManaged, paused, needsApp, off.
         var state: String
         /// In plain words: broken, slow, needs sign-in, set up differently, fine,
         /// checking, paused, managed by its app, lost in an open Claude Code session.
@@ -91,6 +94,10 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         var note: String? = nil
         /// The closed Mac app it waits for ("Wake"), while it needs it open.
         var needsApp: String? = nil
+        /// The agents that have it switched off ("Cursor"), 1.14. A source's
+        /// own `state` reads "off" too. Optional: absent in older files and
+        /// on servers that are on everywhere.
+        var offIn: [String]? = nil
         var sources: [Source]
     }
 

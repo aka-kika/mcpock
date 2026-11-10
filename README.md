@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.13.0](https://img.shields.io/badge/version-1.13.0-7a8fb0)](docs/release-notes/1.13.0.md)
+[![Version 1.14.0](https://img.shields.io/badge/version-1.14.0-7a8fb0)](docs/release-notes/1.14.0.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -24,20 +24,23 @@ files, each written a little differently. One day a tool quietly stops working
 in one agent and not the others, and you only notice when a task fails halfway.
 The agent rarely says why.
 
-mcpock gives you one place to look. It never changes your configs: it reads
-them, checks every server, and shows you what needs attention and why, so you
-(or your agent) can fix it.
+mcpock gives you one place to look. It reads your configs, checks every
+server, and shows you what needs attention and why, so you (or your agent) can
+fix it. It changes a config only when you flip a switch: it shows you the
+change first and keeps a backup.
 
-## What's new in 1.13
+## What's new in 1.14
 
-- **Next step:** every reason has a line under it saying what to do, on the card,
-  in `status.md` and in `mcpock_problems`.
-- **A fix turns green by itself:** save a changed config and mcpock checks that
-  server again within seconds, with no click. Nothing is written.
-- **Smaller:** the footer says two numbers, three ways to copy instead of six, a
-  shorter Settings > General, and Usage counts as one switch, off for new installs.
+- **Turn a server on or off:** a switch beside each agent on the server's card,
+  and **Turn off everywhere**. Off means the agent does not start it next time;
+  on puts it back as it was.
+- **You see it first:** a sheet says what happens in each agent and when it
+  counts, with the exact lines one click away. A backup is saved before every
+  change.
+- **Turned off, not gone:** servers that are off sit behind one line at the end
+  of the list, and agents can read what is off with `mcpock_switches`.
 
-Full notes: [1.13.0](docs/release-notes/1.13.0.md). Earlier: [1.12.2](docs/release-notes/1.12.2.md), [1.12.1](docs/release-notes/1.12.1.md), [1.12.0](docs/release-notes/1.12.0.md).
+Full notes: [1.14.0](docs/release-notes/1.14.0.md). Earlier: [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md), [1.12.1](docs/release-notes/1.12.1.md).
 
 ## What it does
 
@@ -154,7 +157,8 @@ Needs **macOS 26 or later** on Apple Silicon.
 mcpock includes `mcpock-mcp`, a small MCP server your agents can call. It only
 reads the status file mcpock writes after each check
 (`~/Library/Application Support/mcpock/status.json`); it never starts a server
-and never changes anything.
+and never changes anything. Agents can't turn a server on or off: only you can,
+in the app.
 
 **The easy way:** Settings > **Connect** > **Copy for Claude**, then paste into
 Claude Code. The prompt walks Claude through finding your agent configs,
@@ -191,8 +195,9 @@ Then ask your agent to "check my mcpock". The tools it gets:
 | `mcpock_status` | Counts: how many servers are fine, broken, slow, need a sign-in or are set up differently, and when mcpock last checked |
 | `mcpock_problems` | Every server that needs attention, with the reason, the agents and the config files involved |
 | `mcpock_server` | Everything about one server, by name |
+| `mcpock_switches` | Which servers are turned off, and in which agents |
 
-All three are read-only. Secrets are masked (see below). If mcpock isn't
+All four are read-only. Secrets are masked (see below). If mcpock isn't
 running, hasn't checked yet, or its results are old, the answer says so.
 
 Try it from Terminal:
@@ -266,8 +271,17 @@ letters.
 
 ## Privacy and safety
 
-- **Read-only.** mcpock never edits, moves or rewrites any config file.
-  "Open Config…" asks first, with Cancel as the default.
+- **It changes a config only when you flip a switch.** The switch beside an
+  agent on a server's card turns that server on or off there. mcpock shows you
+  the change first, saves a copy of the file in
+  `~/Library/Application Support/mcpock/backups/` (the newest 60; they hold
+  what the config holds, keys included, readable only by you), then replaces
+  the file in one step. It uses the agent's own way: Claude Code's blocked
+  list, the `enabled` line in Codex, Grok, Goose, Hermes and OpenCode; for
+  Claude Desktop and Cursor, which have none, it parks the entry in the same
+  file under `_mcpock_disabled`. Nothing is deleted, and agents can't flip a
+  switch. Everything else only reads: "Open Config…" asks first, with Cancel
+  as the default.
 - **What it runs.** To check a local server, mcpock starts the exact command
   from your config, with its arguments and environment, in its project folder
   when it has one: the same thing your agent runs. It does the handshake, asks
@@ -339,7 +353,7 @@ add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
 ./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
 ```
 
-857 unit tests at v1.13.0. They cover the
+898 unit tests at v1.14.0. They cover the
 probes against real child processes and a real local HTTP server, process
 cleanup, every config format, discovery and the scan's safety rules, grouping,
 "set up differently", secret masking, the status file and the helper's
@@ -419,8 +433,9 @@ tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
 ## Uninstalling
 
 1. In each agent's MCP config, remove the `mcpock` entry you added in
-   **Connect your agents** (mcpock never edits your configs, so it did not add
-   one for you).
+   **Connect your agents** (mcpock did not add it for you). If you turned a
+   server off with mcpock, turn it back on first: a server parked for Claude
+   Desktop or Cursor waits under `_mcpock_disabled` in that agent's file.
 2. In mcpock, open Settings > General and turn **Open at Login** off.
 3. Quit mcpock from its menu bar icon.
 4. Delete `mcpock.app` from Applications.
