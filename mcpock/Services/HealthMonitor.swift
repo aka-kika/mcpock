@@ -179,6 +179,9 @@ final class HealthMonitor {
     @ObservationIgnored var hostAppOf: @Sendable (ServerConfig, [Int: String]) -> HostApp? = {
         HostApps.app(for: $0, learnedPorts: $1)
     }
+    /// The app starting a config's command would open (`HostApps.launchedApp`).
+    /// Runs off the main thread, inside a probe. Swapped in tests.
+    @ObservationIgnored var launchedAppOf: @Sendable (ServerConfig) -> HostApp? = { HostApps.launchedApp(for: $0) }
     /// Whether that app runs. Swapped in tests.
     @ObservationIgnored var appIsRunning: (HostApp) -> Bool = { HostApps.isRunning($0) }
     /// Which app listens on a local port (lsof). Runs off the main thread,
@@ -200,8 +203,16 @@ final class HealthMonitor {
     /// main thread.
     private func probeWithHostApp() -> @Sendable (ServerConfig, Bool) async -> (ProbeResult, HostLookup) {
         let probe = self.probe, hostAppOf = self.hostAppOf, listeningApp = self.listeningApp
+        let launchedAppOf = self.launchedAppOf
         let learned = learnedHostPorts, skip = lookedUpPorts
-        return { config, fetchTools in
+        return { [self] config, fetchTools in
+            // A command inside a closed app would open that app: never start
+            // it, it waits for her to open the app (11 Nov, Native Screen).
+            if let app = launchedAppOf(config), await !MainActor.run(body: { self.appIsRunning(app) }) {
+                var waiting = ProbeResult(state: .broken, failureReason: "Needs \(app.name) open", tools: nil)
+                waiting.appWasClosed = true
+                return (waiting, HostLookup(app: app))
+            }
             let result = await probe(config, fetchTools)
             let lookup = HostApps.lookUp(config, healthy: result.state == .healthy, learned: learned, skip: skip,
                                          hostAppOf: hostAppOf, listeningApp: listeningApp)
@@ -1011,7 +1022,7 @@ final class HealthMonitor {
         // Failed while the app it belongs to is closed: waiting, not broken.
         // No backoff, so it turns fine at the next check once the app runs.
         if result.state != .healthy, result.state != .selfManaged,
-           let app = closedHostApp(of: servers[index].config) {
+           let app = result.appWasClosed ? lookup.app : closedHostApp(of: servers[index].config) {
             servers[index].state = .needsApp
             servers[index].hostApp = app
             servers[index].consecutiveFailures = 0

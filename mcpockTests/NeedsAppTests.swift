@@ -235,6 +235,117 @@ final class NeedsAppMonitorTests: XCTestCase {
 
 }
 
+/// 11 Nov: a server whose command is an app's own program (Native Screen,
+/// "Native Screen --mcp") opened that app at every check. While the app is
+/// closed it now waits without being started.
+@MainActor
+final class ClosedAppNotStartedTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private let suite = "ClosedAppNotStartedTests-\(UUID().uuidString)"
+    private var folder: URL!
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: suite)
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent("mcpock-launch-\(UUID().uuidString)")
+    }
+
+    override func tearDown() {
+        defaults.retireSuite(named: suite)
+        try? FileManager.default.removeItem(at: folder)
+        super.tearDown()
+    }
+
+    private let screen = HostApp(name: "Native Screen", bundlePath: "/Applications/Native Screen.app",
+                                 bundleID: "com.example.screen")
+
+    private func config(_ command: String, args: [String] = []) -> ServerConfig {
+        ServerConfig(id: "T:\(command)", name: "nativescreen", source: ServerSource(label: "T"), projectPath: nil,
+                     transport: .stdio, command: command, args: args, env: [:], url: nil, headers: [:])
+    }
+
+    func testAClosedAppIsNeverStartedByACheck() async throws {
+        let monitor = HealthMonitor(defaults: defaults)
+        let configs = [config("/Applications/Native Screen.app/Contents/MacOS/Native Screen", args: ["--mcp"])]
+        monitor.discover = { configs }
+        let started = CallNames()
+        monitor.probe = { config, _ in
+            started.add(config.name)
+            return ProbeResult(state: .healthy, failureReason: nil, tools: [])
+        }
+        let screen = self.screen
+        let running = AppRunning(false)
+        monitor.launchedAppOf = { _ in screen }
+        monitor.hostAppOf = { _, _ in screen }
+        monitor.appIsRunning = { _ in running.value }
+        await monitor.reloadConfigs()
+        await monitor.refreshNow(force: true)
+        await monitor.refreshNow(force: true)
+        await monitor.refresh(groupName: "nativescreen")
+        XCTAssertEqual(started.names, [], "no check, the Timer, Refresh nor Check again starts it")
+        let group = try XCTUnwrap(monitor.groups.first)
+        XCTAssertEqual(group.state, .needsApp)
+        XCTAssertEqual(group.needsAppName, "Native Screen")
+        XCTAssertEqual(ShortReason.line(for: group), "Needs Native Screen open")
+
+        // She opens it: checked again, and fine.
+        running.value = true
+        await monitor.refreshNow(force: true)
+        XCTAssertEqual(started.names, ["nativescreen"])
+        XCTAssertEqual(monitor.groups.first?.state, .healthy)
+
+        // She quits it again: it waits, not started.
+        running.value = false
+        await monitor.refreshNow(force: true)
+        XCTAssertEqual(started.names, ["nativescreen"])
+        XCTAssertEqual(monitor.groups.first?.state, .needsApp)
+    }
+
+    /// A fake app on disk: `<name>.app` with its main program and a helper.
+    private func makeApp(_ name: String) throws -> String {
+        let app = folder.appendingPathComponent("\(name).app")
+        let macOS = app.appendingPathComponent("Contents/MacOS")
+        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+        let plist: [String: Any] = ["CFBundleExecutable": name, "CFBundleIdentifier": "com.example.\(UUID().uuidString)",
+                                    "CFBundleName": name, "CFBundlePackageType": "APPL"]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: app.appendingPathComponent("Contents/Info.plist"))
+        for file in [name, "\(name.lowercased())-mcp"] {
+            let url = macOS.appendingPathComponent(file)
+            try Data("#!/bin/sh\n".utf8).write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+        return app.path
+    }
+
+    func testOnlyTheAppsOwnProgramOpensIt() throws {
+        let app = try makeApp("Screen")
+        XCTAssertEqual(HostApps.launchedApp(for: config("\(app)/Contents/MacOS/Screen", args: ["--mcp"]))?.name, "Screen")
+        XCTAssertNil(HostApps.launchedApp(for: config("\(app)/Contents/MacOS/screen-mcp")),
+                     "a helper beside it runs without the app: still checked")
+        XCTAssertEqual(HostApps.app(for: config("\(app)/Contents/MacOS/screen-mcp"), learnedPorts: [:])?.name, "Screen",
+                       "but it still waits for the app after a failed check")
+        XCTAssertNil(HostApps.launchedApp(for: config("/usr/bin/env", args: ["\(app)/Contents/MacOS/Screen"])),
+                     "an argument is not the program")
+    }
+
+    func testALauncherScriptThatRunsTheApp() throws {
+        let app = try makeApp("Screen")
+        let script = folder.appendingPathComponent("screen-launch")
+        try Data("#!/bin/zsh\n# \(app)/Contents/MacOS/Other\nexec \"\(app)/Contents/MacOS/Screen\" --mcp\n".utf8).write(to: script)
+        XCTAssertEqual(HostApps.launchedApp(for: config(script.path))?.name, "Screen")
+        let helper = folder.appendingPathComponent("helper-launch")
+        try Data("#!/bin/zsh\nexec \"\(app)/Contents/MacOS/screen-mcp\"\n".utf8).write(to: helper)
+        XCTAssertNil(HostApps.launchedApp(for: config(helper.path)))
+    }
+
+    func testAnHTTPServerIsNeverSkipped() {
+        let http = ServerConfig(id: "T:h", name: "h", source: ServerSource(label: "T"), projectPath: nil,
+                                transport: .http, command: nil, args: [], env: [:], url: "http://127.0.0.1:9/mcp", headers: [:])
+        XCTAssertNil(HostApps.launchedApp(for: http))
+    }
+}
+
 private final class AppRunning: @unchecked Sendable {
     private let lock = NSLock()
     private var on: Bool

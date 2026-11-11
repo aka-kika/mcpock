@@ -51,13 +51,8 @@ enum HostApps {
     /// (review 2026-10-20, 5345).
     nonisolated static func scriptHints(_ text: String) -> (bundles: [String], ports: [Int]) {
         var bundles: [String] = []
-        for line in text.split(whereSeparator: \.isNewline) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
-            // `exec`, `nohup` and `VAR=value` before the program are not it.
-            let words = AkaSource.splitCommandLine(trimmed)
-                .drop { $0 == "exec" || $0 == "nohup" || $0 == "command" || ($0.contains("=") && !$0.hasPrefix("/")) }
-            guard let program = words.first, let path = bundlePath(ofExecutable: program) else { continue }
+        for program in scriptPrograms(text) {
+            guard let path = bundlePath(ofExecutable: program) else { continue }
             if !bundles.contains(path) { bundles.append(path) }
         }
         var ports: [Int] = []
@@ -66,6 +61,20 @@ enum HostApps {
             if !ports.contains(port) { ports.append(port) }
         }
         return (bundles, ports)
+    }
+
+    /// The program each line of a launcher script runs (comments skipped;
+    /// `exec`, `nohup` and `VAR=value` before the program are not it).
+    nonisolated static func scriptPrograms(_ text: String) -> [String] {
+        var programs: [String] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
+            let words = AkaSource.splitCommandLine(trimmed)
+                .drop { $0 == "exec" || $0 == "nohup" || $0 == "command" || ($0.contains("=") && !$0.hasPrefix("/")) }
+            if let program = words.first { programs.append(program) }
+        }
+        return programs
     }
 
     private static let localPortRegex = try! NSRegularExpression(pattern: #"(?:localhost|127\.0\.0\.1|\[::1\]):(\d{2,5})"#)
@@ -146,6 +155,37 @@ enum HostApps {
             if let path = learnedPorts[port], let app = hostApp(atBundlePath: path) { return app }
         }
         return nil
+    }
+
+    /// The app that starting this server's command would open: the command
+    /// is the app's own main program (symbolic links followed), or a launcher
+    /// script runs it. Starting it opens the app, so mcpock never checks it
+    /// while the app is closed (11 Nov: Native Screen, run as "Native Screen
+    /// --mcp", came back at every check after Kika quit it). A helper the app
+    /// ships beside it (`Contents/MacOS/wake-mcp`, Docker's CLI) runs without
+    /// opening the app, so it is checked as before.
+    nonisolated static func launchedApp(for config: ServerConfig) -> HostApp? {
+        guard config.transport == .stdio else { return nil }
+        let env = PathResolver.processEnvironment(configEnv: config.env)
+        let command = PathResolver.resolveCommand(config.command ?? "", env: env)
+        var programs: [String] = []
+        if command.hasPrefix("/") { programs.append(command) }
+        if let script = launcherScript(atPath: command) {
+            programs += scriptPrograms(script)
+        }
+        for program in programs {
+            let real = URL(fileURLWithPath: program).resolvingSymlinksInPath().path
+            guard let bundle = bundlePath(ofExecutable: real), let app = hostApp(atBundlePath: bundle),
+                  let main = Bundle(path: bundle)?.executableURL?.resolvingSymlinksInPath().path,
+                  isMainProgram(real, mainExecutable: main) else { continue }
+            return app
+        }
+        return nil
+    }
+
+    /// True when `path` is the app's main program (both resolved).
+    nonisolated static func isMainProgram(_ path: String, mainExecutable: String) -> Bool {
+        URL(fileURLWithPath: path).standardizedFileURL.path == URL(fileURLWithPath: mainExecutable).standardizedFileURL.path
     }
 
     /// True while the app runs.
