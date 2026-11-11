@@ -60,6 +60,24 @@ struct DetailCardView: View {
     }
 
     var body: some View {
+        // The sheet's buttons stay in view however many agents it lists
+        // (seen in the VM: with six, Turn Off was below the fold). They sit
+        // under the scroll view, not over it, so nothing scrolls beneath them
+        // and they need no fill of their own: the card's one backdrop shows
+        // through the whole sheet (11 Nov, 3654: a white stripe on glass).
+        VStack(spacing: 0) {
+            scrollingContent
+            if let plan = state.pendingSwitch {
+                SwitchSheetButtons(plan: plan, state: state, theme: theme)
+            }
+        }
+        .onChange(of: contentHeight) { _, _ in reportHeight() }
+        .onChange(of: state.pendingSwitch != nil) { _, _ in reportHeight() }
+        .animation(.easeInOut(duration: 0.16), value: state.isComparing)
+        .animation(.easeInOut(duration: 0.16), value: state.pendingSwitch != nil)
+    }
+
+    private var scrollingContent: some View {
         ScrollView(.vertical) {
             Group {
                 if let plan = state.pendingSwitch {
@@ -78,17 +96,6 @@ struct DetailCardView: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .panelScrollIndicators()
-        // The sheet's buttons stay in view however many agents it lists
-        // (seen in the VM: with six, Turn Off was below the fold).
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let plan = state.pendingSwitch {
-                SwitchSheetButtons(plan: plan, state: state, theme: theme)
-            }
-        }
-        .onChange(of: contentHeight) { _, _ in reportHeight() }
-        .onChange(of: state.pendingSwitch != nil) { _, _ in reportHeight() }
-        .animation(.easeInOut(duration: 0.16), value: state.isComparing)
-        .animation(.easeInOut(duration: 0.16), value: state.pendingSwitch != nil)
     }
 
     // MARK: - Details
@@ -1170,7 +1177,8 @@ struct SwitchSheet: View {
 }
 
 /// Cancel and Turn Off / Turn On, pinned under the sheet so they never
-/// scroll out of view.
+/// scroll out of view. No background of its own: it sits on the same
+/// backdrop as the sheet above it (3654).
 struct SwitchSheetButtons: View {
     let plan: SwitchPlan
     @Bindable var state: PanelState
@@ -1197,6 +1205,5 @@ struct SwitchSheetButtons: View {
             .padding(.vertical, 11)
         }
         .frame(width: DetailCardPresenter.width, height: Self.height)
-        .background(theme.background)
     }
 }
