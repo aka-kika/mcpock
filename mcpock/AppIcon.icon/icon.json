@@ -3,8 +3,10 @@
     {
       "layers": [
         {
-          "image-name": "pocket.png",
-          "name": "pocket",
+          "image-name": "marks.png",
+          "name": "marks",
+          "opacity": 1,
+          "blend-mode": "normal",
           "glass": true,
           "position": {
             "scale": 1,
@@ -12,38 +14,37 @@
               0,
               0
             ]
-          }
+          },
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.89020,0.87451,0.84706,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.87843,0.87843,0.87843,1.00000"
+              }
+            }
+          ]
         }
       ],
-      "name": "Pocket",
-      "specular": true,
+      "name": "marks",
+      "specular": false,
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
-      },
-      "blur-material": null,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+        "kind": "none",
+        "opacity": 0
       }
     },
     {
       "layers": [
         {
-          "image-name": "light.png",
-          "name": "light",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "image-name": "plugs.png",
-          "name": "plugs",
+          "image-name": "knob.png",
+          "name": "knob",
+          "opacity": 1,
+          "blend-mode": "normal",
           "glass": true,
           "position": {
             "scale": 1,
@@ -54,44 +55,43 @@
           }
         }
       ],
-      "name": "Plugs",
+      "name": "knob",
       "specular": true,
       "shadow": {
         "kind": "neutral",
         "opacity": 0.35
-      },
-      "blur-material": null,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
       }
     },
     {
       "layers": [
         {
-          "image-name": "tile.png",
-          "name": "tile",
-          "glass": false,
+          "image-name": "track.png",
+          "name": "track",
+          "glass": true,
           "position": {
             "scale": 1,
             "translation-in-points": [
               0,
               0
             ]
-          }
+          },
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.89020,0.87451,0.84706,1.00000"
+              }
+            }
+          ]
         }
       ],
-      "name": "Tile",
+      "name": "Track",
       "specular": false,
       "shadow": {
         "kind": "none",
         "opacity": 0
       },
-      "blur-material": null,
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
-      }
+      "blur-material": null
     }
   ],
   "supported-platforms": {
@@ -104,8 +104,8 @@
     {
       "value": {
         "linear-gradient": [
-          "srgb:0.49804,0.60784,0.86667,1.00000",
-          "srgb:0.56078,0.66275,0.90196,1.00000"
+          "srgb:0.87451,0.86275,0.83137,1.00000",
+          "srgb:0.90588,0.89020,0.86667,1.00000"
         ],
         "orientation": {
           "start": {
@@ -117,6 +117,18 @@
             "y": 0
           }
         }
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.23529,0.23529,0.23137,1.00000"
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": {
+        "solid": "srgb:0.16471,0.16471,0.16471,1.00000"
       }
     }
   ]
