@@ -132,10 +132,11 @@ final class UsageStore {
     }
 
     /// Calls for `server` in `window` across every agent's records, for the
-    /// Servers tab's rows (11 Nov, 37f0). Nil until real counts exist, or
-    /// with Usage off.
-    func count(server: String, window: UsageWindow, now: Date = Date()) -> Int? {
-        guard hasCounts, window != .off else { return nil }
+    /// Servers tab's rows (11 Nov, 37f0). Nil until real counts exist, with
+    /// Usage off, or when none of `agents` (the row's base agent names) keeps
+    /// a record: never a fake 0 (review 11 Nov).
+    func count(server: String, agents: [String], window: UsageWindow, now: Date = Date()) -> Int? {
+        guard hasCounts, window != .off, agents.contains(where: hasReader(for:)) else { return nil }
         let wanted = HealthMonitor.normalizedName(server)
         let cutoff = window.days.map { Self.dayIndex(for: now) - ($0 - 1) }
         var total = 0

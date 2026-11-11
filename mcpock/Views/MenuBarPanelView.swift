@@ -283,7 +283,9 @@ struct MenuBarPanelView: View {
             isChecking: panel.isChecking(name),
             asksYou: !(panel.asks?.asks(for: name).isEmpty ?? true),
             counts: RowCounts(tools: group.tools.count, hidden: monitor.hiddenToolCount(groupName: name),
-                              calls: panel.usageStore?.count(server: name, window: usageWindow), window: usageWindow),
+                              calls: panel.usageStore?.count(server: name, agents: group.sources.map { AgentBadge.agentName(fromLabel: $0.agent) },
+                                                            window: usageWindow),
+                              window: usageWindow),
             actions: panel.rowActions(for: name)
         )
     }

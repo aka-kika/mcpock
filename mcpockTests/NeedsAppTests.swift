@@ -327,6 +327,12 @@ final class ClosedAppNotStartedTests: XCTestCase {
                        "but it still waits for the app after a failed check")
         XCTAssertNil(HostApps.launchedApp(for: config("/usr/bin/env", args: ["\(app)/Contents/MacOS/Screen"])),
                      "an argument is not the program")
+        // An Electron app given a script runs as Node, no window (review 11 Nov).
+        XCTAssertNil(HostApps.launchedApp(for: config("\(app)/Contents/MacOS/Screen", args: ["/x/server.js"])))
+        let asNode = ServerConfig(id: "T:node", name: "node", source: ServerSource(label: "T"), projectPath: nil,
+                                  transport: .stdio, command: "\(app)/Contents/MacOS/Screen", args: ["--stdio"],
+                                  env: ["ELECTRON_RUN_AS_NODE": "1"], url: nil, headers: [:])
+        XCTAssertNil(HostApps.launchedApp(for: asNode))
     }
 
     func testALauncherScriptThatRunsTheApp() throws {

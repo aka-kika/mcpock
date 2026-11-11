@@ -440,6 +440,13 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .sevenDays, now: now), 2)
         XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .thirtyDays, now: now), 3)
         XCTAssertEqual(store.count(agent: "Code", server: "reed-md", window: .allTime, now: now), 4)
+
+        // The Servers tab's total (37f0): every agent's calls, but never a
+        // fake 0 for a row whose agents keep no record (review 11 Nov).
+        XCTAssertEqual(store.count(server: "reed-md", agents: ["Code", "Codex"], window: .thirtyDays, now: now), 3)
+        XCTAssertNil(store.count(server: "reed-md", agents: ["Codex", "Goose"], window: .thirtyDays, now: now))
+        XCTAssertEqual(store.count(server: "other", agents: ["Code"], window: .thirtyDays, now: now), 0, "a real 0")
+        XCTAssertNil(store.count(server: "reed-md", agents: ["Code"], window: .off, now: now))
     }
 
     /// A Hermes profile's calls are filed as "Hermes · scribe": its row counts

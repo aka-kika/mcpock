@@ -234,7 +234,8 @@ private struct AgentRowView: View {
                     usageStore: panel.usageStore,
                     hiddenTools: panel.monitor.hiddenToolCount(
                         groupName: server.name,
-                        configIDs: Set(groups[server.name]?.sources.filter { $0.label == section.agent }.map(\.configID) ?? [])),
+                        // Sections group by `GroupSource.agent`: a project's "Code (MyApp)" is in Claude Code's.
+                        configIDs: Set(groups[server.name]?.sources.filter { $0.agent == section.agent }.map(\.configID) ?? [])),
                     usageAgent: AgentBadge.agentName(fromLabel: section.agent),
                     // A profile keeps its own counts ("Hermes · scribe"); a
                     // project-scoped Claude Code row counts under the agent.

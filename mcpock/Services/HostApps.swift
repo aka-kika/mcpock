@@ -166,6 +166,10 @@ enum HostApps {
     /// opening the app, so it is checked as before.
     nonisolated static func launchedApp(for config: ServerConfig) -> HostApp? {
         guard config.transport == .stdio else { return nil }
+        // An Electron app's program given a script runs as Node, no window
+        // (`ProcessRunner` sets ELECTRON_RUN_AS_NODE; MiniMax Code's `matrix`):
+        // it works with the app closed, so it is checked (review 11 Nov).
+        if PathResolver.isNodeScript(config.args.first) || config.env["ELECTRON_RUN_AS_NODE"] != nil { return nil }
         let env = PathResolver.processEnvironment(configEnv: config.env)
         let command = PathResolver.resolveCommand(config.command ?? "", env: env)
         var programs: [String] = []
