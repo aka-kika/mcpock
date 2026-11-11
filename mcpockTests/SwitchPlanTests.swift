@@ -70,7 +70,7 @@ final class SwitchPlanTests: XCTestCase {
 
         let off = plan(before, on: false, running: true)
         XCTAssertEqual(off.title, "Turn off openrouter everywhere?")
-        XCTAssertEqual(off.changes.map(\.agents), [["Claude Code"], ["Codex"], ["Cursor"], ["Goose"]])
+        XCTAssertEqual(off.changes.map(\.agents), [["Claude Code"], ["Codex / ChatGPT desktop"], ["Cursor"], ["Goose"]])
         XCTAssertEqual(off.skipped, ["VS Code"])
         XCTAssertEqual(off.problems, [])
         XCTAssertEqual(off.changes.map(\.when), [
@@ -133,7 +133,7 @@ final class SwitchPlanTests: XCTestCase {
                                         now: Date(timeIntervalSince1970: 1_800_000_000)).error)
         let names = try FileManager.default.contentsOfDirectory(atPath: backups.path)
         XCTAssertEqual(names.count, 1)
-        XCTAssertTrue(names[0].hasSuffix("-codex-config.toml"), names[0])
+        XCTAssertTrue(names[0].hasSuffix("-codex-chatgpt-desktop-config.toml"), names[0])
         let copy = backups.appendingPathComponent(names[0])
         XCTAssertEqual(try String(contentsOf: copy, encoding: .utf8), original)
         let mode = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: copy.path)[.posixPermissions] as? NSNumber)
@@ -360,7 +360,7 @@ final class SwitchPlanTests: XCTestCase {
         let hide = toolPlan(configs, hide: ["delete_key"])
         XCTAssertEqual(hide.title, "Hide delete_key in openrouter?")
         XCTAssertEqual(hide.confirmTitle, "Hide")
-        XCTAssertEqual(Set(hide.changes.flatMap(\.agents)), ["Claude Code", "Codex", "Goose"])
+        XCTAssertEqual(Set(hide.changes.flatMap(\.agents)), ["Claude Code", "Codex / ChatGPT desktop", "Goose"])
         XCTAssertEqual(Set(hide.skipped), ["Cursor", "VS Code"], "no setting for single tools there")
         XCTAssertTrue(CardText.switchNotes(for: hide).isEmpty, "they are rows of their own on the sheet")
         let before = [".claude/settings.json", ".cursor/mcp.json", ".codex/config.toml", ".config/goose/config.yaml"].map(text)
@@ -391,7 +391,7 @@ final class SwitchPlanTests: XCTestCase {
         try seed()
         let codexOnly = discover().filter { $0.source.label == "Codex" }
         let plan = toolPlan(codexOnly, hide: ["delete_key"])
-        XCTAssertEqual(plan.changes.map(\.agents), [["Codex"]])
+        XCTAssertEqual(plan.changes.map(\.agents), [["Codex / ChatGPT desktop"]])
         XCTAssertTrue(plan.skipped.isEmpty)
     }
 

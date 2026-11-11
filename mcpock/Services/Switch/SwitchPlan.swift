@@ -395,8 +395,9 @@ enum SwitchWriter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let slug = agent.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" }
-        return "\(formatter.string(from: now))-\(String(slug))-\(file.lastPathComponent)"
+        // "Codex / ChatGPT desktop" -> "codex-chatgpt-desktop": one dash per gap.
+        let slug = agent.lowercased().split { !($0.isLetter || $0.isNumber) }.joined(separator: "-")
+        return "\(formatter.string(from: now))-\(slug)-\(file.lastPathComponent)"
     }
 
     private static func prune(_ backups: URL) {

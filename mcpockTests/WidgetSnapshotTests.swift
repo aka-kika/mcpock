@@ -118,7 +118,7 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.problems.map(\.name), ["dead", "sluggish"])
         XCTAssertEqual(snapshot.problems.map(\.isBroken), [true, false])
         XCTAssertEqual(snapshot.brokenCount, 1)
-        let codex = snapshot.agents.first { $0.name == "Codex" }
+        let codex = snapshot.agents.first { $0.name == "Codex / ChatGPT desktop" }
         let cursor = snapshot.agents.first { $0.name == "Cursor" }
         XCTAssertEqual(codex?.brokenCount, 1)
         XCTAssertEqual(codex?.problemCount, 1)

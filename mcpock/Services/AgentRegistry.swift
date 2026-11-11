@@ -262,6 +262,9 @@ struct AgentBadge: Hashable, Sendable {
     /// but a detail card or an agent row reading "Code" says nothing.
     static let displayNames: [String: String] = [
         "Code": "Claude Code",
+        // The ChatGPT desktop app reads the same ~/.codex/config.toml (OpenAI's
+        // docs), so the row names both (11 Nov).
+        "Codex": "Codex / ChatGPT desktop",
         // Agents only the scan finds are named after their dot folder (r3 3301).
         "gemini": "Gemini CLI",
         "qwen": "Qwen Code",
