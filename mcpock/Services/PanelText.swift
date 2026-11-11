@@ -186,3 +186,56 @@ extension ServerGroup {
         groups.compactMap(\.lastChecked).max()
     }
 }
+
+/// A server row's numbers, the same on the Servers and Agents tabs (11 Nov,
+/// Kika: "same feature, same look"; 37f0): its tools, "70/100 tools" when
+/// some are hidden (4b6a), and its calls in the Usage window. Before, Servers
+/// showed a bare tool count and Agents a bare call count, and the two read as
+/// the same number.
+struct RowCounts: Equatable {
+    /// The tools it reported at its last check.
+    var tools: Int
+    /// Of those, hidden (on the Servers tab: by every agent that can hide
+    /// tools; inside an agent: by that agent).
+    var hidden: Int = 0
+    /// Calls in the Usage window; nil with Usage off or no record.
+    var calls: Int?
+    /// Why there is no call count when there could be one ("No usage record
+    /// for this agent"), for the tooltip; nil otherwise.
+    var noCallsReason: String? = nil
+    /// The Usage window, for the tooltip.
+    var window: UsageWindow = .default
+
+    /// "24 tools · 130 calls", "70/100 tools · 1.2k calls", "1 tool", or
+    /// "" when there is nothing to say yet.
+    var line: String {
+        [toolsPart, callsPart].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    private var toolsPart: String? {
+        guard tools > 0 else { return nil }
+        let shown = min(max(hidden, 0), tools)
+        let number = shown > 0 ? "\(tools - shown)/\(tools)" : "\(tools)"
+        return "\(number) \(tools == 1 ? "tool" : "tools")"
+    }
+
+    private var callsPart: String? {
+        calls.map { "\(UsageText.compact($0)) \($0 == 1 ? "call" : "calls")" }
+    }
+
+    /// The tooltip: the same in full words.
+    var help: String {
+        var parts: [String] = []
+        if tools > 0 {
+            let shown = min(max(hidden, 0), tools)
+            parts.append(shown > 0 ? "\(tools - shown) of \(tools) tools on, \(shown) hidden"
+                                   : "\(tools) tool\(tools == 1 ? "" : "s")")
+        }
+        if let calls {
+            let span = window.days.map { "in \($0) days" } ?? "all time"
+            parts.append("\(calls) call\(calls == 1 ? "" : "s") \(span)")
+        }
+        if let noCallsReason { parts.append(noCallsReason) }
+        return parts.joined(separator: ", ")
+    }
+}

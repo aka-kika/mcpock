@@ -242,3 +242,25 @@ final class PanelTextTests: XCTestCase {
         XCTAssertEqual(AgentBadge.displayLabel("Hermes \u{00B7} scribe"), "Hermes \u{00B7} scribe")
     }
 }
+
+/// 37f0 and 4b6a (11 Nov): the rows' numbers, labelled, the same on both tabs.
+final class RowCountsTests: XCTestCase {
+    func testTheLine() {
+        XCTAssertEqual(RowCounts(tools: 24, calls: 130).line, "24 tools \u{00B7} 130 calls")
+        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 1234).line, "70/100 tools \u{00B7} 1.2k calls")
+        XCTAssertEqual(RowCounts(tools: 1, calls: 1).line, "1 tool \u{00B7} 1 call")
+        XCTAssertEqual(RowCounts(tools: 24, calls: nil).line, "24 tools", "Usage off: no call count")
+        XCTAssertEqual(RowCounts(tools: 0, calls: 5).line, "5 calls", "not checked yet: calls only")
+        XCTAssertEqual(RowCounts(tools: 0, calls: nil).line, "")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 4, calls: 0).line, "0/4 tools \u{00B7} 0 calls")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 9).line, "0/4 tools", "never more hidden than there are")
+    }
+
+    func testTheTooltip() {
+        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 130, window: .thirtyDays).help,
+                       "70 of 100 tools on, 30 hidden, 130 calls in 30 days")
+        XCTAssertEqual(RowCounts(tools: 2, calls: 1, window: .allTime).help, "2 tools, 1 call all time")
+        XCTAssertEqual(RowCounts(tools: 2, calls: nil, noCallsReason: "No usage record for this agent").help,
+                       "2 tools, No usage record for this agent")
+    }
+}

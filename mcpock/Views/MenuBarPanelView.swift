@@ -9,6 +9,8 @@ struct MenuBarPanelView: View {
     @Bindable var monitor: HealthMonitor
     @Bindable var panel: PanelState
     @AppStorage(AppPreferences.themeKey, store: AppPreferences.store) private var themeRaw = AppPreferences.defaultTheme.rawValue
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
+    private var usageWindow: UsageWindow { UsageWindow(rawValue: usageWindowRaw) ?? .default }
     @Environment(\.inGlassPanel) private var inGlassPanel
     @Environment(\.colorScheme) private var systemColorScheme
     @FocusState private var searchFocused: Bool
@@ -280,6 +282,8 @@ struct MenuBarPanelView: View {
             isSelected: panel.selectedName == name,
             isChecking: panel.isChecking(name),
             asksYou: !(panel.asks?.asks(for: name).isEmpty ?? true),
+            counts: RowCounts(tools: group.tools.count, hidden: monitor.hiddenToolCount(groupName: name),
+                              calls: panel.usageStore?.count(server: name, window: usageWindow), window: usageWindow),
             actions: panel.rowActions(for: name)
         )
     }

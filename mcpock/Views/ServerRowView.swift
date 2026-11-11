@@ -29,13 +29,13 @@ struct ServerRowView: View {
     var isChecking = false
     /// An agent asks about this server (1.16): a small dot after the name.
     var asksYou = false
+    /// "70/100 tools · 130 calls" (11 Nov, 4b6a and 37f0).
+    var counts = RowCounts(tools: 0)
     let actions: ServerRowActions
     @State private var isHovered = false
 
     /// Badges shown before the rest fold into "+N".
     static let badgeLimit = 3
-    /// Width of the tool count column, so counts line up down the list.
-    static let toolCountWidth: CGFloat = 24
     /// Where the second line starts: past the health mark and its gap.
     static let noteIndent: CGFloat = HealthMark.boxSize + 10
 
@@ -87,11 +87,7 @@ struct ServerRowView: View {
 
                     badges
 
-                    Text(group.tools.isEmpty ? "" : "\(group.tools.count)")
-                        .font(Theme.numeric)
-                        .foregroundStyle(theme.textTertiary)
-                        .frame(width: Self.toolCountWidth, alignment: .trailing)
-                        .help(toolHelp)
+                    RowCountsLabel(counts: counts, theme: theme)
                 }
 
                 if let note = ShortReason.line(for: group) {
@@ -138,10 +134,6 @@ struct ServerRowView: View {
         }
     }
 
-    private var toolHelp: String {
-        let count = group.tools.count
-        return count == 0 ? "" : "\(count) tool\(count == 1 ? "" : "s")"
-    }
 
     @ViewBuilder
     private var badges: some View {
@@ -156,6 +148,27 @@ struct ServerRowView: View {
             }
         }
         .fixedSize()
+    }
+}
+
+/// A server row's numbers, labelled: "24 tools · 130 calls". One view for
+/// the Servers and Agents tabs, so the same thing always looks the same
+/// (11 Nov, 37f0).
+struct RowCountsLabel: View {
+    let counts: RowCounts
+    let theme: ThemeColors
+
+    var body: some View {
+        let line = counts.line
+        if !line.isEmpty {
+            Text(line)
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(theme.textTertiary)
+                .lineLimit(1)
+                .fixedSize()
+                .help(counts.help)
+                .accessibilityLabel(counts.help)
+        }
     }
 }
 

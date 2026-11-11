@@ -138,6 +138,36 @@ final class SwitchPanelTests: XCTestCase {
         return PanelState(monitor: monitor, defaults: defaults)
     }
 
+    /// 4b6a and 37f0 (11 Nov): a row says "2/3 tools" when tools are
+    /// hidden: on the Servers tab those every agent that can hide tools
+    /// hides, inside an agent that agent's own.
+    func testRowsCountHiddenTools() async throws {
+        let state = try await makeState()
+        let monitor = state.monitor
+        try "[mcp_servers.openrouter]\ncommand = \"/usr/bin/true\"\ndisabled_tools = [\"b\"]\n"
+            .write(toFile: path(".codex/config.toml"), atomically: true, encoding: .utf8)
+        ParsedFileCache.removeAll()
+        monitor.probe = { _, _ in
+            ProbeResult(state: .healthy, failureReason: nil,
+                        tools: ["a", "b", "c"].map { MCPToolInfo(name: $0, description: "") })
+        }
+        await monitor.reloadConfigs()
+        await monitor.refreshNow(force: true)
+        await monitor.refreshHiddenTools()?.value
+        let group = try XCTUnwrap(monitor.groups.first)
+        let codex = Set(group.sources.filter { $0.agent == "Codex" }.map(\.configID))
+        let cursor = Set(group.sources.filter { $0.agent == "Cursor" }.map(\.configID))
+        XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter"), 1, "Cursor can't hide tools: Codex decides")
+        XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter", configIDs: codex), 1)
+        XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter", configIDs: cursor), 0)
+        XCTAssertEqual(RowCounts(tools: 3, hidden: monitor.hiddenToolCount(groupName: "openrouter"), calls: 130).line,
+                       "2/3 tools \u{00B7} 130 calls")
+
+        monitor.switchesEnabled = false
+        monitor.refreshHiddenTools()
+        XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter"), 0, "demo mode reads nothing")
+    }
+
     func testFlippingASwitchOnlyOpensTheSheetAndEscapeClosesIt() async throws {
         let state = try await makeState()
         let group = try XCTUnwrap(state.monitor.groups.first)

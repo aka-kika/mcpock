@@ -725,6 +725,8 @@ final class PanelState {
     func loadHiddenTools(for name: String) {
         hiddenToolsGroup = name
         hiddenTools = monitor.hiddenTools(groupName: name)
+        // The rows' "70/100 tools" follow what the card reads (4b6a).
+        monitor.refreshHiddenTools()
     }
 
     /// Per declaration id of `name`: the tools hidden there. Empty until

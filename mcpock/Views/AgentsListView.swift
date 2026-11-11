@@ -232,6 +232,9 @@ private struct AgentRowView: View {
                     actions: panel.rowActions(for: server.name),
                     theme: theme,
                     usageStore: panel.usageStore,
+                    hiddenTools: panel.monitor.hiddenToolCount(
+                        groupName: server.name,
+                        configIDs: Set(groups[server.name]?.sources.filter { $0.label == section.agent }.map(\.configID) ?? [])),
                     usageAgent: AgentBadge.agentName(fromLabel: section.agent),
                     // A profile keeps its own counts ("Hermes · scribe"); a
                     // project-scoped Claude Code row counts under the agent.
@@ -324,6 +327,8 @@ private struct AgentServerRow: View {
     /// Usage counts (1.7): nil whenever the panel wasn't given a store (every
     /// test that builds this row for something else).
     let usageStore: UsageStore?
+    /// Of the server's tools, how many this agent hides (4b6a).
+    let hiddenTools: Int
     /// The agent's base label (a "· profile" or "(Project)" suffix already
     /// stripped by the caller), for the usage lookup.
     let usageAgent: String
@@ -355,7 +360,7 @@ private struct AgentServerRow: View {
                             .accessibilityLabel("Pinned")
                     }
                     Spacer(minLength: 0)
-                    usageCount
+                    RowCountsLabel(counts: counts, theme: theme)
                 }
                 if let note = server.note {
                     Text(note)
@@ -386,18 +391,20 @@ private struct AgentServerRow: View {
         }
     }
 
-    /// The trailing call count (1.7): compact ("1.2k"), monospaced,
-    /// `textTertiary`. Nothing at all with the Usage setting Off; a dash with
-    /// a tooltip for an agent whose reader doesn't exist yet, never a fake 0.
-    @ViewBuilder
-    private var usageCount: some View {
-        if usageWindow != .off, let usageStore {
-            let calls = usageStore.count(agent: usageAgent, server: server.name, window: usageWindow, recordedAs: usageRecordedAs)
-            Text(calls.map(UsageText.compact) ?? "\u{2013}")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(theme.textTertiary)
-                .help(calls == nil ? "No usage record for this agent" : "")
+    /// "24 tools · 130 calls", the same label as the Servers tab (11 Nov,
+    /// 37f0): the server's tools, "70/100" when this agent hides some
+    /// (4b6a), and this agent's calls in the Usage window. No call count with
+    /// Usage off, or for an agent that keeps no record (the tooltip says so),
+    /// never a fake 0.
+    private var counts: RowCounts {
+        let tools = group?.tools.count ?? 0
+        let hidden = hiddenTools
+        guard usageWindow != .off, let usageStore else {
+            return RowCounts(tools: tools, hidden: hidden, calls: nil, window: usageWindow)
         }
+        let calls = usageStore.count(agent: usageAgent, server: server.name, window: usageWindow, recordedAs: usageRecordedAs)
+        return RowCounts(tools: tools, hidden: hidden, calls: calls,
+                         noCallsReason: calls == nil ? "No usage record for this agent" : nil, window: usageWindow)
     }
 
     private var noteColor: Color {

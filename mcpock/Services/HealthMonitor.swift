@@ -427,6 +427,58 @@ final class HealthMonitor {
         return result
     }
 
+    // MARK: - Hidden tools on the rows (11 Nov, 4b6a)
+
+    /// Per declaration (`ServerConfig.id`), every row's: the tools its agent
+    /// hides, as `hiddenTools(groupName:)` reads them. Agents with no way to
+    /// hide tools are left out. Read off the main thread after each config
+    /// read, check round and switch write, so a row can say "70/100 tools"
+    /// without reading files while it draws.
+    private(set) var hiddenToolsByConfig: [String: Set<String>] = [:]
+    @ObservationIgnored private var hiddenToolsTask: Task<Void, Never>?
+
+    /// Read `hiddenToolsByConfig` again, in the background. Returns the
+    /// read, for tests to wait on.
+    @discardableResult
+    func refreshHiddenTools() -> Task<Void, Never>? {
+        hiddenToolsTask?.cancel()
+        guard switchesEnabled else {
+            if !hiddenToolsByConfig.isEmpty { hiddenToolsByConfig = [:] }
+            return nil
+        }
+        let inputs = groups.map { group -> ([ServerConfig], [String], [String: [String]]) in
+            let ids = Set(Self.instanceIDs(forGroup: group.name, in: servers))
+            return (servers.map(\.config).filter { ids.contains($0.id) }, group.tools.map(\.name), ownToolNames(ids))
+        }
+        let settings = claudeSettingsPath
+        hiddenToolsTask = Task { [weak self] in
+            let found = await Task.detached(priority: .utility) { () -> [String: Set<String>] in
+                var all: [String: Set<String>] = [:]
+                for (configs, tools, own) in inputs {
+                    all.merge(ToolPlanner.hiddenTools(configs: configs, allTools: tools, ownTools: own,
+                                                      claudeSettingsPath: settings)) { _, new in new }
+                }
+                return all
+            }.value
+            guard !Task.isCancelled, let self, self.hiddenToolsByConfig != found else { return }
+            self.hiddenToolsByConfig = found
+        }
+        return hiddenToolsTask
+    }
+
+    /// How many of a row's tools are hidden: by every one of `configIDs`
+    /// that can hide tools (nil: all of the row's declarations), the card's
+    /// "Hidden" fold. Zero when none of them can hide tools.
+    func hiddenToolCount(groupName: String, configIDs: Set<String>? = nil) -> Int {
+        guard let group = groups.first(where: { Self.normalizedName($0.name) == Self.normalizedName(groupName) })
+        else { return 0 }
+        let ids = configIDs ?? Set(group.sources.map(\.configID))
+        guard !ids.isEmpty else { return 0 }
+        let hiding = ids.compactMap { hiddenToolsByConfig[$0] }
+        guard !hiding.isEmpty else { return 0 }
+        return group.tools.filter { tool in hiding.allSatisfy { $0.contains(tool.name) } }.count
+    }
+
     /// Per declaration of the row (`ServerConfig.id`): the tools its agent
     /// hides. Agents with no way to hide tools are left out.
     func hiddenTools(groupName: String) -> [String: Set<String>] {
@@ -617,6 +669,7 @@ final class HealthMonitor {
             knownScanFiles = ConfigDiscovery.scanFiles(in: found)
         }
         await take(found)
+        refreshHiddenTools()
     }
 
     /// Fold what a read found into `servers`.
@@ -1001,6 +1054,7 @@ final class HealthMonitor {
                 guard let (result, lookup) = results[self.servers[index].id] else { continue }
                 self.apply(result, at: index, lookup: lookup)
             }
+            self.refreshHiddenTools()
             // She pressed Check again, maybe right after /mcp: a lost row must
             // not linger until the next round (review 2026-10-30, 2a27).
             await self.refreshSessionDrops()
@@ -1306,6 +1360,7 @@ final class HealthMonitor {
             }
         }
         if !Task.isCancelled { hasCompletedFirstPass = true }
+        refreshHiddenTools()
         await refreshSessionDrops()
     }
 

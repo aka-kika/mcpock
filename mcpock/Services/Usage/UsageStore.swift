@@ -131,6 +131,20 @@ final class UsageStore {
         return days.reduce(0) { sum, entry in entry.key >= cutoff ? sum + entry.value : sum }
     }
 
+    /// Calls for `server` in `window` across every agent's records, for the
+    /// Servers tab's rows (11 Nov, 37f0). Nil until real counts exist, or
+    /// with Usage off.
+    func count(server: String, window: UsageWindow, now: Date = Date()) -> Int? {
+        guard hasCounts, window != .off else { return nil }
+        let wanted = HealthMonitor.normalizedName(server)
+        let cutoff = window.days.map { Self.dayIndex(for: now) - ($0 - 1) }
+        var total = 0
+        for (key, days) in buckets where key.server == wanted {
+            for (day, calls) in days where cutoff.map({ day >= $0 }) ?? true { total += calls }
+        }
+        return total
+    }
+
     /// Per tool of `server`, across every agent's records: calls in `window`
     /// and the last day one was seen (any time, so a tool used 40 days ago
     /// still says when). Keys are normalized tool names (look them up with
