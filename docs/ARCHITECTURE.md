@@ -113,7 +113,7 @@ The one place mcpock changes another app's file, and only on her click.
 | `Services/PathResolver.swift` | `~` expansion, env merge, the server's own PATH first, then common bin folders (just before `/usr/bin`), `ELECTRON_RUN_AS_NODE=1` for app-bundle commands |
 | `Services/ShellEnvironment.swift` | The login shell's environment (`$SHELL -l -i -c env -0`, 5 s), read once per launch before the first check: the base for starting servers and filling `${VAR}` (1.11) |
 | `Services/ListeningPorts.swift` | Who listens on a local port: a quick connect first, then `lsof` with a 3 s kill; used by aka's check and `HostApps` (1.11) |
-| `Services/HostApps.swift` | The Mac app a server belongs to (the server's own program inside an `.app`, never Xcode's developer tools or an argument's file; a launcher naming one; a local port an app was seen on, via `lsof` off the main thread, re-checked once per session and forgotten when a plain server answers there). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken |
+| `Services/HostApps.swift` | The Mac app a server belongs to (the server's own program inside an `.app`, never Xcode's developer tools or an argument's file; a launcher naming one; a local port an app was seen on, via `lsof` off the main thread, re-checked once per session and forgotten when a plain server answers there). A failing server whose app is closed is `.needsApp` ("Needs Wake open"), not broken. `launchedApp` (1.17): a command that is the app's own main program (`CFBundleExecutable`) is never started while the app is closed, since starting it opens the app; the probe is skipped (`ProbeResult.appWasClosed`) |
 | `Services/SessionDrops.swift` | 1.12: servers an open Claude Code session lost. Reads `~/.claude/sessions/*.json` (a session is open while its pid runs and is not newer than the session) and those sessions' connect/failure lines in `~/Library/Caches/claude-cli-nodejs/<folder>/mcp-logs-<server>/*.jsonl` (tail only). `HealthMonitor.refreshSessionDrops` after each full cycle and on panel open; `ServerGroup.droppedInSession` (healthy rows Claude Code declares) gives the quiet ring, Needs you, the row line and the card note |
 
 ### What the UI says (pure, unit-tested)
@@ -241,7 +241,7 @@ and signed with the app.
 browser login), so `shouldProbe` filters first:
 
 - **Paused** servers are never launched, not even by Refresh.
-- **Needs <App> open**: a check that fails while the server's Mac app is closed reads `.needsApp`, a calm dash with no backoff, never in Needs you or counted as broken. Opening the app checks its servers again after a moment.
+- **Needs <App> open**: a check that fails while the server's Mac app is closed reads `.needsApp`, a calm dash with no backoff, never in Needs you or counted as broken. Opening the app checks its servers again after a moment. A server that is the app's own program is not started at all while the app is closed (1.17, Native Screen reopened at every check).
 - **Backoff:** after repeated failures a server is re-checked after 5 min,
   then 15 min, then hourly. Refresh (`force: true`) skips backoff, never pause.
 - **Self-managed** (`"builtin": true`: servers that run inside their host

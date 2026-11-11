@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.14.0](https://img.shields.io/badge/version-1.14.0-7a8fb0)](docs/release-notes/1.14.0.md)
+[![Version 1.17.0](https://img.shields.io/badge/version-1.17.0-7a8fb0)](docs/release-notes/1.17.0.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -28,6 +28,22 @@ mcpock gives you one place to look. It reads your configs, checks every
 server, and shows you what needs attention and why, so you (or your agent) can
 fix it. It changes a config only when you flip a switch: it shows you the
 change first and keeps a backup.
+
+## What's new in 1.17
+
+- **A check never opens an app:** a server that is a Mac app's own program
+  (like Native Screen, run as "Native Screen --mcp") is not started while
+  that app is closed. It reads "Needs Native Screen open" and is checked as
+  soon as you open the app.
+- **Numbers with words:** every server row says what its numbers are,
+  "24 tools · 130 calls", the same on the Servers and Agents tabs, and
+  "70/100 tools" when some are hidden.
+- **Codex / ChatGPT desktop:** the ChatGPT desktop app reads the same
+  `~/.codex/config.toml`, so the row names both.
+- **New icon:** a switch, set to on.
+- The Hide sheet is one piece of glass: no white stripe under Cancel and Hide.
+
+Full notes: [1.17.0](docs/release-notes/1.17.0.md).
 
 ## What's new in 1.16
 
@@ -77,7 +93,7 @@ Full notes: [1.15.1](docs/release-notes/1.15.1.md), [1.15.0](docs/release-notes/
   | Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
   | Ring (grey) | Still checking |
   | Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
-  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or signed in by the agent, or **Not checked** (a `${VAR}` it cannot fill), or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens) |
+  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or signed in by the agent, or **Not checked** (a `${VAR}` it cannot fill), or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens; a server that is the app's own program is not even started while the app is closed, so a check never opens it) |
 
 - **Spots servers set up differently.** When one agent launches a different
   command or address than the others (often an old path), the row says so, and
@@ -251,7 +267,7 @@ change asks again.
 | Cline | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` | JSON |
 | Continue | `~/.continue/config.json` | JSON |
 | VS Code | `~/Library/Application Support/Code/User/mcp.json` (`servers`) | JSON |
-| Codex | `~/.codex/config.toml` | TOML |
+| Codex / ChatGPT desktop | `~/.codex/config.toml` | TOML |
 | Grok | `~/.grok/config.toml` | TOML |
 | Grok Bot | `~/.grokbot/settings.json` (`mcpBoxServers`, names only) | Settings |
 | Goose | `~/.config/goose/config.yaml` (`extensions:`) | YAML |
