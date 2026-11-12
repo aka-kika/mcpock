@@ -336,7 +336,7 @@ final class ReviewOct30WordingTests: XCTestCase {
         let waiting = AgentServer(name: "c", state: .needsApp, note: "Needs Wake open", rank: nil)
         XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine, paused])), "1 paused")
         XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine, waiting])), "1 waiting")
-        XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine])), "All fine")
+        XCTAssertEqual(AgentSections.problemText(AgentSection(agent: "Cursor", paths: [], servers: [fine])), "")
     }
 
     /// f241: nothing to copy or ask about on a Not checked row.

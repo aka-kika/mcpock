@@ -127,9 +127,15 @@ private struct AgentRowView: View {
                                 .foregroundStyle(theme.textTertiary)
                         }
                         Spacer(minLength: 6)
-                        Text(AgentSections.problemText(section))
-                            .font(.system(size: 11.5, weight: section.problems.isEmpty ? .regular : .medium))
-                            .foregroundStyle(problemColor)
+                        let word = AgentSections.problemText(section)
+                        if !word.isEmpty {
+                            Text(word)
+                                .font(.system(size: 11.5, weight: section.problems.isEmpty ? .regular : .medium))
+                                .foregroundStyle(problemColor)
+                        }
+                        // "21/29 · 3.1k": servers on of all, this agent's
+                        // calls (12 Nov); also on an open agent's header.
+                        RowCountsLabel(counts: agentCounts, theme: theme, size: 11.5)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(theme.textTertiary)
@@ -172,6 +178,20 @@ private struct AgentRowView: View {
                 .fill(isOpen ? theme.rowHighlight : (isHovered ? theme.rowHighlight : .clear))
         }
         .opacity(isDimmed && !isOpen ? 0.45 : 1)
+    }
+
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
+
+    /// The agent's own numbers: servers on of all, and its calls across them
+    /// in the Usage window (nil with Usage off or for an agent that keeps no
+    /// record, never a fake 0).
+    private var agentCounts: RowCounts {
+        let window = UsageWindow(rawValue: usageWindowRaw) ?? .default
+        let calls: Int? = window == .off ? nil : panel.usageStore.flatMap { store in
+            AgentSections.calls(for: section, store: store, window: window)
+        }
+        return RowCounts(tools: section.servers.count, hidden: section.offCount, calls: calls,
+                         window: window, unit: .servers)
     }
 
     private var problemColor: Color {

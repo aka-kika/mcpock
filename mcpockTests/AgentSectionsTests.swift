@@ -105,7 +105,7 @@ final class AgentSectionsTests: XCTestCase {
 
         let code = byAgent["Code"]!
         XCTAssertTrue(code.problems.isEmpty, "Claude Code is in the majority")
-        XCTAssertEqual(AgentSections.problemText(code), "All fine")
+        XCTAssertEqual(AgentSections.problemText(code), "", "nothing to say: the numbers stand alone (12 Nov)")
         XCTAssertEqual(code.fineCount, 2, "the health bar is all fine")
         XCTAssertEqual(code.servers.first { $0.name == "notes-vault" }?.note, nil, "a fine row, no note")
         XCTAssertTrue(byAgent["Hermes"]!.problems.isEmpty)
@@ -224,7 +224,7 @@ final class AgentSectionsTests: XCTestCase {
         ])
         XCTAssertEqual(AgentSections.problemText(sections[0]), "1 needs you")
         XCTAssertEqual(AgentSections.restText(sections[0]), "2 more, all fine")
-        XCTAssertEqual(AgentSections.problemText(sections[1]), "All fine")
+        XCTAssertEqual(AgentSections.problemText(sections[1]), "")
         XCTAssertEqual(AgentSections.restText(sections[1]), "Its only server answers normally")
     }
 

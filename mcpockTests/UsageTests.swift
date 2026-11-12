@@ -463,6 +463,32 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.count(agent: "Hermes", server: "recall", window: .thirtyDays, recordedAs: "Hermes · scribe"), 1)
     }
 
+    /// An agent's row (12 Nov): "21/29 · 3.1k", its calls across its
+    /// servers; nil for an agent with no record, a profile its own calls.
+    func testAgentRowCallsTotal() async {
+        let now = Date()
+        let events = [
+            UsageEvent(agent: "Code", server: "recall", date: now),
+            UsageEvent(agent: "Code", server: "recall", date: now),
+            UsageEvent(agent: "Code", server: "wake", date: now),
+            UsageEvent(agent: "Code", server: "elsewhere", date: now),
+            UsageEvent(agent: "Hermes · scribe", server: "recall", date: now),
+        ]
+        let store = UsageStore(readers: [FakeReader(agent: "Code", events: events), FakeReader(agent: "Hermes", events: [])],
+                               directory: directory, isHostingTests: true, defaults: defaults)
+        await store.start(knownServers: [])?.value
+        let servers = [AgentServer(name: "recall", state: .healthy, note: nil, rank: nil),
+                       AgentServer(name: "wake", state: .off, note: "Off", rank: nil)]
+        XCTAssertEqual(AgentSections.calls(for: AgentSection(agent: "Code", paths: [], servers: servers),
+                                           store: store, window: .thirtyDays, now: now), 3, "only its own servers")
+        XCTAssertNil(AgentSections.calls(for: AgentSection(agent: "Goose", paths: [], servers: servers),
+                                         store: store, window: .thirtyDays, now: now), "no record: no number")
+        XCTAssertEqual(AgentSections.calls(for: AgentSection(agent: "Hermes · scribe", paths: [], servers: servers),
+                                           store: store, window: .thirtyDays, now: now), 1)
+        XCTAssertNil(AgentSections.calls(for: AgentSection(agent: "Code", paths: [], servers: []),
+                                         store: store, window: .thirtyDays, now: now), "no servers: nothing")
+    }
+
     func testServerNameIsNormalized() async {
         let events = [UsageEvent(agent: "Code", server: "Chrome DevTools", date: Date())]
         let store = UsageStore(readers: [FakeReader(agent: "Code", events: events)], directory: directory, isHostingTests: true, defaults: defaults)

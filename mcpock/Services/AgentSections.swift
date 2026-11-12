@@ -248,7 +248,8 @@ enum AgentSections {
     }
 
     /// "3 need you", "1 needs you", "Checking…" (nothing wrong so far, but not
-    /// every server answered yet), or "All fine".
+    /// every server answered yet), "1 not checked" and the like, or "" when
+    /// nothing needs saying (the row's "21/29" carries on and off).
     static func problemText(_ section: AgentSection) -> String {
         let count = section.problems.count
         if count == 0 {
@@ -274,10 +275,30 @@ enum AgentSections {
             // Not "All fine" beside a server mcpock isn't checking (review 2026-10-30, a965).
             if section.pausedCount > 0 { return "\(section.pausedCount) paused" }
             if section.waitingCount > 0 { return "\(section.waitingCount) waiting" }
-            if section.offCount > 0 { return section.fineCount == 0 ? "All off" : "\(section.offCount) off" }
-            return "All fine"
+            // "8 off" and "All fine" went with the numbers (12 Nov, Kika's
+            // pick): the row's "21/29" says how many are on.
+            return ""
         }
         return "\(count) \(count == 1 ? "needs" : "need") you"
+    }
+
+    /// An agent's calls across its servers in `window` (12 Nov), for its
+    /// row's "21/29 · 3.1k". Nil when the agent keeps no usage record (Goose,
+    /// Claude Desktop, ...), never a fake 0. A profile's own calls are filed
+    /// under its full label ("Hermes · scribe"); a project-scoped Claude Code
+    /// row counts under the agent, as on its server rows.
+    @MainActor
+    static func calls(for section: AgentSection, store: UsageStore, window: UsageWindow, now: Date = Date()) -> Int? {
+        guard !section.servers.isEmpty else { return nil }
+        let agent = AgentBadge.agentName(fromLabel: section.agent)
+        let recordedAs = section.agent.contains(" \u{00B7} ") ? section.agent : nil
+        var total = 0
+        for server in section.servers {
+            guard let calls = store.count(agent: agent, server: server.name, window: window,
+                                          recordedAs: recordedAs, now: now) else { return nil }
+            total += calls
+        }
+        return total
     }
 
     /// Every server runs inside its app or in the cloud: none was checked.

@@ -243,17 +243,29 @@ final class PanelTextTests: XCTestCase {
     }
 }
 
-/// 37f0 and 4b6a (11 Nov): the rows' numbers, labelled, the same on both tabs.
+/// 37f0 and 4b6a (11 Nov), numbers only since 12 Nov (Kika: "just the
+/// number"): the same on both tabs and on the agents' own rows.
 final class RowCountsTests: XCTestCase {
     func testTheLine() {
-        XCTAssertEqual(RowCounts(tools: 24, calls: 130).line, "24 tools \u{00B7} 130 calls")
-        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 1234).line, "70/100 tools \u{00B7} 1.2k calls")
-        XCTAssertEqual(RowCounts(tools: 1, calls: 1).line, "1 tool \u{00B7} 1 call")
-        XCTAssertEqual(RowCounts(tools: 24, calls: nil).line, "24 tools", "Usage off: no call count")
-        XCTAssertEqual(RowCounts(tools: 0, calls: 5).line, "5 calls", "not checked yet: calls only")
+        XCTAssertEqual(RowCounts(tools: 24, calls: 130).line, "24 \u{00B7} 130")
+        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 1234).line, "70/100 \u{00B7} 1.2k")
+        XCTAssertEqual(RowCounts(tools: 1, calls: 1).line, "1 \u{00B7} 1")
+        XCTAssertEqual(RowCounts(tools: 24, calls: nil).line, "24", "Usage off: no call count, no dot")
+        XCTAssertEqual(RowCounts(tools: 0, calls: 5).line, "5", "not checked yet: calls only")
         XCTAssertEqual(RowCounts(tools: 0, calls: nil).line, "")
-        XCTAssertEqual(RowCounts(tools: 4, hidden: 4, calls: 0).line, "0/4 tools \u{00B7} 0 calls")
-        XCTAssertEqual(RowCounts(tools: 4, hidden: 9).line, "0/4 tools", "never more hidden than there are")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 4, calls: 0).line, "0/4 \u{00B7} 0")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 9).line, "0/4", "never more hidden than there are")
+        XCTAssertEqual(RowCounts(tools: 54, hidden: 45, calls: 74).onPart, "9/54")
+        XCTAssertEqual(RowCounts(tools: 54, hidden: 45, calls: 74).callsPart, "74")
+        XCTAssertNil(RowCounts(tools: 6).callsPart)
+    }
+
+    func testAnAgentsRow() {
+        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, calls: 3100, unit: .servers).line, "21/29 \u{00B7} 3.1k")
+        XCTAssertEqual(RowCounts(tools: 13, unit: .servers).line, "13", "no record: no calls")
+        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, calls: 12, window: .thirtyDays, unit: .servers).help,
+                       "21 of 29 servers on, 8 turned off, 12 calls in 30 days")
+        XCTAssertEqual(RowCounts(tools: 1, unit: .servers).help, "1 server, all on")
     }
 
     func testTheTooltip() {

@@ -71,6 +71,9 @@ struct ThemeColors: Equatable {
     let textPrimary: Color
     let textSecondary: Color
     let textTertiary: Color
+    /// The calls count beside a row's "9/54" (12 Nov, Kika: "bit dimmed
+    /// color or something so they feel separate"): a step under tertiary.
+    let textDim: Color
     let statusHealthy: Color
     let statusDegraded: Color
     let statusBroken: Color
@@ -190,6 +193,7 @@ struct ThemeColors: Equatable {
         let light = scheme == .light
         let textSecondary = light ? Color.black.opacity(0.62) : Color(nsColor: .secondaryLabelColor)
         let textTertiary = light ? Color.black.opacity(0.56) : Color.white.opacity(0.56)
+        let textDim = light ? Color.black.opacity(0.42) : Color.white.opacity(0.42)
         // Words that warn are grey in Light (Kika's pick, Mocker 10 Nov): the
         // dot, the badge's tint and the bar carry the colour. Dark keeps the
         // pastels, which read 4.7:1 and more there.
@@ -203,6 +207,7 @@ struct ThemeColors: Equatable {
             textPrimary: Color(nsColor: .labelColor),
             textSecondary: textSecondary,
             textTertiary: textTertiary,
+            textDim: textDim,
             statusHealthy: statusHealthy,
             statusDegraded: statusDegraded,
             statusBroken: statusBroken,

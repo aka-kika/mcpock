@@ -151,23 +151,36 @@ struct ServerRowView: View {
     }
 }
 
-/// A server row's numbers, labelled: "24 tools · 130 calls". One view for
-/// the Servers and Agents tabs, so the same thing always looks the same
-/// (11 Nov, 37f0).
+/// A row's numbers: "9/54 · 74", the calls and their dot dimmer (12 Nov,
+/// Kika's picks). One view for server rows on both tabs and the agents' own
+/// rows, so the same thing always looks the same; the words are in the
+/// tooltip.
 struct RowCountsLabel: View {
     let counts: RowCounts
     let theme: ThemeColors
+    var size: CGFloat = 11
 
     var body: some View {
-        let line = counts.line
-        if !line.isEmpty {
-            Text(line)
-                .font(.system(size: 11).monospacedDigit())
-                .foregroundStyle(theme.textTertiary)
-                .lineLimit(1)
-                .fixedSize()
-                .help(counts.help)
-                .accessibilityLabel(counts.help)
+        let on = counts.onPart
+        let calls = counts.callsPart
+        if on != nil || calls != nil {
+            HStack(spacing: 4) {
+                if let on {
+                    Text(on).foregroundStyle(theme.textSecondary)
+                }
+                if on != nil && calls != nil {
+                    Text("\u{00B7}").foregroundStyle(theme.textDim)
+                }
+                if let calls {
+                    Text(calls).foregroundStyle(theme.textDim)
+                }
+            }
+            .font(.system(size: size).monospacedDigit())
+            .lineLimit(1)
+            .fixedSize()
+            .help(counts.help)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(counts.help)
         }
     }
 }
