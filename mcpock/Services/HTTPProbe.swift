@@ -9,14 +9,28 @@ enum HTTPProbe {
 
     /// Probe an HTTP/SSE MCP server via JSON-RPC POST.
     static func probe(config: ServerConfig, fetchTools: Bool) async -> ProbeResult {
+        let deadline = ContinuousClock.now + .seconds(probeTimeout)
         guard let helper = config.headersHelper, !helper.isEmpty else {
-            return await probeResolved(config: config, fetchTools: fetchTools)
+            return await probeResolved(config: config, fetchTools: fetchTools, deadline: deadline)
         }
         // Claude Code's headersHelper: fetch fresh headers first. A failing helper
         // is the server's error, not a misleading 401 from probing without them.
+        let helperCap: Duration
+        do {
+            let seconds = try timeoutInterval(until: deadline, cap: TimeInterval(probeTimeout))
+            helperCap = .seconds(Int64(seconds.rounded(.down)))
+        } catch {
+            return ProbeResult(
+                state: .broken,
+                failureReason: ProbeError.timeout(.seconds(Int64(probeTimeout))).localizedDescription,
+                tools: nil,
+                transientFailure: true
+            )
+        }
         let fetched = await HeadersHelper.run(
             helper: helper, serverName: config.name, serverURL: config.url ?? "",
-            env: config.env, workingDirectory: config.projectPath
+            env: config.env, workingDirectory: config.projectPath,
+            timeout: helperCap
         )
         switch fetched {
         case .failure(let error):
@@ -26,7 +40,7 @@ enum HTTPProbe {
             )
         case .success(let helperHeaders):
             let merged = config.withHeaders(HeadersHelper.merge(static: config.headers, helper: helperHeaders))
-            let result = await probeResolved(config: merged, fetchTools: fetchTools)
+            let result = await probeResolved(config: merged, fetchTools: fetchTools, deadline: deadline)
             // A server may echo a header back in an error: the helper's values
             // never leave the probe, so scrub them from the reason here.
             let known = SecretMask.knownSecrets(env: [:], headers: helperHeaders)
@@ -40,7 +54,9 @@ enum HTTPProbe {
         }
     }
 
-    private static func probeResolved(config: ServerConfig, fetchTools: Bool) async -> ProbeResult {
+    private static func probeResolved(
+        config: ServerConfig, fetchTools: Bool, deadline: ContinuousClock.Instant
+    ) async -> ProbeResult {
         guard let urlString = config.url, let url = URL(string: urlString) else {
             return ProbeResult(
                 state: .broken,
@@ -52,7 +68,6 @@ enum HTTPProbe {
         // One budget for the whole probe: the SSE attempt, a fall-through to the
         // streamable path, each request in it. Before, every step had its own 10 s
         // and a slow server took 25 to 50 s (Argon 2026-10-16 #14).
-        let deadline = ContinuousClock.now + .seconds(probeTimeout)
 
         // Legacy SSE transport: a GET opens the event stream and announces a POST
         // endpoint; responses arrive on the stream. Posting JSON-RPC straight to the
