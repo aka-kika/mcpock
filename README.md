@@ -3,7 +3,7 @@
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
 [![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
 [![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.17.0](https://img.shields.io/badge/version-1.17.0-7a8fb0)](docs/release-notes/1.17.0.md)
+[![Version 1.17.1](https://img.shields.io/badge/version-1.17.1-7a8fb0)](docs/release-notes/1.17.1.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
 
 **A small Mac menu bar app that checks every MCP server your AI agents use, and
@@ -35,15 +35,16 @@ change first and keeps a backup.
   (like Native Screen, run as "Native Screen --mcp") is not started while
   that app is closed. It reads "Needs Native Screen open" and is checked as
   soon as you open the app.
-- **Numbers with words:** every server row says what its numbers are,
-  "24 tools · 130 calls", the same on the Servers and Agents tabs, and
-  "70/100 tools" when some are hidden.
+- **Just the numbers (1.17.1):** a server row reads "9/54 · 74" (9 of 54
+  tools on, then its calls in a lighter grey), or "6" when no tool is
+  hidden. An agent's row reads "21/29 · 3.1k": servers on, and its own
+  calls. Hover the numbers for the words.
 - **Codex / ChatGPT desktop:** the ChatGPT desktop app reads the same
   `~/.codex/config.toml`, so the row names both.
 - **New icon:** a switch, set to on.
 - The Hide sheet is one piece of glass: no white stripe under Cancel and Hide.
 
-Full notes: [1.17.0](docs/release-notes/1.17.0.md).
+Full notes: [1.17.1](docs/release-notes/1.17.1.md), [1.17.0](docs/release-notes/1.17.0.md).
 
 ## What's new in 1.16
 
