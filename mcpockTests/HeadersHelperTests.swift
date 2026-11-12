@@ -144,9 +144,6 @@ final class HeadersHelperTests: XCTestCase {
         XCTAssertFalse(error.localizedDescription.contains(secret))
     }
 
-    /// Timing-safe under load (e57e, failed once at load 10+): the helper
-    /// gets 3 s so its shell surely starts the child first, and the child's
-    /// end is waited for (up to 10 s) instead of a fixed 300 ms.
     /// Review 2026-10-30 (cb15): the headers helper shares the probe's 10 s budget.
     func testProbeCapsHelperTimeoutToWhatIsLeft() throws {
         let deadline = ContinuousClock.now + .seconds(10)
@@ -157,6 +154,9 @@ final class HeadersHelperTests: XCTestCase {
         XCTAssertLessThan(left, 1)
     }
 
+    /// Timing-safe under load (e57e, failed once at load 10+): the helper
+    /// gets 3 s so its shell surely starts the child first, and the child's
+    /// end is waited for (up to 10 s) instead of a fixed 300 ms.
     func testTimeoutKillsTheWholeTree() async throws {
         let pidFile = dir.appendingPathComponent("child.pid").path
         let path = try script("sleep 60 &\necho $! > '\(pidFile)'\nwait")
