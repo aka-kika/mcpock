@@ -159,6 +159,11 @@ struct RowCountsLabel: View {
     let counts: RowCounts
     let theme: ThemeColors
     var size: CGFloat = 11
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    /// The calls' grey: Kika's dimmer step, or tertiary (4.5:1 and more)
+    /// with Increase Contrast on (review 12 Nov).
+    private var dim: Color { contrast == .increased ? theme.textTertiary : theme.textDim }
 
     var body: some View {
         let on = counts.onPart
@@ -169,10 +174,10 @@ struct RowCountsLabel: View {
                     Text(on).foregroundStyle(theme.textSecondary)
                 }
                 if on != nil && calls != nil {
-                    Text("\u{00B7}").foregroundStyle(theme.textDim)
+                    Text("\u{00B7}").foregroundStyle(dim)
                 }
                 if let calls {
-                    Text(calls).foregroundStyle(theme.textDim)
+                    Text(calls).foregroundStyle(dim)
                 }
             }
             .font(.system(size: size).monospacedDigit())

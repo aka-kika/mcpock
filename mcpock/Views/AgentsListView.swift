@@ -126,12 +126,17 @@ private struct AgentRowView: View {
                                 .font(Theme.caption)
                                 .foregroundStyle(theme.textTertiary)
                         }
+                        // The name keeps its room beside the word and the numbers (review 12 Nov).
+                        .layoutPriority(1)
                         Spacer(minLength: 6)
                         let word = AgentSections.problemText(section)
                         if !word.isEmpty {
                             Text(word)
                                 .font(.system(size: 11.5, weight: section.problems.isEmpty ? .regular : .medium))
                                 .foregroundStyle(problemColor)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .help(word)
                         }
                         // "21/29 · 3.1k": servers on of all, this agent's
                         // calls (12 Nov); also on an open agent's header.
@@ -190,7 +195,10 @@ private struct AgentRowView: View {
         let calls: Int? = window == .off ? nil : panel.usageStore.flatMap { store in
             AgentSections.calls(for: section, store: store, window: window)
         }
+        // Same tooltip as its server rows when the agent keeps no record.
+        let noRecord = calls == nil && window != .off && panel.usageStore != nil && !section.servers.isEmpty
         return RowCounts(tools: section.servers.count, hidden: section.offCount, calls: calls,
+                         noCallsReason: noRecord ? "No usage record for this agent" : nil,
                          window: window, unit: .servers)
     }
 
