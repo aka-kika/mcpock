@@ -46,13 +46,12 @@ struct AgentsWidgetView: View {
                 Text(headline(snapshot))
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 6)
-                Group {
-                    if let count = snapshot.agentCount { Text("\(count) agent\(count == 1 ? "" : "s") \u{00B7}") }
-                    WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
+                if let count = snapshot.agentCount {
+                    Text("\(count) agent\(count == 1 ? "" : "s")")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             }
             HStack(alignment: .top, spacing: 0) {
                 ForEach(shown) { agent in
@@ -75,12 +74,17 @@ struct AgentsWidgetView: View {
             }
             .padding(.top, 11)
             Spacer(minLength: 0)
-            if let line = Self.moreLine(snapshot, shown: shown) {
-                Text(line)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            // When it last checked sits here, on the left, like the problems
+            // widget: a relative date takes every point it is offered, so it
+            // can't be pushed to the right of a headline (and `fixedSize` on
+            // it leaves the whole widget blank; found in the VM, 22 Nov).
+            HStack(spacing: 3) {
+                if let line = Self.moreLine(snapshot, shown: shown) { Text(line + " \u{00B7}") }
+                WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
             }
+            .font(.system(size: 10.5))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
         .padding(2)
     }

@@ -265,7 +265,15 @@ final class HealthMonitor {
     /// `forLabel` first strips a profile or project ("Hermes · scribe",
     /// "Claude Code (MyApp)"), which a plain name lookup missed.
     nonisolated static func widgetLogo(_ agentLabel: String) -> String? {
-        AgentBadge.forLabel(agentLabel).logoName
+        if let logo = AgentBadge.forLabel(agentLabel).logoName { return logo }
+        // The status file names agents as people read them ("Codex / ChatGPT
+        // desktop" since 11 Nov), which is not a registry label: map it back,
+        // or the widget shows a letter where the panel shows the logo (22 Nov).
+        for (short, long) in AgentBadge.displayNames
+        where agentLabel == long || agentLabel.hasPrefix(long + " (") || agentLabel.hasPrefix(long + " \u{00B7} ") {
+            if let logo = AgentBadge.forLabel(short).logoName { return logo }
+        }
+        return nil
     }
 
     /// Display rows: instances sharing a server name collapsed into one group.

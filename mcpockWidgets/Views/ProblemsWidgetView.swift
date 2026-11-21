@@ -79,12 +79,14 @@ struct ProblemsWidgetView: View {
                         .lineLimit(1)
                 }
             }
-            .layoutPriority(1)
             Spacer(minLength: 6)
+            // The state keeps its room; a long name or agent line gives way.
             Text(problem.status)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(1)
         }
         .frame(height: 30)
     }

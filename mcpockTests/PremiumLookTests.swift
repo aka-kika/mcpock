@@ -218,6 +218,16 @@ final class PremiumLookTests: XCTestCase {
         XCTAssertEqual(agent.countWords, "21 of 29")
     }
 
+    /// The status file names Codex "Codex / ChatGPT desktop": its ring must
+    /// still get the logo, not a letter (found on the VM desktop, 22 Nov).
+    func testWidgetLogoKnowsAnAgentByItsDisplayName() {
+        XCTAssertEqual(HealthMonitor.widgetLogo("Codex"), "agent-codex")
+        XCTAssertEqual(HealthMonitor.widgetLogo(AgentBadge.displayLabel("Codex")), "agent-codex")
+        XCTAssertEqual(HealthMonitor.widgetLogo("Claude Code"), "agent-claudecode")
+        XCTAssertEqual(HealthMonitor.widgetLogo("Claude Code (MyApp)"), "agent-claudecode")
+        XCTAssertNil(HealthMonitor.widgetLogo("Some New Agent"))
+    }
+
     func testWidgetAgentNamesFoldProjects() {
         XCTAssertEqual(MCPockWidgetSnapshot.agentNames(["Claude Code (MyApp)", "Claude Code", "Cursor"]), ["Claude Code", "Cursor"])
     }
