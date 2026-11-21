@@ -389,7 +389,8 @@ final class HealthMonitor {
     /// `configIDs` nil is every declaration of the row ("everywhere").
     func switchPlan(groupName: String, configIDs: Set<String>? = nil, turnOn: Bool) -> SwitchPlan {
         let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
-        let configs = servers.map(\.config).filter { ids.contains($0.id) }
+        // A scanned file she has not allowed yet is never written, also not by "everywhere".
+        let configs = servers.filter { ids.contains($0.config.id) && !$0.awaitingFileOK }.map(\.config)
         return SwitchPlanner.plan(server: groupName, configs: configs, turnOn: turnOn,
                                   claudeSettingsPath: claudeSettingsPath, running: SwitchPlanner.isRunning,
                                   parkedDirectory: switchParked)
@@ -428,7 +429,8 @@ final class HealthMonitor {
     /// `configIDs` nil is every declaration of the row.
     func toolPlan(groupName: String, configIDs: Set<String>? = nil, hide: [String], show: [String]) -> SwitchPlan {
         let ids = configIDs ?? Set(Self.instanceIDs(forGroup: groupName, in: servers))
-        let configs = servers.map(\.config).filter { ids.contains($0.id) }
+        // A scanned file she has not allowed yet is never written, also not by "everywhere".
+        let configs = servers.filter { ids.contains($0.config.id) && !$0.awaitingFileOK }.map(\.config)
         return ToolPlanner.plan(server: groupName, configs: configs, hide: hide, show: show,
                                 allTools: toolNames(groupName: groupName), ownTools: ownToolNames(ids),
                                 claudeSettingsPath: claudeSettingsPath)
@@ -1187,8 +1189,9 @@ final class HealthMonitor {
                     failureReason: v.failureReason.map { SecretMask.scrub($0, known: known) },
                     compareKey: Differs.launchTarget(v.config).parts.joined(separator: "\u{1F}"),
                     awaitingFileOK: v.awaitingFileOK,
-                    canSwitch: ServerSwitch.mechanism(agent: v.config.source.label, configID: v.config.id,
-                                                      builtin: v.config.builtin) != nil
+                    // Never a file still waiting for her OK (a Hermes profile the scan found).
+                    canSwitch: !v.awaitingFileOK && ServerSwitch.mechanism(agent: v.config.source.label, configID: v.config.id,
+                                                                           builtin: v.config.builtin) != nil
                 )
             }
             // A switched-off declaration is not compared: nothing starts it.

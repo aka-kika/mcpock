@@ -48,7 +48,7 @@ enum ConfigDiscovery {
             // Servers mcpock moved out of this agent's file (1.14, Claude
             // Desktop): listed as turned off, from mcpock's own folder.
             var parked: [DiscoveredEntry] = []
-            if let parkedDirectory, ServerSwitch.mechanism(agent: agent.label, configID: "reg:", builtin: false) == .parkOutside {
+            if let parkedDirectory, ServerSwitch.mechanism(agent: agent.label, configID: "reg:", builtin: false)?.parkKey != nil {
                 let active = Set((parsed ?? []).map(\.name))
                 for (name, raw) in ParkedStore.entries(agent: agent.label, configPath: agent.path, directory: parkedDirectory)
                 where !active.contains(name) {

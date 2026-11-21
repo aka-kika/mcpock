@@ -75,6 +75,30 @@ final class PremiumLookTests: XCTestCase {
         XCTAssertEqual(CardText.toolsTitle(count: 3, hidden: 9), "Tools \u{00B7} 0 of 3 on", "never more off than there are")
     }
 
+    // MARK: - Off in one Claude Code project
+
+    func testAProjectsOwnOffListIsReadByFolderName() {
+        let json = """
+            {"projects": {
+              "/Users/me/code/shop": {"disabledMcpServers": ["github", "claude.ai Gmail", ""]},
+              "/Users/me/code/blog": {"disabledMcpServers": ["github", "notion"]},
+              "/Users/me/code/site": {"mcpServers": {}}
+            }}
+            """
+        let off = ClaudeProjectOff.projects(claudeJSON: Data(json.utf8))
+        XCTAssertEqual(off["github"], ["blog", "shop"])
+        XCTAssertEqual(off["notion"], ["blog"])
+        XCTAssertNil(off["claude.ai Gmail"], "the account's connectors have their own section")
+        XCTAssertTrue(ClaudeProjectOff.projects(claudeJSON: Data("[]".utf8)).isEmpty)
+    }
+
+    func testTheCardSaysWhereItIsOff() {
+        XCTAssertNil(ClaudeProjectOff.note([]))
+        XCTAssertEqual(ClaudeProjectOff.note(["shop"]), "Off in one project: shop")
+        XCTAssertEqual(ClaudeProjectOff.note(["blog", "shop"]), "Off in 2 projects: blog, shop")
+        XCTAssertEqual(ClaudeProjectOff.note(["a", "b", "c", "d"]), "Off in 4 projects")
+    }
+
     // MARK: - The icon carries the state
 
     func testAFineServerHasNoBadge() {

@@ -93,6 +93,8 @@ enum SwitchPlanner {
     static let appBundleIDs: [String: [String]] = [
         "Claude Desktop": ["com.anthropic.claudefordesktop"],
         "Cursor": ["com.todesktop.230313mzl4w4u92"],
+        "VS Code": ["com.microsoft.VSCode"],
+        "Windsurf": ["com.exafunction.windsurf"],
     ]
 
     @MainActor
@@ -144,19 +146,19 @@ enum SwitchPlanner {
                     // An entry an early 1.14 build parked inside the file
                     // (`_mcpock_disabled`) and not in mcpock's folder: moved
                     // back where it is (review 10 Nov, ds-2).
-                    if mechanism == .parkOutside, turnOn,
+                    if mechanism.parkKey != nil, turnOn,
                        ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name] == nil,
                        text.map({ ServerSwitch.isParkedInFile($0, server: step.name) }) == true {
                         mechanism = .park
                     }
                     if index == 0 { firstMechanism = mechanism }
                     var parkedValue: String?
-                    if mechanism == .parkOutside {
+                    if let parkKey = mechanism.parkKey {
                         if turnOn {
                             parkedValue = ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name]
                             parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: nil))
                         } else {
-                            guard let raw = text.flatMap({ ServerSwitch.entryText(in: $0, server: step.name) }) else {
+                            guard let raw = text.flatMap({ ServerSwitch.entryText(in: $0, server: step.name, key: parkKey) }) else {
                                 throw ServerSwitch.SwitchError.cannotEdit
                             }
                             parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: raw))
@@ -189,7 +191,7 @@ enum SwitchPlanner {
         switch mechanism {
         case .claudeDeny:
             return turnOn ? "Comes off Claude Code's blocked list." : "Goes on Claude Code's blocked list."
-        case .openCode, .toml, .yaml:
+        case .openCode, .toml, .yaml, .jsonDisabled:
             return turnOn ? "Marked on in its config." : "Marked off in its config."
         case .park:
             return turnOn ? "Moved back to where it was." : "Parked inside its config, keys and all."
@@ -210,8 +212,8 @@ enum SwitchPlanner {
         case "Claude Desktop":
             return running ? "Claude Desktop is open: \(word.lowercased()) after you quit and open it again"
                 : "\(word) the next time Claude Desktop opens"
-        case "Cursor":
-            return running ? "Cursor is open: \(word.lowercased()) after it reopens" : "\(word) the next time Cursor opens"
+        case "Cursor", "VS Code", "Windsurf":
+            return running ? "\(agent) is open: \(word.lowercased()) after it reopens" : "\(word) the next time \(agent) opens"
         default:
             return "\(word) from its next run"
         }
@@ -227,9 +229,9 @@ enum SwitchPlanner {
             let parked = "\"\(ServerSwitch.parkedKey)\": { \(name): {\u{2026}} }"
             return turnOn ? ["- " + parked, "+ " + active] : ["- " + active, "+ " + parked]
         }
-        if mechanism == .parkOutside {
+        if let parkKey = mechanism.parkKey {
             let name = JSONSpanEditor.quoted(server)
-            let active = "\"mcpServers\": { \(name): {\u{2026}} }"
+            let active = "\"\(parkKey)\": { \(name): {\u{2026}} }"
             let kept = "mcpock/parked/\(ParkedStore.fileName(forAgent: agent)): \(name)"
             return turnOn ? ["- " + kept, "+ " + active] : ["- " + active, "+ " + kept]
         }

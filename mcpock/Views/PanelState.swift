@@ -365,6 +365,7 @@ final class PanelState {
         Task { await monitor.refreshSessionDrops() }
         // The account's connectors, when she asked for them and the list is old.
         refreshConnectorsIfDue()
+        refreshClaudeProjectOff()
         userPickedFilter = false
         didJumpToNeedsYou = false
         // Start from her own saved choice: an earlier automatic jump to Needs
@@ -390,6 +391,31 @@ final class PanelState {
                 self?.openAskedCard()
             }
         }
+    }
+
+    // MARK: - Off in one Claude Code project (22 Nov)
+
+    /// Server name to the Claude Code projects that switched it off, read
+    /// from `~/.claude.json` when the panel opens. Swapped in tests.
+    private(set) var claudeProjectOff: [String: [String]] = [:]
+    @ObservationIgnored var loadClaudeProjectOff: () -> [String: [String]] = {
+        guard let agent = AgentRegistry.known.first(where: { $0.label == AgentRegistry.claudeCodeLabel }),
+              let data = FileManager.default.contents(atPath: agent.path) else { return [:] }
+        return ClaudeProjectOff.projects(claudeJSON: data)
+    }
+
+    func refreshClaudeProjectOff() {
+        Task { @MainActor [weak self] in
+            guard let load = self?.loadClaudeProjectOff else { return }
+            let found = await Task.detached(priority: .utility) { load() }.value
+            self?.claudeProjectOff = found
+        }
+    }
+
+    /// The card's line under Claude Code's own (user scope) row.
+    func projectOffNote(server: String, source: GroupSource) -> String? {
+        guard source.agent == AgentRegistry.claudeCodeLabel, source.label == source.agent, !source.isOff else { return nil }
+        return ClaudeProjectOff.note(claudeProjectOff[server] ?? [])
     }
 
     // MARK: - Claude account connectors (22 Nov)

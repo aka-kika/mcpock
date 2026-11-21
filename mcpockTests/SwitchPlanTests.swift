@@ -36,7 +36,7 @@ final class SwitchPlanTests: XCTestCase {
             KnownAgent(label: "Cursor", path: path(".cursor/mcp.json"), shape: .json),
             KnownAgent(label: "Codex", path: path(".codex/config.toml"), shape: .mcpServersTOML),
             KnownAgent(label: "Goose", path: path(".config/goose/config.yaml"), shape: .gooseYAML),
-            KnownAgent(label: "VS Code", path: path("vscode/mcp.json"), shape: .json),
+            KnownAgent(label: "Continue", path: path("continue/config.json"), shape: .json),
         ]
     }
 
@@ -46,7 +46,7 @@ final class SwitchPlanTests: XCTestCase {
         try put(".cursor/mcp.json", "{\n  \"mcpServers\": {\n    \"openrouter\": {\n      \"command\": \"npx\",\n      \"env\": { \"OPENROUTER_API_KEY\": \"sk-or-v1-abcdefabcdefabcdefabcdef\" }\n    }\n  }\n}\n")
         try put(".codex/config.toml", "[mcp_servers.openrouter]\ncommand = \"npx\"\n")
         try put(".config/goose/config.yaml", "extensions:\n  openrouter:\n    enabled: true\n    type: stdio\n    cmd: npx\n    args: []\n")
-        try put("vscode/mcp.json", #"{"servers": {"openrouter": {"command": "npx"}}}"#)
+        try put("continue/config.json", #"{"mcpServers": {"openrouter": {"command": "npx"}}}"#)
     }
 
     private func discover() -> [ServerConfig] {
@@ -71,7 +71,7 @@ final class SwitchPlanTests: XCTestCase {
         let off = plan(before, on: false, running: true)
         XCTAssertEqual(off.title, "Turn off openrouter everywhere?")
         XCTAssertEqual(off.changes.map(\.agents), [["Claude Code"], ["Codex / ChatGPT desktop"], ["Cursor"], ["Goose"]])
-        XCTAssertEqual(off.skipped, ["VS Code"])
+        XCTAssertEqual(off.skipped, ["Continue"])
         XCTAssertEqual(off.problems, [])
         XCTAssertEqual(off.changes.map(\.when), [
             "Off in new sessions", "Off from its next run", "Cursor is open: off after it reopens", "Off in new sessions",
@@ -225,6 +225,88 @@ final class SwitchPlanTests: XCTestCase {
                            claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
     }
 
+    // MARK: The agents added on 22 Nov, from their real file shapes
+
+    private func discover(_ label: String, _ rel: String) -> [ServerConfig] {
+        ParsedFileCache.removeAll()
+        return ConfigDiscovery.discover(registry: [KnownAgent(label: label, path: path(rel), shape: .json)],
+                                        scanRoots: [], parkedDirectory: parked)
+    }
+
+    private func plan(_ label: String, _ rel: String, on: Bool, running: Bool = false) -> SwitchPlan {
+        SwitchPlanner.plan(server: "openrouter", configs: discover(label, rel).filter { $0.name == "openrouter" }, turnOn: on,
+                           claudeSettingsPath: path(".claude/settings.json"), running: { _ in running }, parkedDirectory: parked)
+    }
+
+    /// VS Code keeps its servers under "servers" and its schema allows no key
+    /// it does not know: the entry waits in mcpock's folder, and comes back
+    /// under "servers".
+    func testVSCodeServerWaitsInMcpocksFolderAndComesBackUnderServers() throws {
+        let rel = "Code/User/mcp.json"
+        let original = "{\n  \"servers\": {\n    \"openrouter\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"openrouter-mcp\"]\n    },\n    \"github\": {\n      \"type\": \"http\",\n      \"url\": \"https://api.githubcopilot.com/mcp/\"\n    }\n  },\n  \"inputs\": []\n}\n"
+        try put(rel, original)
+        let off = plan("VS Code", rel, on: false, running: true)
+        XCTAssertEqual(off.changes.count, 1)
+        XCTAssertTrue(off.skipped.isEmpty && off.problems.isEmpty)
+        XCTAssertEqual(off.changes[0].diff, [
+            "- \"servers\": { \"openrouter\": {\u{2026}} }",
+            "+ mcpock/parked/vs-code.json: \"openrouter\"",
+        ])
+        XCTAssertEqual(off.changes[0].when, "VS Code is open: off after it reopens")
+        XCTAssertNil(SwitchWriter.apply(off, backups: backups, parked: parked).error)
+
+        let file = try XCTUnwrap(text(rel))
+        XCTAssertFalse(file.contains("openrouter"))
+        XCTAssertFalse(file.contains(ServerSwitch.parkedKey) || file.contains("mcpServers"), "no key VS Code's schema does not know")
+        XCTAssertTrue(file.contains("\"github\"") && file.contains("\"inputs\""))
+
+        let listed = try XCTUnwrap(discover("VS Code", rel).first { $0.name == "openrouter" })
+        XCTAssertTrue(listed.turnedOff, "listed as off from mcpock's folder")
+        XCTAssertEqual(listed.commandLine, "npx -y openrouter-mcp")
+
+        let on = plan("VS Code", rel, on: true)
+        XCTAssertEqual(on.changes.map(\.what), ["Moved back into its config from mcpock's folder."])
+        XCTAssertEqual(on.changes[0].when, "On the next time VS Code opens")
+        XCTAssertNil(SwitchWriter.apply(on, backups: backups, parked: parked).error)
+        XCTAssertEqual(NSDictionary(dictionary: try XCTUnwrap(ServerSwitch.jsonObject(try XCTUnwrap(text(rel))) as? [String: Any])),
+                       NSDictionary(dictionary: try XCTUnwrap(ServerSwitch.jsonObject(original) as? [String: Any])))
+        XCTAssertEqual(ParkedStore.entries(agent: "VS Code", configPath: path(rel), directory: parked), [:])
+        XCTAssertEqual(discover("VS Code", rel).filter(\.turnedOff).count, 0)
+    }
+
+    /// Windsurf has no documented flag: the same way as Cursor.
+    func testWindsurfServerWaitsInMcpocksFolder() throws {
+        let rel = ".codeium/windsurf/mcp_config.json"
+        try put(rel, "{\n  \"mcpServers\": {\n    \"openrouter\": {\n      \"command\": \"npx\"\n    }\n  }\n}\n")
+        let off = plan("Windsurf", rel, on: false)
+        XCTAssertEqual(off.changes.first?.diff.last, "+ mcpock/parked/windsurf.json: \"openrouter\"")
+        XCTAssertNil(SwitchWriter.apply(off, backups: backups, parked: parked).error)
+        XCTAssertFalse(try XCTUnwrap(text(rel)).contains("openrouter"))
+        XCTAssertEqual(discover("Windsurf", rel).first { $0.name == "openrouter" }?.turnedOff, true)
+        XCTAssertNil(SwitchWriter.apply(plan("Windsurf", rel, on: true), backups: backups, parked: parked).error)
+        XCTAssertTrue(try XCTUnwrap(text(rel)).contains("\"openrouter\""))
+    }
+
+    /// Cline has its own flag, the one its own switch writes: nothing leaves the file.
+    func testClineServerIsMarkedOffInItsOwnFileAndBack() throws {
+        let rel = "Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+        let original = "{\n  \"mcpServers\": {\n    \"openrouter\": {\n      \"command\": \"npx\",\n      \"autoApprove\": []\n    }\n  }\n}\n"
+        try put(rel, original)
+        let off = plan("Cline", rel, on: false)
+        XCTAssertEqual(off.changes.map(\.what), ["Marked off in its config."])
+        XCTAssertTrue(off.changes[0].parked.isEmpty)
+        XCTAssertNil(SwitchWriter.apply(off, backups: backups, parked: parked).error)
+        XCTAssertTrue(try XCTUnwrap(text(rel)).contains("\"disabled\": true"))
+        XCTAssertEqual(discover("Cline", rel).first { $0.name == "openrouter" }?.turnedOff, true)
+        XCTAssertEqual(ParkedStore.entries(agent: "Cline", configPath: path(rel), directory: parked), [:])
+
+        let on = plan("Cline", rel, on: true)
+        XCTAssertEqual(on.changes.map(\.what), ["Marked on in its config."])
+        XCTAssertNil(SwitchWriter.apply(on, backups: backups, parked: parked).error)
+        XCTAssertTrue(try XCTUnwrap(text(rel)).contains("\"disabled\": false"))
+        XCTAssertEqual(discover("Cline", rel).first { $0.name == "openrouter" }?.turnedOff, false)
+    }
+
     /// The real Claude Desktop rewrites its config at launch and keeps only
     /// what it knows (seen 2026-11-10), so nothing may wait inside that file.
     func testClaudeDesktopServerWaitsInMcpocksFolderAndComesBack() throws {
@@ -253,7 +335,7 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(listed.source.label, "Claude Desktop")
         XCTAssertEqual(listed.commandLine, "npx -y openrouter-mcp")
         XCTAssertEqual(listed.env["OPENROUTER_API_KEY"], "sk-or-v1-abcdefabcdefabcdefabcdef")
-        XCTAssertEqual(ServerSwitch.mechanism(agent: "Claude Desktop", configID: listed.id, builtin: false), .parkOutside)
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Claude Desktop", configID: listed.id, builtin: false), .parkOutside(key: "mcpServers"))
 
         let on = desktopPlan(on: true)
         XCTAssertEqual(on.changes.map(\.what), ["Moved back into its config from mcpock's folder."])
@@ -361,7 +443,7 @@ final class SwitchPlanTests: XCTestCase {
         XCTAssertEqual(hide.title, "Hide delete_key in openrouter?")
         XCTAssertEqual(hide.confirmTitle, "Hide")
         XCTAssertEqual(Set(hide.changes.flatMap(\.agents)), ["Claude Code", "Codex / ChatGPT desktop", "Goose"])
-        XCTAssertEqual(Set(hide.skipped), ["Cursor", "VS Code"], "no setting for single tools there")
+        XCTAssertEqual(Set(hide.skipped), ["Cursor", "Continue"], "no setting for single tools there")
         XCTAssertTrue(CardText.switchNotes(for: hide).isEmpty, "they are rows of their own on the sheet")
         let before = [".claude/settings.json", ".cursor/mcp.json", ".codex/config.toml", ".config/goose/config.yaml"].map(text)
 

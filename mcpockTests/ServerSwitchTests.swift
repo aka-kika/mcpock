@@ -367,16 +367,108 @@ final class ServerSwitchTests: XCTestCase {
                                            mechanism: .yaml(section: "extensions"), server: "mcpock", turnOn: false))
     }
 
+    // MARK: Cline (its own "disabled" flag), 22 Nov
+
+    private let clineSettings = """
+    {
+      "mcpServers": {
+        "github": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": { "GITHUB_TOKEN": "x" },
+          "autoApprove": []
+        },
+        "fetch": { "command": "uvx", "args": ["mcp-server-fetch"], "disabled": false }
+      }
+    }
+    """
+
+    func testClineGetsItsOwnDisabledFlagAndNothingElseChanges() throws {
+        let off = try edit(clineSettings, .jsonDisabled, "github", on: false)
+        let root = try XCTUnwrap(ServerSwitch.jsonObject(off) as? [String: Any])
+        let servers = try XCTUnwrap(root["mcpServers"] as? [String: Any])
+        XCTAssertEqual((servers["github"] as? [String: Any])?["disabled"] as? Bool, true)
+        XCTAssertEqual((servers["github"] as? [String: Any])?["command"] as? String, "npx", "the entry is kept, keys and all")
+        XCTAssertEqual((servers["fetch"] as? [String: Any])?["disabled"] as? Bool, false, "the other server is untouched")
+        XCTAssertTrue(off.contains("\"GITHUB_TOKEN\": \"x\""))
+        // On again: the flag is set back, the way Cline's own switch leaves it.
+        let on = try edit(off, .jsonDisabled, "github", on: true)
+        let again = try XCTUnwrap((ServerSwitch.jsonObject(on) as? [String: Any])?["mcpServers"] as? [String: Any])
+        XCTAssertEqual((again["github"] as? [String: Any])?["disabled"] as? Bool, false)
+    }
+
+    func testClineFlagThatIsThereIsFlippedInPlace() throws {
+        let off = try edit(clineSettings, .jsonDisabled, "fetch", on: false)
+        XCTAssertTrue(off.contains("\"disabled\": true"))
+        XCTAssertEqual(try edit(off, .jsonDisabled, "fetch", on: true), clineSettings)
+    }
+
+    func testClineServerWithNoFlagIsAlreadyOnAndAMissingOneIsRefused() throws {
+        XCTAssertEqual(try edit(clineSettings, .jsonDisabled, "github", on: true), clineSettings)
+        XCTAssertThrowsError(try edit(clineSettings, .jsonDisabled, "nope", on: false))
+        XCTAssertThrowsError(try edit("{ \"mcpServers\": [] }", .jsonDisabled, "github", on: false))
+    }
+
+    func testClineCheckRefusesAnyOtherChange() {
+        let tampered = clineSettings.replacingOccurrences(of: "\"x\"", with: "\"y\"")
+            .replacingOccurrences(of: "\"autoApprove\": []", with: "\"autoApprove\": [], \"disabled\": true")
+        XCTAssertFalse(ServerSwitch.verify(before: clineSettings, after: tampered, mechanism: .jsonDisabled, server: "github", turnOn: false))
+    }
+
+    // MARK: VS Code (its servers sit under "servers"), 22 Nov
+
+    private let vscodeMCP = """
+    {
+      "servers": {
+        "github": { "type": "http", "url": "https://api.githubcopilot.com/mcp/" },
+        "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] }
+      },
+      "inputs": []
+    }
+    """
+
+    func testVSCodeServerLeavesItsFileAndComesBackUnderServers() throws {
+        let vscode = SwitchMechanism.parkOutside(key: "servers")
+        let raw = try XCTUnwrap(ServerSwitch.entryText(in: vscodeMCP, server: "playwright", key: "servers"))
+        XCTAssertNil(ServerSwitch.entryText(in: vscodeMCP, server: "playwright"), "not under mcpServers")
+        let off = try edit(vscodeMCP, vscode, "playwright", on: false)
+        let servers = try XCTUnwrap((ServerSwitch.jsonObject(off) as? [String: Any])?["servers"] as? [String: Any])
+        XCTAssertEqual(Set(servers.keys), ["github"])
+        XCTAssertNil((ServerSwitch.jsonObject(off) as? [String: Any])?["mcpServers"], "no key VS Code does not know")
+        XCTAssertNotNil((ServerSwitch.jsonObject(off) as? [String: Any])?["inputs"])
+        let on = try ServerSwitch.edited(off, mechanism: vscode, server: "playwright", turnOn: true, parkedValue: raw)
+        XCTAssertEqual(NSDictionary(dictionary: try XCTUnwrap(ServerSwitch.jsonObject(on) as? [String: Any])),
+                       NSDictionary(dictionary: try XCTUnwrap(ServerSwitch.jsonObject(vscodeMCP) as? [String: Any])))
+    }
+
+    // MARK: Hermes profiles, 22 Nov
+
+    func testAHermesProfileIsSwitchedLikeHermesAndNoOtherScannedFileIs() {
+        let profile = "scan:/Users/me/.hermes/profiles/scribe/config.yaml:global:notion"
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Hermes \u{00B7} scribe", configID: profile, builtin: false), .yaml(section: "mcp_servers"))
+        XCTAssertNil(ServerSwitch.mechanism(agent: "Hermes \u{00B7} scribe", configID: profile, builtin: true))
+        XCTAssertNil(ServerSwitch.mechanism(agent: "Hermes \u{00B7} notes",
+                                            configID: "scan:/Users/me/.hermes/notes/mcp.json:global:a", builtin: false), "not a profile's config")
+        XCTAssertNil(ServerSwitch.mechanism(agent: "scribe", configID: profile, builtin: false), "the label must say Hermes")
+        XCTAssertNil(ServerSwitch.mechanism(agent: "Goose \u{00B7} x",
+                                            configID: "scan:/Users/me/.config/goose/x/config.yaml:global:a", builtin: false))
+    }
+
     // MARK: Which agents get a switch
 
     func testOnlyKnownFilesOfAgentsWithAWayGetASwitch() {
         XCTAssertEqual(ServerSwitch.mechanism(agent: "Code", configID: "scan:/x/.mcp.json:global:a", builtin: false), .claudeDeny)
         XCTAssertEqual(ServerSwitch.mechanism(agent: "Codex", configID: "reg:Codex:global:a", builtin: false), .toml)
         XCTAssertEqual(ServerSwitch.mechanism(agent: "Goose", configID: "reg:Goose:global:a", builtin: false), .yaml(section: "extensions"))
-        XCTAssertEqual(ServerSwitch.mechanism(agent: "Cursor", configID: "reg:Cursor:global:a", builtin: false), .parkOutside)
-        XCTAssertEqual(ServerSwitch.mechanism(agent: "Claude Desktop", configID: "reg:Claude Desktop:global:a", builtin: false), .parkOutside)
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Cursor", configID: "reg:Cursor:global:a", builtin: false), .parkOutside(key: "mcpServers"))
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Claude Desktop", configID: "reg:Claude Desktop:global:a", builtin: false), .parkOutside(key: "mcpServers"))
         XCTAssertNil(ServerSwitch.mechanism(agent: "Cursor", configID: "scan:/x/mcp.json:global:a", builtin: false))
-        XCTAssertNil(ServerSwitch.mechanism(agent: "VS Code", configID: "reg:VS Code:global:a", builtin: false))
+        // 22 Nov: the agents the first round left out.
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "VS Code", configID: "reg:VS Code:global:a", builtin: false), .parkOutside(key: "servers"))
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Windsurf", configID: "reg:Windsurf:global:a", builtin: false), .parkOutside(key: "mcpServers"))
+        XCTAssertEqual(ServerSwitch.mechanism(agent: "Cline", configID: "reg:Cline:global:a", builtin: false), .jsonDisabled)
+        XCTAssertNil(ServerSwitch.mechanism(agent: "Cline", configID: "scan:/x/cline_mcp_settings.json:global:a", builtin: false))
+        XCTAssertNil(ServerSwitch.mechanism(agent: "Continue", configID: "reg:Continue:global:a", builtin: false))
         XCTAssertNil(ServerSwitch.mechanism(agent: "Codex", configID: "reg:Codex:global:a", builtin: true))
         XCTAssertNil(ServerSwitch.mechanism(agent: AkaSource.label, configID: "aka:1", builtin: false))
     }

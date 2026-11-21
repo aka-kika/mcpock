@@ -26,8 +26,21 @@ enum SwitchMechanism: Equatable, Sendable {
     /// config at launch and drops keys it does not know (seen with the real
     /// app), and a logged-in Cursor may rewrite `mcp.json` too: the entry
     /// moves out of the file into mcpock's own folder (`ParkedStore`), where
-    /// no app can lose it.
-    case parkOutside
+    /// no app can lose it. Windsurf and VS Code go the same way (22 Nov):
+    /// neither has a documented flag in its file, and VS Code's schema allows
+    /// no unknown key. `key` is the object the servers sit in: `mcpServers`,
+    /// or `servers` in VS Code's `mcp.json`.
+    case parkOutside(key: String)
+    /// Cline (22 Nov): `"disabled": true` under `mcpServers.<name>`, the flag
+    /// its own switch writes (cline/cline, `services/mcp/schemas.ts` and
+    /// `McpHub.toggleServerDisabledRPC`).
+    case jsonDisabled
+
+    /// The object a `.parkOutside` server is taken out of; nil for the rest.
+    var parkKey: String? {
+        if case .parkOutside(let key) = self { return key }
+        return nil
+    }
 }
 
 enum ServerSwitch {
@@ -50,15 +63,27 @@ enum ServerSwitch {
     static func mechanism(agent: String, configID: String, builtin: Bool) -> SwitchMechanism? {
         guard !builtin else { return nil }
         if agent == AgentRegistry.claudeCodeLabel { return .claudeDeny }
+        // A Hermes profile's own config (22 Nov): a file the scan finds, but
+        // Hermes's by its place, and switched the way Hermes's main file is.
+        if isHermesProfile(agent: agent, configID: configID) { return .yaml(section: "mcp_servers") }
         guard configID.hasPrefix("reg:") else { return nil }
         switch agent {
         case "Codex", "Grok": return .toml
         case "Goose": return .yaml(section: "extensions")
         case "Hermes": return .yaml(section: "mcp_servers")
         case "OpenCode": return .openCode
-        case "Claude Desktop", "Cursor": return .parkOutside
+        case "Claude Desktop", "Cursor", "Windsurf": return .parkOutside(key: "mcpServers")
+        case "VS Code": return .parkOutside(key: "servers")
+        case "Cline": return .jsonDisabled
         default: return nil
         }
+    }
+
+    /// "Hermes · scribe" from `~/.hermes/profiles/scribe/config.yaml`: the
+    /// label says Hermes, and the scanned file is a profile's config.
+    static func isHermesProfile(agent: String, configID: String) -> Bool {
+        agent.hasPrefix("Hermes \u{00B7} ") && configID.hasPrefix("scan:")
+            && configID.contains("/.hermes/profiles/") && configID.contains("/config.yaml:")
     }
 
     /// Claude Code's user settings, beside its `~/.claude.json`.
@@ -95,19 +120,20 @@ enum ServerSwitch {
             case .claudeDeny: after = try claudeDeny(before, server: server, turnOn: turnOn)
             case .openCode: after = try openCode(before, server: server, turnOn: turnOn)
             case .park: after = try park(before, server: server, turnOn: turnOn)
-            case .parkOutside:
+            case .jsonDisabled: after = try jsonDisabled(before, server: server, turnOn: turnOn)
+            case .parkOutside(let key):
                 if turnOn {
                     guard let parkedValue, jsonObject(parkedValue) is [String: Any],
                           let root = JSONSpanEditor.parse(before), root.members != nil else { throw SwitchError.cannotEdit }
-                    if root.member("mcpServers")?.value.members != nil {
-                        after = try JSONSpanEditor.insertMember(in: before, objectPath: ["mcpServers"], key: server, valueText: parkedValue)
+                    if root.member(key)?.value.members != nil {
+                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [key], key: server, valueText: parkedValue)
                     } else {
-                        guard root.member("mcpServers") == nil else { throw SwitchError.cannotEdit }
+                        guard root.member(key) == nil else { throw SwitchError.cannotEdit }
                         let entry = "{\(JSONSpanEditor.quoted(server)): \(parkedValue)}"
-                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [], key: "mcpServers", valueText: entry)
+                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [], key: key, valueText: entry)
                     }
                 } else {
-                    after = try JSONSpanEditor.removeMember(in: before, objectPath: ["mcpServers"], key: server).text
+                    after = try JSONSpanEditor.removeMember(in: before, objectPath: [key], key: server).text
                 }
             case .toml:
                 guard let edited = TOMLSwitch.setEnabled(turnOn, server: server, in: before) else { throw SwitchError.cannotEdit }
@@ -135,8 +161,8 @@ enum ServerSwitch {
 
     /// The entry of `server` under `mcpServers`, exactly as the file writes
     /// it: what `ParkedStore` keeps while it is off.
-    static func entryText(in text: String, server: String) -> String? {
-        guard let value = JSONSpanEditor.parse(text)?.value(at: ["mcpServers", server]), value.members != nil else { return nil }
+    static func entryText(in text: String, server: String, key: String = "mcpServers") -> String? {
+        guard let value = JSONSpanEditor.parse(text)?.value(at: [key, server]), value.members != nil else { return nil }
         return JSONSpanEditor.text(Array(text.unicodeScalars)[value.start..<value.end])
     }
 
@@ -179,6 +205,15 @@ enum ServerSwitch {
         let value = "[" + newline + keyIndent + unit + element(indent: keyIndent + unit, multiline: true)
             + newline + keyIndent + "]"
         return try JSONSpanEditor.insertMember(in: text, objectPath: [], key: "deniedMcpServers", valueText: value)
+    }
+
+    /// Cline's own flag. Turning on a server that carries no `disabled` key
+    /// changes nothing: it is on already as far as this flag goes.
+    private static func jsonDisabled(_ text: String, server: String, turnOn: Bool) throws -> String {
+        let path = ["mcpServers", server]
+        guard let entry = JSONSpanEditor.parse(text)?.value(at: path), entry.members != nil else { throw SwitchError.cannotEdit }
+        if entry.member("disabled") == nil, turnOn { return text }
+        return try JSONSpanEditor.setMember(in: text, objectPath: path, key: "disabled", valueText: turnOn ? "false" : "true")
     }
 
     /// The entry's place in an OpenCode file: the current shape first.
@@ -247,7 +282,7 @@ enum ServerSwitch {
     static func verify(before: String, after: String, mechanism: SwitchMechanism, server: String, turnOn: Bool,
                        parkedValue: String? = nil) -> Bool {
         switch mechanism {
-        case .claudeDeny, .openCode, .park, .parkOutside:
+        case .claudeDeny, .openCode, .park, .parkOutside, .jsonDisabled:
             guard var expected = jsonObject(before) as? [String: Any],
                   let actual = jsonObject(after) as? [String: Any] else { return false }
             guard applyExpected(&expected, mechanism: mechanism, server: server, turnOn: turnOn,
@@ -271,14 +306,20 @@ enum ServerSwitch {
     private static func applyExpected(_ root: inout [String: Any], mechanism: SwitchMechanism, server: String, turnOn: Bool,
                                       parkedValue: String? = nil) -> Bool {
         switch mechanism {
-        case .parkOutside:
-            var servers = root["mcpServers"] as? [String: Any] ?? [:]
+        case .parkOutside(let key):
+            var servers = root[key] as? [String: Any] ?? [:]
             if turnOn {
                 guard servers[server] == nil, let entry = parkedValue.flatMap(jsonObject) as? [String: Any] else { return false }
                 servers[server] = entry
             } else {
                 guard servers.removeValue(forKey: server) != nil else { return false }
             }
+            root[key] = servers
+            return true
+        case .jsonDisabled:
+            guard var servers = root["mcpServers"] as? [String: Any], var entry = servers[server] as? [String: Any] else { return false }
+            if entry["disabled"] != nil || !turnOn { entry["disabled"] = !turnOn }
+            servers[server] = entry
             root["mcpServers"] = servers
             return true
         case .claudeDeny:

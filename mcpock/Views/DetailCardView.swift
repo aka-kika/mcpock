@@ -435,6 +435,7 @@ struct DetailCardView: View {
             theme: theme,
             note: state.switchNotes[source.configID],
             toolNote: toolNote(for: source),
+            projectNote: state.projectOffNote(server: group.name, source: source),
             flip: source.canSwitch && state.monitor.switchesEnabled
                 ? { state.askSwitch(group.name, source: source, turnOn: source.isOff) } : nil
         )
@@ -842,6 +843,8 @@ private struct UsedByRow: View {
     var note: String? = nil
     /// "2 tools hidden" / "Sees all 26 tools: can't hide single tools" (Part 2).
     var toolNote: String? = nil
+    /// "Off in one project: shop": a Claude Code project's own /mcp list (22 Nov).
+    var projectNote: String? = nil
     /// Flips this agent's switch (opens the sheet); nil when mcpock has no
     /// way to switch it there.
     var flip: (() -> Void)? = nil
@@ -874,6 +877,14 @@ private struct UsedByRow: View {
                         .font(.system(size: 11))
                         .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
+                }
+                if let projectNote {
+                    Text(projectNote)
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(projectNote + ". Turned off with /mcp in Claude Code; mcpock only shows it.")
                 }
             }
             Spacer(minLength: 4)

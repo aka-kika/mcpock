@@ -83,16 +83,16 @@ final class SwitchPanelTests: XCTestCase {
     }
 
     func testTheEverywhereSwitch() throws {
-        let mixed = groups([config("s", "Code"), config("s", "Cursor", off: true), config("s", "VS Code")])[0]
+        let mixed = groups([config("s", "Code"), config("s", "Cursor", off: true), config("s", "Continue")])[0]
         XCTAssertEqual(mixed.sources.map(\.canSwitch), [true, true, false])
         let on = try XCTUnwrap(CardText.everywhereSwitch(for: mixed))
         XCTAssertEqual(on.label, "All 2", "only the agents with a switch")
         XCTAssertEqual(on.actionTitle, "Turn off in all 2")
         XCTAssertFalse(on.turnOn, "on while any of them is on")
-        let allOff = groups([config("s", "Code", off: true), config("s", "Cursor", off: true), config("s", "VS Code")])[0]
+        let allOff = groups([config("s", "Code", off: true), config("s", "Cursor", off: true), config("s", "Continue")])[0]
         XCTAssertEqual(CardText.everywhereSwitch(for: allOff)?.turnOn, true)
         XCTAssertEqual(CardText.everywhereSwitch(for: allOff)?.actionTitle, "Turn on in all 2")
-        XCTAssertNil(CardText.everywhereSwitch(for: groups([config("s", "Cursor"), config("s", "VS Code")])[0]),
+        XCTAssertNil(CardText.everywhereSwitch(for: groups([config("s", "Cursor"), config("s", "Continue")])[0]),
                      "one switch only: the row's own does it")
         XCTAssertEqual(CardText.switchLine(isOff: true, note: nil), "Turned off")
         XCTAssertEqual(CardText.switchLine(isOff: true, note: "Off after Cursor reopens"), "Off after Cursor reopens")
