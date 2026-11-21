@@ -48,6 +48,12 @@ struct AgentsListView: View {
                         )
                         .id(section.agent)
                     }
+                    // Under the agents (22 Nov): the account's connectors and
+                    // the agents managed online. Not while she searches: the
+                    // search is for servers and agents mcpock checks.
+                    if panel.query.trimmingCharacters(in: .whitespaces).isEmpty {
+                        AccountSectionsView(panel: panel, theme: theme)
+                    }
                 }
                 .padding(.horizontal, 6)
                 .padding(.top, 6)

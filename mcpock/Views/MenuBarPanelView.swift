@@ -444,6 +444,7 @@ struct MenuBarPanelView: View {
                 // and the spin must read as "working". A tap mid-check does nothing.
                 guard !isChecking else { return }
                 monitor.startRefreshAll()   // spins at once, not after discovery
+                panel.refreshConnectorsIfDue(force: true)   // her Refresh asks Claude Code again too
             }
             FooterGlyphButton(systemImage: "gearshape", title: "Settings, updates and Quit", theme: theme) {
                 StatusItemRightClick.showFromFooter()

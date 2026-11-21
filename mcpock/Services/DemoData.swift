@@ -84,7 +84,17 @@ enum DemoData {
     static func seedPreferences(_ defaults: UserDefaults) {
         AppPreferences.savePausedServers([HealthMonitor.normalizedName(pausedServerName)], to: defaults)
         AppPreferences.saveUsageWindow(.thirtyDays, to: defaults)   // the screenshots show the counts
+        // The pictures show the account's connectors and a typed name (22 Nov).
+        defaults.set(true, forKey: AppPreferences.includeConnectorsKey)
+        AppPreferences.saveManagedOnlineNames(["chatgpt": "notion, canva"], to: defaults)
     }
+
+    /// Sample claude.ai connectors, one in each state the section draws.
+    static let connectors: [ClaudeConnector] = ClaudeConnectors.merged([
+        ClaudeConnector(name: "Gmail", host: "gmail.mcp.claude.com", state: .connected),
+        ClaudeConnector(name: "Canva", host: "mcp.canva.com", state: .connected),
+        ClaudeConnector(name: "Linear", host: "mcp.linear.app", state: .failing),
+    ], off: ["canva": ["shop"]])
 
     /// A scratch directory for the usage store, so `UsageStore.load()` never
     /// even reads the real `usage.json` — `isHostingTests` already stops

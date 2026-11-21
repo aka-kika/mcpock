@@ -92,10 +92,61 @@ struct SettingsAgentsPane: View {
                     .font(Theme.caption)
                     .foregroundStyle(theme.textTertiary)
             }
+            onlineSection
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .panelScrollIndicators()
+    }
+
+    @AppStorage(AppPreferences.includeConnectorsKey, store: AppPreferences.store) private var includeConnectors = false
+    @AppStorage(AppPreferences.showManagedOnlineKey, store: AppPreferences.store) private var showManagedOnline = true
+    @State private var managedNames: [String: String] = AppPreferences.loadManagedOnlineNames()
+
+    static let connectorsHelp = "Shows your Claude account's connectors under the agents. mcpock asks Claude Code for its list "
+        + "(claude mcp list), at most every 30 minutes; Claude Code starts its servers to answer. "
+        + ClaudeConnectors.footnote
+    static let managedOnlineHelp = "One row for each agent that keeps its servers on its website: a link to that page. "
+        + "mcpock can't read or check them. Type their names if you want them listed."
+
+    /// Servers that are not in a file on this Mac (22 Nov).
+    @ViewBuilder
+    private var onlineSection: some View {
+        Section {
+            Toggle(isOn: $includeConnectors) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Include claude.ai connectors")
+                        .foregroundStyle(theme.textPrimary)
+                    Text(Self.connectorsHelp)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Toggle(isOn: $showManagedOnline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show agents managed online")
+                        .foregroundStyle(theme.textPrimary)
+                    Text(Self.managedOnlineHelp)
+                        .font(Theme.caption)
+                        .foregroundStyle(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if showManagedOnline {
+                ForEach(ManagedOnline.all) { agent in
+                    TextField(agent.name, text: Binding(
+                        get: { managedNames[agent.id] ?? "" },
+                        set: { value in
+                            managedNames[agent.id] = value
+                            AppPreferences.saveManagedOnlineNames(managedNames)
+                        }
+                    ), prompt: Text("Server names, with commas"))
+                }
+            }
+        } header: {
+            Text("Not on this Mac")
+        }
     }
 
     private func row(_ entry: SettingsAgentEntry) -> some View {

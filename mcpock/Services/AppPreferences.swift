@@ -167,6 +167,34 @@ enum AppPreferences {
     /// on, and an earlier install keeps the 7 days or All time it chose.
     static let usageWindowKey = "usageWindow"
 
+    /// Settings > Agents "Include claude.ai connectors" (22 Nov). Off by
+    /// default: mcpock has to ask Claude Code for them, and that is not free.
+    static let includeConnectorsKey = "includeClaudeConnectors"
+
+    static func loadIncludeConnectors(from defaults: UserDefaults = store) -> Bool {
+        defaults.bool(forKey: includeConnectorsKey)
+    }
+
+    /// Settings > Agents "Show agents managed online" (22 Nov). On by default:
+    /// the rows cost nothing, they are links.
+    static let showManagedOnlineKey = "showManagedOnline"
+
+    static func loadShowManagedOnline(from defaults: UserDefaults = store) -> Bool {
+        defaults.object(forKey: showManagedOnlineKey) as? Bool ?? true
+    }
+
+    /// The server names she typed for an agent managed online, by its id
+    /// (`ManagedOnlineAgent.id`): "notion, canva".
+    static let managedOnlineNamesKey = "managedOnlineServerNames"
+
+    static func loadManagedOnlineNames(from defaults: UserDefaults = store) -> [String: String] {
+        defaults.dictionary(forKey: managedOnlineNamesKey) as? [String: String] ?? [:]
+    }
+
+    static func saveManagedOnlineNames(_ names: [String: String], to defaults: UserDefaults = store) {
+        defaults.set(names.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }, forKey: managedOnlineNamesKey)
+    }
+
     /// Settings > General "Open with ⌃⌥M" (1.10): the shortcut that opens
     /// and closes the panel from any app (`GlobalHotKey`). On by default.
     static let openPanelHotKeyKey = "openPanelHotKey"

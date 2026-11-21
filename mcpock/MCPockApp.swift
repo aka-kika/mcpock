@@ -118,6 +118,13 @@ struct MCPockApp: App {
             defaults: monitorDefaults
         )
         let panel = PanelState(monitor: monitor, defaults: monitorDefaults)
+        // The account's connectors (22 Nov): sample rows in demo mode, and
+        // never a process while hosting tests.
+        if isDemo {
+            panel.loadConnectors = { .connectors(DemoData.connectors) }
+        } else if isHostingTests {
+            panel.loadConnectors = { .unavailable("") }
+        }
         panel.usageStore = usageStore
         // Agents read each tool's calls through the status file (1.16).
         monitor.toolUsage = { [weak usageStore] server, window in

@@ -363,6 +363,8 @@ final class PanelState {
         isPanelOpen = true
         // A server an open session lost shows without waiting for the timer (1.12).
         Task { await monitor.refreshSessionDrops() }
+        // The account's connectors, when she asked for them and the list is old.
+        refreshConnectorsIfDue()
         userPickedFilter = false
         didJumpToNeedsYou = false
         // Start from her own saved choice: an earlier automatic jump to Needs
@@ -388,6 +390,63 @@ final class PanelState {
                 self?.openAskedCard()
             }
         }
+    }
+
+    // MARK: - Claude account connectors (22 Nov)
+
+    /// What Claude Code lists as connectors of the account, problems first.
+    /// Empty until she turns the setting on and Claude Code has answered.
+    private(set) var connectors: [ClaudeConnector] = []
+    /// One grey line in the section's place: "Asking Claude Code…", or why
+    /// there is no list.
+    private(set) var connectorsNote: String?
+    @ObservationIgnored private var connectorsLoadedAt: Date?
+    @ObservationIgnored private var connectorsTask: Task<Void, Never>?
+    /// Swapped in tests and in demo mode, which never start a process.
+    @ObservationIgnored var loadConnectors: () async -> ClaudeConnectors.LoadResult = { await ClaudeConnectors.load() }
+
+    var includesConnectors: Bool { AppPreferences.loadIncludeConnectors(from: defaults) }
+
+    /// Asks Claude Code again when the list is older than
+    /// `ClaudeConnectors.refreshEvery`, or at once with `force` (the footer's
+    /// Refresh, or the setting just turned on). Off: the list is dropped.
+    func refreshConnectorsIfDue(force: Bool = false, now: Date = Date()) {
+        guard includesConnectors else {
+            connectorsTask?.cancel()
+            connectorsTask = nil
+            connectors = []
+            connectorsNote = nil
+            connectorsLoadedAt = nil
+            return
+        }
+        guard connectorsTask == nil else { return }
+        if !force, let loaded = connectorsLoadedAt, now.timeIntervalSince(loaded) < ClaudeConnectors.refreshEvery { return }
+        if connectors.isEmpty { connectorsNote = "Asking Claude Code\u{2026}" }
+        connectorsTask = Task { @MainActor [weak self] in
+            guard let load = self?.loadConnectors else { return }
+            let result = await load()
+            guard let self, !Task.isCancelled else { return }
+            self.connectorsTask = nil
+            self.connectorsLoadedAt = Date()
+            switch result {
+            case .connectors(let list):
+                self.connectors = list
+                self.connectorsNote = list.isEmpty ? "Claude Code lists no claude.ai connectors." : nil
+            case .unavailable(let reason):
+                // Keep the last list on a hiccup; say why there is none otherwise.
+                self.connectorsNote = self.connectors.isEmpty ? reason : nil
+            }
+        }
+    }
+
+    /// The agents managed online to list: products with an agent on this Mac.
+    var managedOnline: [ManagedOnlineAgent] {
+        ManagedOnline.shown(localAgents: allAgentSections.map(\.agent),
+                            enabled: AppPreferences.loadShowManagedOnline(from: defaults))
+    }
+
+    func managedOnlineNames(for agent: ManagedOnlineAgent) -> [String] {
+        ManagedOnline.names(AppPreferences.loadManagedOnlineNames(from: defaults)[agent.id] ?? "")
     }
 
     func panelClosed() {
