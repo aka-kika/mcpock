@@ -1,214 +1,73 @@
 # mcpock
 
-[![macOS 26+](https://img.shields.io/badge/macOS-26%2B-555?logo=apple)](#install)
-[![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white)](#for-developers)
-[![Dependencies: 1 (Sparkle)](https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b)](docs/THIRD-PARTY.md)
-[![Version 1.17.1](https://img.shields.io/badge/version-1.17.1-7a8fb0)](docs/release-notes/1.17.1.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-888)](LICENSE)
+<p align="center">
+  <a href="#install"><img src="https://img.shields.io/badge/macOS-26%2B-555?logo=apple" alt="macOS 26 or later"></a>
+  <a href="docs/DEVELOPING.md"><img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white" alt="Swift and SwiftUI"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/signed%20%26%20notarized-Developer%20ID-6b8e6b" alt="Signed and notarized by Apple"></a>
+  <a href="#connect-an-agent"><img src="https://img.shields.io/badge/MCP-5%20tools-7a8fb0" alt="MCP server with 5 tools"></a>
+  <a href="docs/THIRD-PARTY.md"><img src="https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b" alt="One dependency: Sparkle"></a>
+  <a href="docs/release-notes/1.17.1.md"><img src="https://img.shields.io/badge/version-1.17.1-7a8fb0" alt="Version 1.17.1"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-888" alt="MIT License"></a>
+</p>
 
-**A small Mac menu bar app that checks every MCP server your AI agents use, and
-tells you which ones are broken, slow, waiting for a sign-in, or set up
-differently from one agent to the next.**
+<p align="center"><a href="https://mcpock.com">mcpock.com</a> · <a href="https://github.com/aka-kika/mcpock/releases/latest">latest release</a></p>
 
-MCP (Model Context Protocol) servers are the small programs that give agents
-like Claude Code, Cursor or Codex their extra tools. mcpock finds them in your
-agents' config files, starts each one the way the agent would, and checks that
-it answers.
+A native macOS menu bar app that checks every MCP server your AI agents use and tells you which ones are broken, slow, waiting for a sign-in, or set up differently from one agent to the next. MCP (Model Context Protocol) servers are the small programs that give agents like Claude Code, Cursor or Codex their extra tools. mcpock knows where 18 agents keep their servers, finds them, starts each one the way the agent would, and checks that it answers. It changes a config only when you flip a switch, and shows you the change first.
 
 ![mcpock's panel on the Servers tab (made-up demo servers): the ones that need you come first, one broken, one slow, one waiting for a sign-in, one set up differently, each with a health shape, the logos of the agents that use it and its tool count. Beside it, the card of the server that needs a sign-in, with why, Ask an agent and Copy errors, and below the card the Problems desktop widget listing the same four servers.](docs/images/mcpock-servers.png)
 
-## Why
+- macOS 26 or later, Apple Silicon. Lives in the menu bar only: no Dock icon, no window.
+- Swift and SwiftUI, one dependency (Sparkle, for signed updates).
+- Reads Claude Code, Claude Desktop, Cursor, Windsurf, Codex, Grok, Goose, Hermes, OpenCode, VS Code and more, plus any standard MCP config it finds.
+- Ships its own small MCP server, so you can say "check my mcpock" to an agent.
 
-When you use more than one agent, the same MCP server ends up in five config
-files, each written a little differently. One day a tool quietly stops working
-in one agent and not the others, and you only notice when a task fails halfway.
-The agent rarely says why.
+## Problems first, in plain words
 
-mcpock gives you one place to look. It reads your configs, checks every
-server, and shows you what needs attention and why, so you (or your agent) can
-fix it. It changes a config only when you flip a switch: it shows you the
-change first and keeps a backup.
+When you use more than one agent, the same MCP server ends up in several config files, each written a little differently. One day a tool quietly stops working in one agent and not the others, and the agent rarely says why. mcpock gives you one place to look.
 
-## What's new in 1.17
+It starts each local server (or calls a remote one), does the MCP handshake, asks for its tool list, then stops it. It does this every 15 minutes by default (1 minute to 4 hours, or only when you click Refresh), and checks a server again within seconds when you save its config. Health shows as a shape, not only a colour:
 
-- **A check never opens an app:** a server that is a Mac app's own program
-  (like Native Screen, run as "Native Screen --mcp") is not started while
-  that app is closed. It reads "Needs Native Screen open" and is checked as
-  soon as you open the app.
-- **Just the numbers (1.17.1):** a server row reads "9/54 · 74" (9 of 54
-  tools on, then its calls in a lighter grey), or "6" when no tool is
-  hidden. An agent's row reads "21/29 · 3.1k": servers on, and its own
-  calls. Hover the numbers for the words.
-- **Codex / ChatGPT desktop:** the ChatGPT desktop app reads the same
-  `~/.codex/config.toml`, so the row names both.
-- **New icon:** a switch, set to on.
-- The Hide sheet is one piece of glass: no white stripe under Cancel and Hide.
+| Shape | Means |
+|-------|-------|
+| Filled dot (green) | Fine: it started and listed its tools |
+| Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
+| Ring (grey) | Still checking |
+| Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
+| Dash (grey) | Paused by you, runs inside its own app, signed in by the agent, a `${VAR}` it cannot fill, or its Mac app is closed |
 
-Full notes: [1.17.1](docs/release-notes/1.17.1.md), [1.17.0](docs/release-notes/1.17.0.md).
+The list starts with *Needs you*, then your pinned servers, then everything else. Click a row for its card: the full error with **Copy errors** and **Ask an agent**, which agents use the server and where their configs live, its tools, and **Check again**, **Pin** and **Hide**. The menu bar icon stays plain while all is fine; no numbers, no blinking, no notifications. Control-Option-M opens the panel from any app, and the arrow keys, Return, Cmd-F and Cmd-R work as you would expect.
 
-## What's new in 1.16
-
-- **Agents ask, you decide:** an agent can ask you to hide a tool or turn a
-  server off, with its reason. It shows on the server's card with Yes and No,
-  a dot on the menu bar icon and one notification. Only your Yes changes
-  anything, through the usual sheet. An ask with no answer ends after a day.
-- **Agents see which tools you use:** each tool's calls and last use, the same
-  numbers the card shows (with Usage counts on).
-
-- **1.16.1:** easier to read in light mode: warning words in a calm dark grey
-  (the dots and bars keep their colour), every grey darker.
-
-Full notes: [1.16.1](docs/release-notes/1.16.1.md), [1.16.0](docs/release-notes/1.16.0.md).
-
-## What's new in 1.15
-
-- **Hide single tools:** a switch beside each tool on the server's card. Your
-  agents stop seeing that tool; nothing is deleted, and one click shows it again.
-- **See which tools you use:** with Usage counts on, each tool shows its calls
-  and when it was last used. Tools not used lately fold together, with one
-  **Hide all** button.
-- **Every agent, untick to keep:** the sheet lists each agent that has the
-  server; untick one to leave it alone. A backup is saved before every change.
-- **1.15.1:** one "All" switch above the agents' switches on the card, easier
-  to read in light mode, and fixes (a slow server can no longer stop the checks).
-
-Full notes: [1.15.1](docs/release-notes/1.15.1.md), [1.15.0](docs/release-notes/1.15.0.md). Earlier: [1.14.0](docs/release-notes/1.14.0.md) (the server switch), [1.13.0](docs/release-notes/1.13.0.md), [1.12.2](docs/release-notes/1.12.2.md).
-
-## What it does
-
-- **Finds your servers automatically.** It knows the config files of the common
-  agents and also scans the usual config folders for anything written in a
-  standard MCP format. The same server in several agents shows as one row.
-- **Checks each one.** It starts a local server (or calls a remote one), does
-  the MCP handshake, asks for its tool list, then closes it. Every 15 minutes
-  by default (1 minute to 4 hours, or only when you click Refresh). It also
-  watches the config files it knows, without writing to them: a saved change is
-  read within seconds and only the servers it touched are checked (not in Manual).
-  A config file in a new place is found at launch or when you click Refresh. A server that is already fine
-  keeps its tool list between rounds; Refresh and Check again ask for it anew.
-- **Shows health as a shape, not only a colour:**
-
-  | Shape | Means |
-  |-------|-------|
-  | Filled dot (green) | Fine: it started and listed its tools |
-  | Ring (amber) | Slow (no answer in 20 s, tried twice; 10 s for a remote server) or needs sign-in (HTTP 401/403) |
-  | Ring (grey) | Still checking |
-  | Diamond (red) | Broken: could not start, quit on start, or refused the handshake |
-  | Dash (grey) | Paused by you, or runs inside its own app and can't be checked from outside, or signed in by the agent, or **Not checked** (a `${VAR}` it cannot fill), or **Needs Wake open**: it belongs to a Mac app that is closed (not broken; it is checked again as soon as the app opens; a server that is the app's own program is not even started while the app is closed, so a check never opens it) |
-
-- **Spots servers set up differently.** When one agent launches a different
-  command or address than the others (often an old path), the row says so, and
-  **Compare** shows each agent's version side by side. The same runtime in
-  another folder (`npx` here, an agent's own `~/.agent/node/bin/npx` there) is not a
-  difference. If the agents are
-  meant to differ, choose **Mark as intended** on the card (or **Mark as
-  Intended** in the right-click menu).
-- **Problems first.** The list starts with *Needs you*, then your pinned
-  servers, then everything else. One toggle in the footer shows only problems.
-- **Agents tab.** The panel opens here: one row per agent with a small health
-  bar that grows in after each check. Open an agent to see its servers (the
-  first 5, **+N more** for the rest; servers that need you always show) and
-  its config file. With the problems toggle on, agents with nothing wrong
-  stay listed below, faded.
-- **Usage counts, if you want them.** One switch in Settings > General, off for
-  a new install. Then, next to each server under an agent: how many times that
-  agent called it in the last 30 days, and on a server's card, the same per tool.
-  Read from the agent's own history on your Mac: Claude Code, Grok, Cursor and
-  Hermes today. A dash means that agent keeps no record mcpock can read yet.
-- **Detail card.** Click a row: the full error (with **Ask an agent** and
-  **Copy errors**), which agents use the server and where their config lives,
-  its tools (name and short description; **+N more** lists them all), and
-  **Check again**, **Pin** and **Hide**. While a server is re-checked, its
-  row shows a small spinning mark.
-- **Lost in a session.** When a server drops inside a Claude Code session that
-  is still open (a short network blip), its row says "Lost in 1 open Claude
-  Code session: run /mcp there", even while mcpock's own check reaches it.
-  Read from Claude Code's own session and server logs on your Mac.
-- **Quiet menu bar icon.** Plain when all is fine, a small ring when something
-  is slow or needs a look, a small diamond when something is broken. No
-  numbers, no blinking, no notifications.
-- **Keyboard friendly.** Control-Option-M opens and closes the panel from any
-  app (pick your own keys, or turn it off, in Settings > General). Arrow keys move (on the Agents tab,
-  Right and Left open and close an agent), Return opens the card, Escape closes, Cmd-F searches servers, agents and tool names, Cmd-R
-  checks the selected row again (or every server), Cmd-C copies the selected
-  row's error (or its details).
-- **Desktop widgets.** Status (small), Problems (up to four servers that need
-  you) and Agents (up to five agents, the ones that need you first), both
-  medium: right-click the desktop, **Edit Widgets…**, search mcpock. They
-  update after each check.
-- **Glass theme.** Apple's Liquid Glass for the panel, the card and Settings,
-  following light/dark and your Clear/Tinted setting. On macOS 27 the panel is
-  its own see-through window, so the glass shows your real desktop.
-- **Settings:** appearance (System, Dark, Light, Glass), how often to check, Open at
-  Login, pin / show / hide each server, the list of agents found, and **Connect** for your agents.
-- **Lets your agents ask it.** A small MCP server ships inside the app, so you
-  can say "check my mcpock" to an agent instead of pasting errors. An agent can
-  also ask you to hide a tool or turn a server off; only your Yes changes anything.
+## One row per agent
 
 ![mcpock's Agents tab (made-up demo servers): one row per agent with a small health bar and how many of its servers need you; agents with nothing wrong are listed below, faded. On the left, the Status desktop widget (4 need you, 14 servers) and the Agents widget with a health bar per agent.](docs/images/mcpock-agents.png)
 
-## Install
+The panel opens on the **Agents** tab: one row per agent with a small health bar, the agents that need you first. Open one to see its servers and its config file. Turn on **Usage counts** in Settings > General to see how many times each agent called each server in the last 30 days, and each tool's calls on a server's card (read from Claude Code, Grok, Cursor and Hermes history on your Mac; off until you turn it on).
 
-1. Download `mcpock.dmg` from the [Releases](https://github.com/aka-kika/mcpock/releases) page.
-2. Open it and drag **mcpock** to Applications. The app is signed and notarized
-   by Apple, so it opens without warnings.
-3. Launch it. mcpock lives only in the menu bar (look for the server-rack icon);
-   there is no Dock icon and no window.
+Desktop widgets show the same at a glance: **Status** (small), **Problems** and **Agents** (medium). Right-click the desktop, **Edit Widgets…**, and search for mcpock.
 
-Needs **macOS 26 or later** on Apple Silicon.
+## Set up differently, side by side
 
-**First launch, good to know:**
+When one agent launches a different command or address for the same server than the others (often an old path), the row says so, and **Compare** on the card shows each agent's version side by side, with secret values hidden. The same runtime in another folder is not a difference. If the agents are meant to differ, choose **Mark as intended**; the note comes back by itself if an agent's setup changes later.
 
-- mcpock starts checking as soon as it launches, before you open the panel.
-  On a Mac with many agents the first check takes a while (slow servers get
-  20 seconds); the footer counts it ("Checking 12 of 30").
-- If one of your servers lives in **Documents, Desktop or Downloads**, macOS
-  asks whether mcpock may open that folder. Click **Allow**: mcpock has to start
-  the server from there to check it. If you clicked Don't Allow, turn it on in
-  System Settings > Privacy & Security > Files and Folders (or Full Disk Access).
-- Turn on **Open at Login** in Settings > General if you want it always there.
+When a server drops inside a Claude Code session that is still open, its row says "Lost in 1 open Claude Code session: run /mcp there", even while mcpock's own check reaches it.
 
-## Quick start
+## You flip the switches
 
-1. Click the menu bar icon. The panel opens on the **Agents** tab: one row per
-   agent, the ones that need you first; open one to see its servers. The
-   **Servers** tab lists every server, problems first.
-2. Click a row that needs you. The card says why, in plain words.
-3. Click **Copy errors** (or **Ask an agent**) and paste it to your agent, or
-   fix the config yourself.
-4. Save the fix. mcpock sees the changed config within seconds and checks that
-   server again, so the row turns green by itself. **Check again** on the card
-   (or Cmd-R) does it at once; with checks set to Manual, it waits for you.
-5. Right-click any server for Pause checks, Pin, Hide, **Copy Errors** and **Ask an
-   Agent** (a prompt that asks an agent to look into the problem and advise you
-   before it changes anything). Pause a server that opens a login page or an
-   app each time it starts. Right-click the summary at the bottom of the panel
-   for **Copy All Problems**.
+A switch beside each agent on a server's card turns that server on or off there, and a switch beside each tool hides that tool from your agents. mcpock uses each agent's own setting for this (Claude Code's blocked and deny lists, `enabled` and `disabled_tools` lines in Codex, Grok, Goose, Hermes and OpenCode), shows you the change first and saves a backup of the file. Nothing is deleted, and one click turns it back.
 
-## Connect your agents
+Agents can't flip a switch. They can only ask: an ask shows on the server's card with its reason and Yes and No, and only your Yes changes anything, through the same sheet. Everything else mcpock does only reads.
 
-mcpock includes `mcpock-mcp`, a small MCP server your agents can call. It only
-reads the status file mcpock writes after each check
-(`~/Library/Application Support/mcpock/status.json`); it never starts a server
-and never changes anything. Agents can't turn a server on or off: only you can,
-in the app.
+## Connect an agent
 
-**The easy way:** Settings > **Connect** > **Copy for Claude**, then paste into
-Claude Code. The prompt walks Claude through finding your agent configs,
-backing each one up, adding `mcpock` where it's missing (in each file's own
-format) and testing it.
+mcpock includes `mcpock-mcp`, a small MCP server that only reads the status file mcpock writes after each check. It never starts a server and never changes a config.
 
-**By hand:** Settings > Connect lists your agents and shows which ones
-already have mcpock (Connected, Not connected, Not on this Mac), with a copy
-button per agent for the right line. mcpock only reads these files; you or
-your agent paste the line. For Claude Code:
+**The easy way:** Settings > **Connect** > **Copy for Claude**, then paste into Claude Code. **By hand:** Settings > Connect shows which agents already have mcpock, with the right line for each. For Claude Code:
 
 ```bash
 claude mcp add --scope user mcpock -- /Applications/mcpock.app/Contents/Helpers/mcpock-mcp
 ```
 
-For agents that use `mcpServers` JSON (Claude Desktop, Cursor, Windsurf, Cline
-and most others):
+For agents that use `mcpServers` JSON (Claude Desktop, Cursor, Windsurf, Cline and most others):
 
 ```json
 {
@@ -231,335 +90,45 @@ Then ask your agent to "check my mcpock". The tools it gets:
 | `mcpock_switches` | Which servers are turned off, and in which agents, which tools are hidden, and what became of each ask |
 | `mcpock_ask` | Asks you to hide or show a tool, or turn a server off or on, with a reason. Changes nothing by itself |
 
-The first four only read. `mcpock_ask` leaves a request in mcpock's own folder;
-you answer it on the server's card (Yes opens the usual sheet), and an ask with
-no answer ends after a day. Secrets are masked (see below). If mcpock isn't
-running, hasn't checked yet, or its results are old, the answer says so.
+The first four only read. Secrets are masked. If mcpock isn't running, hasn't checked yet, or its results are old, the answer says so.
 
-Try it from Terminal:
+## Privacy
 
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"1"}}}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | /Applications/mcpock.app/Contents/Helpers/mcpock-mcp
-```
+- To check a local server, mcpock runs the exact command from your config, the same thing your agent runs, then stops it and its child processes. Paused servers are never started.
+- The only network connections are to the remote MCP servers in your configs and to mcpock.com to check for updates. No accounts, no analytics.
+- Anything that looks like an API key is masked wherever mcpock shows or stores it. The status file for agents holds env and header names, never their values.
+- Usage counts keep only the agent, the server name and the day: never a message, an argument, a result or a file path.
+- Why no App Store: its sandbox would stop mcpock from starting servers and reading configs in your home folder.
 
-## Supported agents
+Every detail: [docs/PRIVACY.md](docs/PRIVACY.md).
 
-mcpock reads these files directly. Anything else that writes one of the
-standard formats (JSON `mcpServers`, `servers` or `mcp`; TOML
-`[mcp_servers.*]`; YAML `extensions:` or `mcp_servers:`) in `~/.config`,
-`~/Library/Application Support` or a hidden folder in your home folder is found
-by the scan, with no code change. A server from a file only the scan found shows
-**Waiting for your OK** until you choose **Allow this file** once (on its card, or
-right-click the row): mcpock never starts a command from a file no agent it knows
-reads without your OK. An update from a version before 1.10.9 keeps the files
-that version already checked, once; after that, a file whose commands or env
-change asks again.
-
-| Agent | Config file | Format |
-|-------|-------------|--------|
-| Claude Code | `~/.claude.json` (global and per-project servers), and `.mcp.json` files the scan finds, but only inside `~/.config`, `~/Library/Application Support` or a hidden folder in your home folder, not in ordinary project folders (only the servers you approved in Claude Code) | JSON |
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` | JSON |
-| Cursor | `~/.cursor/mcp.json` | JSON |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` | JSON |
-| Antigravity | `~/.gemini/config/mcp_config.json` | JSON |
-| Cline | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` | JSON |
-| Continue | `~/.continue/config.json` | JSON |
-| VS Code | `~/Library/Application Support/Code/User/mcp.json` (`servers`) | JSON |
-| Codex / ChatGPT desktop | `~/.codex/config.toml` | TOML |
-| Grok | `~/.grok/config.toml` | TOML |
-| Grok Bot | `~/.grokbot/settings.json` (`mcpBoxServers`, names only) | Settings |
-| Goose | `~/.config/goose/config.yaml` (`extensions:`) | YAML |
-| Hermes | `~/.hermes/config.yaml` (`mcp_servers:`) | YAML |
-| Kimi Code | `~/.kimi-code/mcp.json` | JSON |
-| MiniMax | `~/.minimax/mcp.json` | JSON |
-| OpenCode | `~/.config/opencode/opencode.json` (`mcp`) | JSON |
-| aka | Asked from aka's local helper (`127.0.0.1:6464`) while aka runs | API |
-| Tinycast | `~/Library/Preferences/com.tinycast.app.plist` (`mcpServers`) | Settings |
-
-Notes: servers turned off with `enabled: false` are skipped. `${VAR}`,
-`${env:VAR}` and `${workspaceFolder}` are filled in before a check, from
-mcpock's own environment and the project folder. A server whose command, args,
-URL or headers use one mcpock can't fill (like `${input:...}`) reads **Not
-checked**; in an env value it stays as written and the server still starts,
-because most servers start without their key and ask for it only when a tool
-runs. Servers marked
-`"builtin": true` (they run inside their own app) are shown
-but never started. **aka** keeps its servers in its own database, so mcpock
-asks aka's local helper for the list (only when aka itself is the program on
-that port) and starts each server the way aka does;
-because aka launches servers its own way, it never counts toward "set up
-differently". If aka asks for access before listing its servers (a newer aka
-wants a token mcpock does not have yet), aka shows as **Needs access**. **Tinycast** keeps its servers in its own settings and their
-keys and sign-ins in its own Keychain items, which mcpock never reads: a
-Tinycast server that needs one shows as managed by its app, the others are
-checked like any other. **Grok Bot** keeps its connectors in your Grok account and runs them on its
-own computers; its settings file holds at most their names, so mcpock lists
-those under Grok Bot and never starts them. Nothing on this Mac lists the rest,
-so Grok Bot is listed in Settings > Agents once installed (its app or
-`~/.grokbot`), and with an empty list it reads **Not visible here**: check its
-connectors in Grok Bot's own settings. It joins the panel's Agents tab only
-when it has names to list. A remote server
-written as `serverUrl` (Antigravity, Windsurf) is read like `url`. Thirty-one agents have their real logo in the app (Grok Bot since 1.12.2); others show two
-letters.
-
-## Privacy and safety
-
-- **It changes a config only when you flip a switch.** The switch beside an
-  agent on a server's card turns that server on or off there. mcpock shows you
-  the change first, saves a copy of the file in
-  `~/Library/Application Support/mcpock/backups/` (the newest 60; they hold
-  what the config holds, keys included, readable only by you), then replaces
-  the file in one step. It uses the agent's own way: Claude Code's blocked
-  list, the `enabled` line in Codex, Grok, Goose, Hermes and OpenCode. Claude
-  Desktop and Cursor have none, and an app that rewrites its own file can drop
-  what it does not know (Claude Desktop does), so for these two the entry
-  waits in `~/Library/Application Support/mcpock/parked/` (readable only by
-  you) and moves back when you turn it on. The switch beside a tool hides
-  that tool the same way, in the agent's own setting: Claude Code's deny list,
-  `disabled_tools` in Codex, Grok's `disabled_mcp_tools`, `tools: exclude` in
-  Hermes, `available_tools` in Goose, a deny rule in OpenCode (Cursor and
-  Claude Desktop have none). Nothing is deleted, and agents can't flip a
-  switch: they can only ask, and your Yes goes through the same sheet. Everything else only reads: "Open Config…" asks first, with Cancel
-  as the default.
-- **What it runs.** To check a local server, mcpock starts the exact command
-  from your config, with its arguments and environment, in its project folder
-  when it has one: the same thing your agent runs. It does the handshake, asks
-  for the tool list, then stops the process and all its child processes.
-  Remote servers get the same few requests over HTTP. Paused servers are never
-  started.
-- **Secrets are masked.** The status file for agents holds env and header
-  **names**, never their values. Anything that looks like an API key in
-  command lines, URLs, server replies and error texts is masked wherever
-  mcpock shows or stores it.
-- **Network stays narrow.** The only connections are to the remote MCP
-  servers in your configs, to aka on your own Mac if you use it, and
-  to mcpock.com to check for app updates (Settings > About). No
-  accounts, no analytics, nothing else phones home.
-  mcpock calls a remote server the way your config says, `http://` too. A
-  server whose config sends keys over plain `http://` to another machine
-  gets a warning on its card: anyone on that network can read those keys.
-- **Updates are signed, and you're asked before the first automatic check.**
-  mcpock checks mcpock.com for a newer version (Sparkle, its one dependency —
-  see [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md)); every update is verified
-  against a key only the maintainer holds before it installs. Turn automatic checks off
-  any time in Settings > About; "Check for Updates…" there always works.
-- **Usage counts read, never keep, your chats.** To count calls, mcpock reads
-  the agents' own history files and databases (read-only) and keeps only the
-  agent, the server name and the day, in `~/Library/Application
-  Support/mcpock/usage.json`, plus what it needs to never count a call twice:
-  for each history file a hashed key, how far it has read and the time of the
-  newest call it counted, and for Cursor the record keys of recent calls with
-  their times. Never a message, an argument, a result or a file path.
-  They are off until you turn on **Usage counts** in Settings > General, and
-  turning them off stops the reading.
-- **Session logs, read only.** To spot a server lost in an open Claude Code
-  session, mcpock reads `~/.claude/sessions/*.json` (which sessions run, and
-  in which folder) and those sessions' lines in Claude Code's own MCP logs
-  (`~/Library/Caches/claude-cli-nodejs`), looking only at connect and failure
-  lines. Nothing is kept or sent.
-- **Where it looks.** Only known config paths and the usual config folders.
-  The scan never looks inside Documents, Desktop or Downloads, and it skips
-  symbolic links so it can't be led anywhere else.
-- **Why no App Store.** The App Store sandbox would stop mcpock from starting
-  servers and reading configs in your home folder, so it ships as a signed,
-  notarized download instead.
-
-## For developers
-
-### Build and run
-
-You need macOS 26+, Xcode 26+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-(`brew install xcodegen`).
+## Install
 
 ```bash
-git clone https://github.com/aka-kika/mcpock.git
-cd mcpock
-xcodegen generate
-xcodebuild -scheme mcpock -configuration Debug \
-  -derivedDataPath build \
-  -destination 'platform=macOS,arch=arm64' build
-open build/Build/Products/Debug/mcpock.app
+brew install --cask aka-kika/tap/mcpock
 ```
 
-Debug builds sign with an Apple Development identity (team in `project.yml`),
-which keeps macOS folder permissions across rebuilds. Without that certificate,
-add `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO` to the `xcodebuild` line
-(that is what CI does).
+Or download `mcpock.dmg` from [mcpock.com](https://mcpock.com) or the [Releases](https://github.com/aka-kika/mcpock/releases) page, open it and drag **mcpock** to Applications. It is signed and notarized by Apple and updates itself (Sparkle; you are asked before the first automatic check).
 
-### Test
+Needs macOS 26 or later on Apple Silicon. Launch it and look for its icon in the menu bar. If one of your servers lives in Documents, Desktop or Downloads, macOS asks whether mcpock may open that folder: click **Allow**, since mcpock has to start the server from there. Turn on **Open at Login** in Settings > General if you want it always there.
 
-```bash
-./scripts/ci.sh      # xcodegen generate + build + test, same as GitHub Actions
-```
+## Docs
 
-901 unit tests at v1.14.0. They cover the
-probes against real child processes and a real local HTTP server, process
-cleanup, every config format, discovery and the scan's safety rules, grouping,
-"set up differently", secret masking, the status file and the helper's
-answers, and the panel's wording and layout.
+- [docs/SUPPORTED-AGENTS.md](docs/SUPPORTED-AGENTS.md): every agent mcpock reads, its config file and format, and the special cases.
+- [docs/PRIVACY.md](docs/PRIVACY.md): what mcpock runs, reads, writes and sends.
+- [docs/FAQ.md](docs/FAQ.md): what each state means, what to do about it, and how to uninstall.
+- [docs/DEVELOPING.md](docs/DEVELOPING.md): build, test, how it works, adding an agent, release.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the module map, one refresh step by step, the rules that must not regress.
+- [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md): Sparkle and the agent logos, with their licenses.
+- [docs/release-notes/](docs/release-notes/): what changed in each version.
 
-### How it works
+## Release
 
-- **Discovery:** `AgentRegistry` (known paths) plus `ConfigScanner` (a shallow,
-  size-capped scan of the usual config folders) plus `AkaSource`. A file counts
-  only when it has at least one server with a `command` or a `url`, which keeps
-  unrelated JSON out. TOML and YAML are read by small built-in parsers.
-- **Probing:** `HealthMonitor` probes every server in parallel off the main
-  thread. stdio servers get newline-delimited JSON-RPC (`initialize`,
-  `tools/list`) and are then stopped along with their child processes. HTTP
-  servers get the same over streamable HTTP (session id replayed) or legacy SSE.
-  Identical setups are probed once. A single timeout shows as slow, a second one
-  or a hard failure as broken, and failing servers back off to hourly checks.
-- **Grouping:** instances with the same name (case and separators ignored)
-  become one row; the worst state wins, and a launch target that differs from
-  the majority becomes a "set up differently" note.
-- **UI:** a `MenuBarExtra` panel of fixed size, with the detail card as a child
-  panel beside it that never takes focus. The tools list is on the card.
-- **Agents:** after each change the app writes `status.json` and `status.md`;
-  the bundled `mcpock-mcp` (stdio) answers from that file; its `mcpock_ask`
-  only leaves a request in `asks/` for you to answer.
-
-The full module map, the flow of one refresh, and the rules that must not
-regress are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-### Project layout
-
-```
-mcpock/                 The app
-  MCPockApp.swift       Entry point: the menu bar item and panel
-  Models/               Server config, health, groups
-  Services/             Discovery, probes, process runner, texts, status file
-  Theme/                Colours, fonts, appearance
-  Views/                Panel, rows, detail card, Agents tab, Settings
-  Assets.xcassets/      App icon, agent logos, About links
-mcpock-mcp/             The MCP helper (main.swift)
-mcpockWidgets/          The desktop widgets (Status, Problems, Agents)
-Shared/                 Code compiled into both app and helper
-mcpockTests/            Unit tests
-project.yml             XcodeGen spec (source of truth for the Xcode project)
-scripts/ci.sh           Local CI: generate, build, test
-scripts/release.sh      Release build, Developer ID signing, notarized DMG
-scripts/appcast.sh      Sparkle's signed update feed (appcast.xml) from a folder of release DMGs
-docs/                   Architecture, release notes, third-party credits
-```
-
-### Adding an agent
-
-If it writes a standard format into a scanned folder, it already works. Add a
-row to `AgentRegistry.known` for a clean name or a path outside the scan; add a
-`ConfigShape` and a parser for a new format; add a logo as an
-`agent-<name>.imageset` plus a `logoNames` entry. Details in
-[docs/ARCHITECTURE.md §7](docs/ARCHITECTURE.md#7-adding-an-agent).
-
-### Release
-
-`scripts/release.sh` builds Release, signs with a Developer ID identity and
-hardened runtime, notarizes and staples the app and the DMG, and writes
-`dist/mcpock.dmg`. One-time setup, storing an app-specific password in your
-keychain:
-
-```bash
-xcrun notarytool store-credentials my-notary \
-  --apple-id "you@example.com" --team-id <TEAMID> \
-  --password "<app-specific password from appleid.apple.com>"
-MCPOCK_NOTARY_PROFILE=my-notary MCPOCK_SIGN_IDENTITY=<identity hash> ./scripts/release.sh
-```
-
-You can put the two variables in `scripts/release.env` (git-ignored, see
-`scripts/release.env.example`) instead. Without them the script stops with an
-error. It also stops if `docs/release-notes/<version>.md` is missing, if the
-tests (`scripts/ci.sh`) fail, or if Gatekeeper rejects the app.
-
-## Uninstalling
-
-1. In each agent's MCP config, remove the `mcpock` entry you added in
-   **Connect your agents** (mcpock did not add it for you). If you turned a
-   server off with mcpock, turn it back on first: one turned off for Claude
-   Desktop or Cursor waits in `~/Library/Application Support/mcpock/parked/`.
-2. In mcpock, open Settings > General and turn **Open at Login** off.
-3. Quit mcpock from its menu bar icon.
-4. Delete `mcpock.app` from Applications.
-5. Optional, to remove what it left behind (open Finder, press Shift+Cmd+G, and
-   paste each path):
-   - `~/Library/Application Support/mcpock` (the status and usage files)
-   - `~/Library/Preferences/com.mcpock.app.plist` (your settings)
-   - `~/Library/Group Containers/P5RB3W3D58.com.mcpock` (shared with the widgets)
-
-## FAQ and troubleshooting
-
-**macOS asks for permission to open a folder.**
-One of your servers runs from Documents, Desktop or Downloads, and mcpock has
-to start it there. Allow it once; it sticks. mcpock's own scan never looks in
-those folders.
-
-**A server shows broken. What now?**
-Click it. The card shows the real error: "command not found" (the program isn't
-installed, or isn't on the PATH mcpock uses: it adds `/opt/homebrew/bin`,
-`/usr/local/bin` and `~/.local/bin`; use a full path in the config if needed),
-"Quit on start (exit …)" when the process never answered initialize, or "Quit after starting (exit …)" when it dies after a good start (often a missing API key; the card shows the server's own error text), or
-no answer in time (20 seconds for a local server, tried twice; 10 seconds for
-a remote one). Copy the error, fix it in the agent's config, then
-Check again.
-
-**It says "Needs sign-in".**
-The server answered with HTTP 401 or 403 although its config sends a token
-header: the token is likely wrong or expired. Fix the header in the config.
-mcpock never signs in for you, so this state doesn't turn red.
-
-**It says "Signed in by the agent".**
-The server answered with HTTP 401 or 403 and its config has no token header:
-you signed in inside the agent (OAuth), and the agent keeps that sign-in to
-itself. Nothing is wrong, mcpock just can't check this server. It shows a
-calm dash and stays out of Needs you.
-
-**What does "set up differently" mean?**
-The same server name launches a different command, script or address in one
-agent than in the others. Sometimes that's intended; often it is an old path.
-**Compare** on the card shows each version (secret values hidden).
-
-If it's intended (say each agent has its own key and its own small launcher
-script), click **Mark as intended** in the card's yellow box, or right-click
-the row and choose **Mark as Intended**. The row stops counting as a problem, but
-mcpock keeps checking it and still shows real errors. mcpock remembers how the
-agents were set up at that moment (a short fingerprint of each command or
-address, never keys or env values), agent by agent. If an agent's setup
-changes later, or a new agent sets it up another way, the note comes back on
-its own for that agent; an agent you remove keeps the mark quiet. The card then shows a quiet "Marked as intended" line;
-**Undo** there, or **Unmark as Intended** in the right-click menu, takes it
-back.
-
-**A login page or an app opens every time mcpock checks.**
-Starting that server has a side effect. Right-click it and choose **Pause checks**:
-mcpock won't start it again until you resume it.
-
-**The grey dash?**
-Either you paused the server, or it runs inside its own app (marked
-`"builtin": true`) and can't be checked from outside, or the agent signed in to it,
-or it is Not checked because a `${VAR}` in its config cannot be filled. None of these
-counts as a problem.
-
-**I added a server and it doesn't show.**
-Click **Refresh** in the footer: it looks for configs again and checks
-everything. A save in a config mcpock already knows (or a scan file it is allowed to read) is checked within seconds, unless checks are Manual. A file in a new place is found at launch or on Refresh; the timer re-reads only the files it already knows.
-
-**My agent says mcpock isn't running or hasn't checked yet.**
-Make sure mcpock is running (start it from Applications if its icon isn't in
-the menu bar). It starts checking at launch and writes the status file once the
-first check is done, then ask again.
-
-**Hidden servers?**
-Still checked, just not listed. A hidden server that breaks comes back to the
-panel until it works again. Change it in Settings > Servers.
+Each version's notes are in [docs/release-notes/](docs/release-notes/); the newest is [1.17.1](docs/release-notes/1.17.1.md). Signed and notarized DMGs are on the [Releases](https://github.com/aka-kika/mcpock/releases) page and mcpock.com. How a release is built: [docs/DEVELOPING.md](docs/DEVELOPING.md#release).
 
 ## Thanks
 
-mcpock's interface was shaped by studying these open-source Mac apps, found and
-kept with [reshelf](https://github.com/aka-kika/reshelf)
-([site](https://aka-kika.github.io/reshelf/)), the author's app for collecting
-repos. Thank you to their authors:
+mcpock's interface was shaped by studying these open-source Mac apps, found and kept with [reshelf](https://github.com/aka-kika/reshelf), the author's app for collecting repos. Thank you to their authors:
 
 - [RepoBar](https://github.com/steipete/RepoBar) by @steipete: dashboard rows, detail on demand, pinned and hidden in Preferences.
 - [Skills Manager](https://github.com/yibie/skills-manager) by @yibie: the "which agent uses what" view and showing set-up-differently states.
@@ -569,20 +138,11 @@ repos. Thank you to their authors:
 - [Hop](https://github.com/antonyshakirov/hop) by @antonyshakirov: tabs in a menu bar panel.
 - [TokenMon](https://github.com/faulknerpearce/token_monitor) by @faulknerpearce: a section per agent with a small bar.
 
-## Credits
-
-In-app updates run on [Sparkle](https://sparkle-project.org)
-(MIT), mcpock's one code dependency.
-
-Agent logos come from [LobeHub Icons](https://github.com/lobehub/lobe-icons)
-(MIT) and, for Zed, Warp, JetBrains and Raycast,
-[Simple Icons](https://github.com/simple-icons/simple-icons) (CC0). They are
-trademarks of their owners; mcpock is not affiliated with or endorsed by any of
-them. Details and license texts: [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
+In-app updates run on [Sparkle](https://sparkle-project.org) (MIT). Agent logos come from [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT) and [Simple Icons](https://github.com/simple-icons/simple-icons) (CC0); they are trademarks of their owners, and mcpock is not affiliated with or endorsed by any of them. Details: [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. mcpock is small on purpose: read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ## License
 
@@ -590,4 +150,4 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-Made by Kika · [akakika.com](https://akakika.com) · [X @akakikaaa](https://x.com/akakikaaa) · [GitHub aka-kika](https://github.com/aka-kika)
+Made by **Kika** ([aka-kika](https://github.com/aka-kika), [akakika.com](https://akakika.com)).
