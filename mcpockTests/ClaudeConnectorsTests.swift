@@ -94,6 +94,10 @@ final class ClaudeConnectorsTests: XCTestCase {
         XCTAssertEqual(word["Gmail"], "Off in 2 projects")
         XCTAssertEqual(word["Zed"], .some(nil))
         XCTAssertEqual(merged.first?.mark, .broken)
+        let mark = Dictionary(uniqueKeysWithValues: merged.map { ($0.name, $0.mark) })
+        XCTAssertEqual(mark["Canva"], .off, "off in a project: the dash, not a green dot")
+        XCTAssertEqual(mark["Zed"], .healthy)
+        XCTAssertEqual(mark["Linear"], .broken, "a problem outranks off")
     }
 
     // MARK: - The panel only asks when she turned it on

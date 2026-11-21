@@ -68,7 +68,7 @@ private struct ConnectorRow: View {
 
     private var stateWords: String {
         switch connector.state {
-        case .connected: return "connected"
+        case .connected: return connector.offProjects.isEmpty ? "connected" : "connected, and switched off in a project"
         case .failing: return "it could not connect"
         case .needsSignIn: return "it needs a sign-in"
         case .unknown: return "nothing mcpock can read"

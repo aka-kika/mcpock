@@ -26,10 +26,12 @@ struct ClaudeConnector: Identifiable, Equatable, Sendable {
     var id: String { name }
 
     /// The panel's mark: a dot while connected, a diamond when failing, the
-    /// ring for a sign-in; the grey ring when mcpock can't tell.
+    /// ring for a sign-in; the grey ring when mcpock can't tell. One that is
+    /// switched off in a project wears the dash, as in her mock ("Off for
+    /// this project"): green only when it answers and is on everywhere.
     var mark: HealthState {
         switch state {
-        case .connected: return .healthy
+        case .connected: return offProjects.isEmpty ? .healthy : .off
         case .failing: return .broken
         case .needsSignIn: return .degraded
         case .unknown: return .unknown
