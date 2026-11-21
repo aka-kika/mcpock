@@ -194,6 +194,18 @@ POSSIBILITY OF SUCH DAMAGE.
   the brands are not affiliated with Simple Icons and their marks stay subject
   to each brand's own guidelines.
 
+## Server glyphs: Simple Icons (CC0 1.0)
+
+- **What:** the one-color brand glyphs beside server names
+  (`mcpock/Assets.xcassets/server-*.imageset`), shown as template images the
+  app tints.
+- **Source:** <https://github.com/simple-icons/simple-icons>, `icons/` folder
+  (fetched 2026-11-22).
+- **License:** CC0 1.0 Universal (public domain dedication). No attribution
+  is required; this note is a courtesy. Brand marks belong to their owners;
+  mcpock is not affiliated with them and uses the marks only to name the
+  server.
+
 ```
 MIT License
 

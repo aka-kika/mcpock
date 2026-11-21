@@ -37,6 +37,8 @@ struct MenuBarPanelView: View {
     nonisolated static let headerHeight: CGFloat = 42
     /// The search field (26pt) and the 8pt under it, only while it's open.
     nonisolated static let searchHeight: CGFloat = 34
+    /// The three overview tiles (22 Nov): 10 above, the 66pt tiles, 6 below.
+    nonisolated static let overviewHeight: CGFloat = 82
     /// One thin row, like 1.4.1.
     nonisolated static let footerHeight: CGFloat = 30
     /// The two 1pt rules: under the tabs (or the search) and above the footer.
@@ -46,7 +48,7 @@ struct MenuBarPanelView: View {
 
     /// Chrome above and below the list. Both tabs share it.
     nonisolated static func chromeHeight(searchOpen: Bool) -> CGFloat {
-        headerHeight + (searchOpen ? searchHeight : 0) + footerHeight + dividersHeight
+        headerHeight + (searchOpen ? searchHeight : 0) + overviewHeight + footerHeight + dividersHeight
     }
 
     nonisolated static func listHeight(searchOpen: Bool) -> CGFloat {
@@ -67,6 +69,11 @@ struct MenuBarPanelView: View {
                     .frame(height: Self.searchHeight)
             }
             rule
+            OverviewTilesView(overview: overview, theme: theme)
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                .frame(height: Self.overviewHeight)
             // The one-time notes sit under the list in the layout (1.12.1): the
             // list gives up their height and scrolls in what is left, so a note
             // never covers a row.
@@ -117,6 +124,16 @@ struct MenuBarPanelView: View {
         Rectangle()
             .fill(theme.divider)
             .frame(height: 1)
+    }
+
+    /// The three numbers on top, the same on both tabs.
+    private var overview: PanelOverview {
+        PanelOverview.build(
+            groups: monitor.visibleGroups,
+            agentCount: panel.allAgentSections.filter { !$0.servers.isEmpty }.count,
+            hiddenTools: { monitor.hiddenToolCount(groupName: $0.name) },
+            checking: isChecking
+        )
     }
 
     // MARK: - Search
@@ -394,7 +411,7 @@ struct MenuBarPanelView: View {
                 FooterTextButton(title: "Undo hide", theme: theme) { panel.undoHide() }
             } else {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(copiedNote ?? footerSummary)
+                    Text(copiedNote ?? footerText(now: context.date))
                         .font(Theme.caption)
                         .foregroundStyle(theme.textTertiary)
                         .lineLimit(1)
@@ -483,6 +500,14 @@ struct MenuBarPanelView: View {
             try? await Task.sleep(for: .seconds(1.6))
             copiedNote = nil
         }
+    }
+
+    /// The footer's left side since the tiles carry the totals (22 Nov):
+    /// "Checked 1 min ago · 2 hidden"; while a check runs, how far along it is.
+    private func footerText(now: Date) -> String {
+        guard !isChecking else { return footerSummary }
+        return PanelText.footer(lastChecked: ServerGroup.newestCheck(monitor.groups),
+                                hiddenCount: monitor.hiddenGroups.count, now: now)
     }
 
     private var footerSummary: String {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The Agents tab (v1.5 spec, Phase 4): one row per agent, sorted by what needs
-/// you, each with a health bar. One agent open at a time.
+/// you. One line per agent since the premium look (22 Nov). One agent open at a time.
 /// Round 5: the open agent lists all its servers (problems first) or, with the
 /// footer's attention toggle pressed, only its problem servers. Clicking one
 /// selects it and opens the same detail card as the Servers tab, staying here;
@@ -108,57 +108,46 @@ private struct AgentRowView: View {
     let toggle: () -> Void
     @State private var isHovered = false
 
-    /// Where the health bar and the expanded content start: past the 24pt badge.
-    static let contentIndent: CGFloat = 34
+    static let badgeSize: CGFloat = 20
+    static let rowHeight: CGFloat = 36
+    /// Where the expanded content starts: past the badge.
+    static let contentIndent: CGFloat = 30
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: toggle) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        AgentBadgeView(badge: AgentBadge.forLabel(section.agent), theme: theme, size: 24)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(section.displayName)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(theme.textPrimary)
-                                .lineLimit(1)
-                            Text("\(section.servers.count) server\(section.servers.count == 1 ? "" : "s")")
-                                .font(Theme.caption)
-                                .foregroundStyle(theme.textTertiary)
-                        }
-                        // The name keeps its room beside the word and the numbers (review 12 Nov).
+                // One line (premium look, 22 Nov, Kika's picks): logo, name,
+                // a mark when one of its servers needs you, one value in
+                // words, chevron. No second line, no bar; the calls are in
+                // the tooltip and on the open agent's first line.
+                HStack(spacing: 10) {
+                    AgentBadgeView(badge: AgentBadge.forLabel(section.agent), theme: theme, size: Self.badgeSize)
+                    Text(section.displayName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(1)
+                        // The name keeps its room beside the value (review 12 Nov).
                         .layoutPriority(1)
-                        Spacer(minLength: 6)
-                        let word = AgentSections.problemText(section)
-                        if !word.isEmpty {
-                            Text(word)
-                                .font(.system(size: 11.5, weight: section.problems.isEmpty ? .regular : .medium))
-                                .foregroundStyle(problemColor)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .help(word)
-                        }
-                        // "21/29 · 3.1k": servers on of all, this agent's
-                        // calls (12 Nov); also on an open agent's header.
-                        RowCountsLabel(counts: agentCounts, theme: theme, size: 11.5)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
+                    Spacer(minLength: 6)
+                    if let mark = AgentSections.mark(for: section) {
+                        HealthMark(state: mark, theme: theme, word: AgentSections.problemText(section))
+                            .help(AgentSections.problemText(section))
+                    }
+                    if section.servers.isEmpty {
+                        Text("No servers")
+                            .font(.system(size: 11.5))
                             .foregroundStyle(theme.textTertiary)
-                            .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    } else {
+                        RowCountsLabel(counts: agentCounts, theme: theme,
+                                       extraHelp: AgentSections.problemText(section))
                     }
-                    // No bar for an agent with no servers (1.12.1, Grok Bot).
-                    if !section.servers.isEmpty {
-                        HealthBar(
-                            section: section,
-                            theme: theme,
-                            isRefreshing: panel.monitor.isRefreshing,
-                            firstViewWindowOpen: panel.firstAgentsViewWindowOpen
-                        )
-                            .padding(.leading, Self.contentIndent)
-                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(theme.textTertiary)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
                 }
                 .padding(.horizontal, 8)
-                .padding(.vertical, 9)
+                .frame(height: Self.rowHeight)
                 .background {
                     // The arrow keys are on this agent (1.10.4).
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -202,11 +191,6 @@ private struct AgentRowView: View {
                          window: window, unit: .servers)
     }
 
-    private var problemColor: Color {
-        if section.brokenCount > 0 { return theme.badText }
-        return section.problems.isEmpty ? theme.textTertiary : theme.warnText
-    }
-
     /// Right-click on an agent (round 5, round 8): Copy All Problems first when
     /// it has any (2026-10-04), then the shared path menu, Show in Finder, Copy
     /// Path, then Open Config… last. Two files: Show in Finder and Open Config…
@@ -242,6 +226,14 @@ private struct AgentRowView: View {
         let isFoldExpanded = panel.expandedFoldAgents.contains(section.agent)
         let fold = AgentSections.ServerFold.shown(section.listed, expanded: isFoldExpanded)
         VStack(alignment: .leading, spacing: 1) {
+            // The agent's calls, off the row since 22 Nov.
+            if let calls = agentCounts.callsLine {
+                Text(calls)
+                    .font(Theme.caption)
+                    .foregroundStyle(theme.textTertiary)
+                    .padding(.leading, 6)
+                    .padding(.bottom, 3)
+            }
             if let line = section.emptyLine {
                 Text(line)
                     .font(Theme.caption)
@@ -389,7 +381,8 @@ private struct AgentServerRow: View {
                             .accessibilityLabel("Pinned")
                     }
                     Spacer(minLength: 0)
-                    RowCountsLabel(counts: counts, theme: theme)
+                    RowCountsLabel(counts: counts, theme: theme, size: 11,
+                                   noTools: server.state == .broken && (group?.tools.isEmpty ?? true))
                 }
                 if let note = server.note {
                     Text(note)
@@ -443,86 +436,5 @@ private struct AgentServerRow: View {
         case .unknown, .selfManaged, .paused, .off: return theme.textTertiary
         case .needsApp: return theme.textSecondary
         }
-    }
-}
-
-/// The 4pt bar under an agent: broken, needs-you, fine and not-checked-yet
-/// segments, sized by their counts.
-///
-/// Grows in from the left (round 9, "health bar micro-animation"): a single
-/// `scaleEffect(x:)` on the segment row, anchored `.leading`, animates a
-/// GPU transform rather than recomputing `GeometryReader` widths every frame.
-/// Two triggers:
-/// - **The first real view of the Agents tab this launch** (round 9b —
-///   "the first time the panel opens": the bar lives only here, so this is
-///   the moment that reads as opening it). `panel.firstAgentsViewWindowOpen`
-///   is only briefly true, for the rows already on screen when the tab
-///   first paints with real data; `AgentsListView` closes it right after, so
-///   a row the `LazyVStack` mounts later, on a scroll, never starts its own
-///   grow — it just appears. Both the immediate check (mount already inside
-///   the window) and `onChange` (the window opens a beat after mount,
-///   `MenuBarExtra`'s children can appear before their parent) are needed:
-///   whichever one is true first wins, `sawFirstView` stops the other from
-///   firing twice.
-/// - **Every full refresh after that** (`isRefreshing`'s true -> false edge
-///   — the timer's own cycle or the footer's Refresh — never a single row's
-///   "Check again", which never touches `isRefreshing`).
-///
-/// Reduce Motion: `growth` never leaves 1, so the bar just appears either way.
-private struct HealthBar: View {
-    let section: AgentSection
-    let theme: ThemeColors
-    let isRefreshing: Bool
-    let firstViewWindowOpen: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var growth: CGFloat = 1
-    /// Guards the first-view trigger against firing twice (the mount-time
-    /// check and the `onChange` below can both see it open).
-    @State private var sawFirstView = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let segments = self.segments
-            let gaps = CGFloat(max(segments.count - 1, 0)) * 2
-            let total = CGFloat(max(section.servers.count, 1))
-            HStack(spacing: 2) {
-                ForEach(segments.indices, id: \.self) { index in
-                    Capsule()
-                        .fill(segments[index].color)
-                        .frame(width: max(0, (proxy.size.width - gaps) * CGFloat(segments[index].count) / total))
-                }
-            }
-            .scaleEffect(x: growth, y: 1, anchor: .leading)
-        }
-        .frame(height: 4)
-        .accessibilityHidden(true)
-        .onAppear { grow(ifFirstViewOpen: firstViewWindowOpen) }
-        .onChange(of: firstViewWindowOpen) { _, open in grow(ifFirstViewOpen: open) }
-        .onChange(of: isRefreshing) { old, new in
-            guard PanelState.healthBarShouldGrow(wasRefreshing: old, isRefreshing: new) else { return }
-            growIn()
-        }
-    }
-
-    private func grow(ifFirstViewOpen open: Bool) {
-        guard open, !sawFirstView else { return }
-        sawFirstView = true
-        growIn()
-    }
-
-    private func growIn() {
-        guard !reduceMotion else { return }
-        growth = 0
-        withAnimation(.easeOut(duration: 0.5)) { growth = 1 }
-    }
-
-    private var segments: [(count: Int, color: Color)] {
-        [
-            (section.brokenCount, theme.statusBroken),
-            (section.attentionCount, theme.statusDegraded),
-            (section.fineCount, theme.statusHealthy),
-            // Not checked, for now or by her choice: the neutral part (a965).
-            (section.checkingCount + section.pausedCount + section.waitingCount + section.offCount, theme.elevated),
-        ].filter { $0.count > 0 }
     }
 }

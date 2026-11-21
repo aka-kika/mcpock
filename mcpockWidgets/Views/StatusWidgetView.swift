@@ -1,8 +1,10 @@
 import SwiftUI
 import WidgetKit
 
-/// Small: overall status. The mcpock mark and name, "All fine" or "N need
-/// you", the server count, and when it last checked.
+/// Small: overall status as a ring (premium look, 22 Nov, Kika's pick). The
+/// ring is all servers, the slivers are the ones that need her, the number
+/// inside says how many; when all is fine it holds the total. Under it the
+/// word, then "41 in use · 12 off".
 struct StatusWidgetView: View {
     let entry: MCPockWidgetEntry
     @Environment(\.colorScheme) private var colorScheme
@@ -20,40 +22,27 @@ struct StatusWidgetView: View {
     }
 
     private func content(_ snapshot: MCPockWidgetSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(markColor(snapshot))
-                    .frame(width: 8, height: 8)
-                Text("mcpock")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            StatusRing(snapshot: snapshot, colorScheme: colorScheme)
+            Text(StatusRing.label(snapshot))
+                .font(.system(size: 12, weight: .medium))
+                .padding(.top, 8)
             Spacer(minLength: 0)
-            Text(headline(snapshot))
-                .font(.system(size: 18, weight: .semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
-            Text("\(snapshot.totalServers) server\(snapshot.totalServers == 1 ? "" : "s")")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+            // A stale snapshot says so here; else the quiet totals.
+            if snapshot.isStale(now: entry.date) {
+                WidgetCheckedAt(date: snapshot.generated, stale: true)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(snapshot.inUseLine)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(2)
-    }
-
-    private func headline(_ s: MCPockWidgetSnapshot) -> String {
-        if !s.firstCheckDone { return "Checking\u{2026}" }
-        if s.problemCount == 0 { return "All fine" }
-        return "\(s.problemCount) need\(s.problemCount == 1 ? "s" : "") you"
-    }
-
-    private func markColor(_ s: MCPockWidgetSnapshot) -> Color {
-        if !s.firstCheckDone { return Color.secondary }
-        if s.problemCount == 0 { return WidgetColors.healthy(colorScheme) }
-        return s.markIsRed ? WidgetColors.broken(colorScheme) : WidgetColors.degraded(colorScheme)
     }
 }
 
@@ -74,5 +63,6 @@ struct MCPockStatusWidget: Widget {
     MCPockStatusWidget()
 } timeline: {
     MCPockWidgetEntry(date: .now, snapshot: .placeholderSample)
+    MCPockWidgetEntry(date: .now, snapshot: .placeholderAllFine)
     MCPockWidgetEntry(date: .now, snapshot: nil)
 }

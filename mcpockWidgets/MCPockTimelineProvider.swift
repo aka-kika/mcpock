@@ -52,16 +52,43 @@ extension MCPockWidgetSnapshot {
         firstCheckDone: true,
         totalServers: 48,
         problemCount: 2,
-        fineCount: 46,
+        fineCount: 44,
         problems: [
-            .init(name: "firecrawl", status: "not answering"),
-            .init(name: "figma", status: "needs sign-in"),
+            .init(name: "firecrawl", status: "not answering", isBroken: true, agents: ["Claude Code", "Cursor"]),
+            .init(name: "figma", status: "needs sign-in", isBroken: false, agents: ["Cursor"]),
         ],
         agents: [
-            .init(name: "Claude Code", serverCount: 14, problemCount: 1, fineCount: 13),
-            .init(name: "Grok", serverCount: 10, problemCount: 0, fineCount: 10),
-            .init(name: "Cursor", serverCount: 9, problemCount: 1, fineCount: 8),
-            .init(name: "Hermes", serverCount: 15, problemCount: 0, fineCount: 15),
-        ]
+            .init(name: "Claude Code", logo: "agent-claudecode", serverCount: 14, problemCount: 1, fineCount: 13, brokenCount: 1),
+            .init(name: "Cursor", logo: "agent-cursor", serverCount: 9, problemCount: 2, fineCount: 7, brokenCount: 1),
+            .init(name: "Goose", logo: "agent-goose", serverCount: 12, problemCount: 0, fineCount: 9, offCount: 3),
+            .init(name: "Grok", logo: "agent-grok", serverCount: 10, problemCount: 0, fineCount: 10),
+            .init(name: "Hermes", logo: "agent-hermesagent", serverCount: 15, problemCount: 0, fineCount: 15),
+        ],
+        brokenCount: 1,
+        inUse: 46,
+        toolsOff: 12,
+        agentCount: 7
+    )
+
+    /// The same setup with nothing wrong, for the gallery's second look.
+    static let placeholderAllFine = MCPockWidgetSnapshot(
+        generated: .now.addingTimeInterval(-120),
+        checking: false,
+        firstCheckDone: true,
+        totalServers: 48,
+        problemCount: 0,
+        fineCount: 46,
+        problems: [],
+        agents: placeholderSample.agents.map {
+            var agent = $0
+            agent.fineCount += agent.problemCount
+            agent.problemCount = 0
+            agent.brokenCount = 0
+            return agent
+        },
+        brokenCount: 0,
+        inUse: 46,
+        toolsOff: 12,
+        agentCount: 7
     )
 }

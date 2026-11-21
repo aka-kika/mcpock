@@ -165,6 +165,7 @@ targets:
       - path: Shared/StatusReport.swift
       - path: Shared/WidgetSnapshot.swift
       - path: Shared/WidgetSnapshotStore.swift
+      - path: Shared/RingArcs.swift
       # The agent logos, the same vector templates the Agents tab uses.
       - path: mcpock/Assets.xcassets
     settings:

@@ -60,8 +60,16 @@ final class HealthMonitor {
     private func statusDidChange() {
         statusWriter?.schedule { [weak self] in self?.statusSnapshot() }
         widgetSnapshotWriter?.schedule { [weak self] in
-            self.map { MCPockWidgetSnapshot.build(from: $0.statusSnapshot(), logo: Self.widgetLogo) }
+            self.map {
+                MCPockWidgetSnapshot.build(from: $0.statusSnapshot(), toolsOff: $0.hiddenToolsInUse(), logo: Self.widgetLogo)
+            }
         }
+    }
+
+    /// Tools turned off across the servers she can see and has on: the
+    /// overview tile's and the widgets' number (22 Nov).
+    func hiddenToolsInUse() -> Int {
+        visibleGroups.filter { !$0.isOffEverywhere }.reduce(0) { $0 + hiddenToolCount(groupName: $1.name) }
     }
 
     /// What `status.json` holds right now.

@@ -224,6 +224,29 @@ struct RowCounts: Equatable {
     /// "74", "1.2k", or nil with no call count.
     var callsPart: String? { calls.map(UsageText.compact) }
 
+    /// What a row shows since the premium look (22 Nov, Kika's picks): one
+    /// value in words, "5 of 7 tools" when some are hidden or off, "7 tools"
+    /// when none are; "21 of 29 servers", "29 servers" on an agent's row. Nil
+    /// when there is nothing to count yet. Calls are in the tooltip only.
+    var words: String? {
+        guard tools > 0 else { return nil }
+        let off = clampedHidden
+        let noun: String
+        switch unit {
+        case .tools: noun = tools == 1 ? "tool" : "tools"
+        case .servers: noun = tools == 1 ? "server" : "servers"
+        }
+        return off > 0 ? "\(tools - off) of \(tools) \(noun)" : "\(tools) \(noun)"
+    }
+
+    /// "9,214 calls in 30 days", for an open agent's first line; nil with no
+    /// call count.
+    var callsLine: String? {
+        guard let calls else { return nil }
+        let span = window.days.map { "in \($0) days" } ?? "all time"
+        return "\(calls.formatted(.number.locale(Locale(identifier: "en_US")))) call\(calls == 1 ? "" : "s") \(span)"
+    }
+
     /// The whole label as one string: "9/54 · 74", "6", "74", or "" when
     /// there is nothing to say yet. The view draws the calls dimmer.
     var line: String {

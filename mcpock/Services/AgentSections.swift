@@ -67,6 +67,14 @@ struct AgentSection: Identifiable, Hashable, Sendable {
 /// Servers tab: every source label is an agent. Pure, so `AgentSectionsTests`
 /// covers grouping, per-agent state and the sort.
 enum AgentSections {
+    /// The mark before an agent's value (premium look, 22 Nov): the diamond
+    /// when one of its servers is broken, the ring when one needs her
+    /// otherwise, nothing while all is calm.
+    static func mark(for section: AgentSection) -> HealthState? {
+        if section.brokenCount > 0 { return .broken }
+        return section.problems.isEmpty ? nil : .degraded
+    }
+
     /// Agents sorted by what needs you: most problems first, then by name; aka
     /// always last (round 6).
     /// `query` keeps an agent whose name matches, or that declares a server whose

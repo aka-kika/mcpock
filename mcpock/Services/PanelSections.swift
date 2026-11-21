@@ -40,7 +40,8 @@ struct PanelSection: Identifiable, Hashable, Sendable {
         switch kind {
         case .needsYou: return "Needs you"
         case .pinned: return "Pinned"
-        case .everythingElse: return "Everything else"
+        // "All servers" since the premium look (22 Nov, Kika's pick).
+        case .everythingElse: return "All servers"
         case .turnedOff: return "Turned off"
         }
     }

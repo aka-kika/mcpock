@@ -135,6 +135,9 @@ struct MCPockStatus: Codable, Equatable, Sendable {
         /// color red only what the panel colors red. Optional: a status file
         /// from 1.9.0 or earlier has none.
         var brokenCount: Int? = nil
+        /// Switched off in this agent (22 Nov), for the widgets' "21 of 29".
+        /// Optional: older files have none.
+        var offCount: Int? = nil
     }
 
     /// One declaration of a server in one agent's config.

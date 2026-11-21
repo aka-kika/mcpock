@@ -16,9 +16,10 @@ struct ServerRowActions {
     let askAgent: () -> Void
 }
 
-/// One server in the v1.5 list: health mark, name, pin, agent badges and tool
-/// count on the first line; for a row that needs you, a short reason in the
-/// state's colour underneath. Tools and the full error moved to the detail card,
+/// One server in the list (premium look, 22 Nov): its mono icon, which also
+/// carries the state, the name, pin, and one value on the right (the tool
+/// count in words); for a row that needs you, a short reason in the state's
+/// colour underneath. Tools and the full error moved to the detail card,
 /// so the row no longer expands.
 struct ServerRowView: View {
     let group: ServerGroup
@@ -29,22 +30,22 @@ struct ServerRowView: View {
     var isChecking = false
     /// An agent asks about this server (1.16): a small dot after the name.
     var asksYou = false
-    /// "70/100 tools · 130 calls" (11 Nov, 4b6a and 37f0).
+    /// The row's one value, "5 of 7 tools" (22 Nov); the calls are in its tooltip.
     var counts = RowCounts(tools: 0)
     let actions: ServerRowActions
     @State private var isHovered = false
 
-    /// Badges shown before the rest fold into "+N".
-    static let badgeLimit = 3
     /// Where the second line starts: past the health mark and its gap.
-    static let noteIndent: CGFloat = HealthMark.boxSize + 10
+    static let noteIndent: CGFloat = 18 + 10
 
     var body: some View {
         Button(action: actions.select) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 10) {
-                    HealthMark(state: HealthMark.markState(for: group), theme: theme, checking: isChecking,
-                               word: HealthMark.word(for: group))
+                    // The icon carries the state (22 Nov): no dot on a fine server.
+                    ServerIconView(icon: ServerIcons.icon(for: group), theme: theme,
+                                   badge: ServerIconView.badgeState(for: HealthMark.markState(for: group)),
+                                   checking: isChecking, word: HealthMark.word(for: group))
 
                     Text(group.name)
                         .font(Theme.body)
@@ -85,9 +86,10 @@ struct ServerRowView: View {
                         .accessibilityLabel(CardAction.checkAgain.title)
                     }
 
-                    badges
-
-                    RowCountsLabel(counts: counts, theme: theme)
+                    // One value (22 Nov): the count in words. The agents and
+                    // the calls are in the tooltip and on the card.
+                    RowCountsLabel(counts: counts, theme: theme, noTools: Self.showsNoTools(group),
+                                   extraHelp: Self.usedBy(group))
                 }
 
                 if let note = ShortReason.line(for: group) {
@@ -100,8 +102,8 @@ struct ServerRowView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 7)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: Self.minHeight, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(fill)
@@ -114,6 +116,22 @@ struct ServerRowView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAction(named: CardAction.checkAgain.title, actions.checkAgain)
         .contextMenu { ServerContextMenu(group: group, isPinned: isPinned, actions: actions) }
+    }
+
+    /// Every row is at least this tall, so one-line rows line up (22 Nov).
+    static let minHeight: CGFloat = 36
+
+    /// A broken server that never gave its tools reads "No tools" (22 Nov,
+    /// Kika's pick), where a lone dim call count used to stand.
+    static func showsNoTools(_ group: ServerGroup) -> Bool {
+        group.state == .broken && group.tools.isEmpty
+    }
+
+    /// "Used by Claude Code, Cursor": the tooltip's second line, now that the
+    /// agent icons left the row.
+    static func usedBy(_ group: ServerGroup) -> String? {
+        let agents = group.agents.map(AgentBadge.displayLabel)
+        return agents.isEmpty ? nil : "Used by " + agents.joined(separator: ", ")
     }
 
     private var fill: Color {
@@ -134,58 +152,36 @@ struct ServerRowView: View {
         }
     }
 
-
-    @ViewBuilder
-    private var badges: some View {
-        let agents = group.agents
-        HStack(spacing: 5) {
-            ForEach(agents.prefix(Self.badgeLimit), id: \.self) { agent in
-                AgentBadgeView(badge: AgentBadge.forLabel(agent), theme: theme)
-            }
-            if agents.count > Self.badgeLimit {
-                MoreBadgeView(count: agents.count - Self.badgeLimit, theme: theme)
-                    .help(agents.dropFirst(Self.badgeLimit).map(AgentBadge.displayLabel).joined(separator: ", "))
-            }
-        }
-        .fixedSize()
-    }
 }
 
-/// A row's numbers: "9/54 · 74", the calls and their dot dimmer (12 Nov,
-/// Kika's picks). One view for server rows on both tabs and the agents' own
-/// rows, so the same thing always looks the same; the words are in the
-/// tooltip.
+/// A row's one value (premium look, 22 Nov, Kika's picks): the count in
+/// words, "5 of 7 tools", "29 servers", or "No tools" for a broken server
+/// that never gave any. One view for server rows on both tabs and the
+/// agents' own rows, so the same thing always looks the same; the calls and
+/// the rest are in the tooltip.
 struct RowCountsLabel: View {
     let counts: RowCounts
     let theme: ThemeColors
-    var size: CGFloat = 11
-    @Environment(\.colorSchemeContrast) private var contrast
+    var size: CGFloat = 11.5
+    /// "No tools", in the broken text tone, in place of the count.
+    var noTools = false
+    /// A second tooltip line ("Used by Claude Code, Cursor").
+    var extraHelp: String? = nil
 
-    /// The calls' grey: Kika's dimmer step, or tertiary (4.5:1 and more)
-    /// with Increase Contrast on (review 12 Nov).
-    private var dim: Color { contrast == .increased ? theme.textTertiary : theme.textDim }
+    private var help: String {
+        [noTools ? "No tools: it never answered" : counts.help, extraHelp ?? ""]
+            .filter { !$0.isEmpty }.joined(separator: "\n")
+    }
 
     var body: some View {
-        let on = counts.onPart
-        let calls = counts.callsPart
-        if on != nil || calls != nil {
-            HStack(spacing: 4) {
-                if let on {
-                    Text(on).foregroundStyle(theme.textSecondary)
-                }
-                if on != nil && calls != nil {
-                    Text("\u{00B7}").foregroundStyle(dim)
-                }
-                if let calls {
-                    Text(calls).foregroundStyle(dim)
-                }
-            }
-            .font(.system(size: size).monospacedDigit())
-            .lineLimit(1)
-            .fixedSize()
-            .help(counts.help)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(counts.help)
+        if let text = noTools ? "No tools" : counts.words {
+            Text(text)
+                .font(.system(size: size, design: .rounded).monospacedDigit())
+                .foregroundStyle(noTools ? theme.badText : theme.textSecondary)
+                .lineLimit(1)
+                .fixedSize()
+                .help(help)
+                .accessibilityLabel(help)
         }
     }
 }
