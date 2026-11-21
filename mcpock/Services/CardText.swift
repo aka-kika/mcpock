@@ -421,6 +421,14 @@ enum CardText {
         return "Not used in \(days) days"
     }
 
+    /// The tools section's header (premium look, 22 Nov): "Tools · 5 of 7 on"
+    /// when some are turned off in every agent that can hide them, "Tools · 7"
+    /// when none are. The same words as the row's count.
+    static func toolsTitle(count: Int, hidden: Int) -> String {
+        let off = min(max(hidden, 0), count)
+        return off > 0 ? "Tools \u{00B7} \(count - off) of \(count) on" : "Tools \u{00B7} \(count)"
+    }
+
     /// "Calls in 30 days" beside "Tools · 26"; nil without counts.
     static func callsWindowTitle(window: UsageWindow) -> String? {
         switch window {

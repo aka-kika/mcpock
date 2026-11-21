@@ -66,6 +66,15 @@ final class PremiumLookTests: XCTestCase {
         XCTAssertFalse(ServerRowView.showsNoTools(group("new", .unknown)), "not checked yet")
     }
 
+    // MARK: - The card's tools header
+
+    func testTheCardSaysHowManyToolsAreOn() {
+        XCTAssertEqual(CardText.toolsTitle(count: 7, hidden: 2), "Tools \u{00B7} 5 of 7 on")
+        XCTAssertEqual(CardText.toolsTitle(count: 7, hidden: 0), "Tools \u{00B7} 7")
+        XCTAssertEqual(CardText.toolsTitle(count: 0, hidden: 0), "Tools \u{00B7} 0")
+        XCTAssertEqual(CardText.toolsTitle(count: 3, hidden: 9), "Tools \u{00B7} 0 of 3 on", "never more off than there are")
+    }
+
     // MARK: - The icon carries the state
 
     func testAFineServerHasNoBadge() {

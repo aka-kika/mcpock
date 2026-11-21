@@ -459,7 +459,8 @@ struct DetailCardView: View {
                                              labels: Dictionary(group.sources.map { ($0.configID, $0.label) },
                                                                 uniquingKeysWith: { first, _ in first }))
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: ["Tools \u{00B7} \(group.tools.count)", usage == nil ? nil : CardText.callsWindowTitle(window: usageWindow)]
+            SectionHeader(title: [CardText.toolsTitle(count: group.tools.count, hidden: sections.hidden.count),
+                                  usage == nil ? nil : CardText.callsWindowTitle(window: usageWindow)]
                 .compactMap { $0 }.joined(separator: " \u{00B7} "), count: nil, theme: theme)
             if group.tools.isEmpty {
                 Text(group.state == .unknown ? "Tools show up after the first check." : "No tools reported.")
