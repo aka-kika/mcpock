@@ -1,72 +1,40 @@
 {
   "groups": [
     {
-      "layers": [
-        {
-          "image-name": "marks.png",
-          "name": "marks",
-          "opacity": 1,
-          "blend-mode": "normal",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          },
-          "fill-specializations": [
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "srgb:0.89020,0.87451,0.84706,1.00000"
-              }
-            },
-            {
-              "appearance": "tinted",
-              "value": {
-                "solid": "srgb:0.87843,0.87843,0.87843,1.00000"
-              }
-            }
-          ]
-        }
-      ],
-      "name": "marks",
-      "specular": false,
-      "shadow": {
-        "kind": "none",
-        "opacity": 0
-      }
-    },
-    {
-      "layers": [
-        {
-          "image-name": "knob.png",
-          "name": "knob",
-          "opacity": 1,
-          "blend-mode": "normal",
-          "glass": true,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "name": "knob",
+      "name": "cube",
       "specular": true,
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.35
-      }
-    },
-    {
+        "opacity": 0.45
+      },
       "layers": [
         {
-          "image-name": "track.png",
-          "name": "track",
+          "image-name": "cube-edges.png",
+          "name": "cube-edges",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": false,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "cube-top.png",
+          "name": "cube-top",
+          "opacity": 1,
+          "blend-mode": "normal",
           "glass": true,
           "position": {
             "scale": 1,
@@ -77,21 +45,96 @@
           },
           "fill-specializations": [
             {
-              "appearance": "dark",
+              "appearance": "tinted",
               "value": {
-                "solid": "srgb:0.89020,0.87451,0.84706,1.00000"
+                "solid": "srgb:0.96000,0.96000,0.96000,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "cube-left.png",
+          "name": "cube-left",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.70000,0.70000,0.70000,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "cube-right.png",
+          "name": "cube-right",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.42000,0.42000,0.42000,1.00000"
               }
             }
           ]
         }
-      ],
-      "name": "Track",
+      ]
+    },
+    {
+      "name": "brackets",
       "specular": false,
       "shadow": {
         "kind": "none",
         "opacity": 0
       },
-      "blur-material": null
+      "layers": [
+        {
+          "image-name": "brackets.png",
+          "name": "brackets",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.57647,0.64314,0.82353,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.62000,0.62000,0.62000,1.00000"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "supported-platforms": {
@@ -104,17 +147,17 @@
     {
       "value": {
         "linear-gradient": [
-          "srgb:0.87451,0.86275,0.83137,1.00000",
-          "srgb:0.90588,0.89020,0.86667,1.00000"
+          "srgb:0.82745,0.87451,0.96863,1.00000",
+          "srgb:0.57647,0.64706,0.78824,1.00000"
         ],
         "orientation": {
           "start": {
-            "x": 0.5,
-            "y": 1
+            "x": 0.15,
+            "y": 0.0
           },
           "stop": {
-            "x": 0.5,
-            "y": 0
+            "x": 0.85,
+            "y": 1.0
           }
         }
       }
@@ -122,7 +165,20 @@
     {
       "appearance": "dark",
       "value": {
-        "solid": "srgb:0.23529,0.23529,0.23137,1.00000"
+        "linear-gradient": [
+          "srgb:0.22745,0.25490,0.37647,1.00000",
+          "srgb:0.13333,0.15294,0.22745,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.15,
+            "y": 0.0
+          },
+          "stop": {
+            "x": 0.85,
+            "y": 1.0
+          }
+        }
       }
     },
     {

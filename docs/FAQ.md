@@ -87,6 +87,7 @@ panel until it works again. Change it in Settings > Servers.
    paste each path). Do steps 1 and 2 first: this folder also holds servers
    that are turned off and the backups of your configs.
    - `~/Library/Application Support/mcpock` (the status and usage files, the
-     backups, servers that wait while turned off, and the filter's lists)
+     backups, servers that wait while turned off, the filter's lists, and
+     any server icons of your own)
    - `~/Library/Preferences/com.mcpock.app.plist` (your settings)
    - `~/Library/Group Containers/P5RB3W3D58.com.mcpock` (shared with the widgets)

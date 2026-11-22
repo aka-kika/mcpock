@@ -10,6 +10,9 @@ struct PanelOverview: Equatable, Sendable {
     var agents: Int
     /// Tools hidden across those servers (hidden by every agent that can hide).
     var toolsOff: Int
+    /// Every tool of those servers, hidden or not: the tile reads "149/388"
+    /// (Kika, 22 Nov: "show how many of how many").
+    var toolsTotal: Int = 0
     /// How many servers have a hidden tool.
     var toolsOffServers: Int
     /// Rows in Needs you.
@@ -42,6 +45,7 @@ struct PanelOverview: Equatable, Sendable {
             inUse: on.count,
             agents: agentCount,
             toolsOff: hidden.reduce(0, +),
+            toolsTotal: on.reduce(0) { $0 + $1.tools.count },
             toolsOffServers: hidden.count,
             // The number is the servers that need her: the same count as the
             // Needs you section, the menu bar icon and the widgets. Only when
@@ -88,9 +92,19 @@ struct PanelOverview: Equatable, Sendable {
         return toolsOffServers == 1 ? "in 1 server" : "in \(toolsOffServers) servers"
     }
 
+    /// "/388" beside the middle tile's number; nil before any server listed its tools.
+    var toolsTotalText: String? {
+        toolsTotal > 0 ? "/\(toolsTotal)" : nil
+    }
+
+    /// The middle tile for VoiceOver: "149 of 388".
+    var toolsOffSpoken: String {
+        toolsTotal > 0 ? "\(toolsOff) of \(toolsTotal)" : "\(toolsOff)"
+    }
+
     /// The third tile's grey line: how far the check is, else what kind of
-    /// problems, else nothing.
+    /// problems, else "all fine" under its quiet 0.
     var needYouLine: String {
-        checkingLine ?? needLine
+        checkingLine ?? (needYou == 0 ? "all fine" : needLine)
     }
 }

@@ -23,8 +23,10 @@ enum StatusBadgeKind: Equatable, Sendable {
     }
 }
 
-/// The menu-bar icon: `server.rack`, plus a small badge at its bottom-right
-/// corner when something needs attention. The badge sits in a knockout (a hole
+/// The menu-bar icon: mcpock's own glyph (three stacked server units, each
+/// with a slot and a light; 22 Nov), plus a small badge at its bottom-right
+/// corner when something needs attention. The glyph is drawn on a half-point
+/// grid for an 18 pt box, so every edge lands on a whole pixel. The badge sits in a knockout (a hole
 /// punched through the glyph) so it reads cleanly over the glyph's strokes
 /// whatever the menu bar's colour is. Badge colours are the theme's status
 /// colours for the menu bar's own look, never the app theme: the deeper ones on
@@ -48,11 +50,16 @@ struct StatusIconView: View {
     static let diamondSide: CGFloat = 6
     /// Clear space between the badge and the glyph.
     static let knockout: CGFloat = 1.5
+    /// The glyph's asset (a one-colour template) and the box it is drawn for.
+    /// Also the icon of a server that has none of its own (`ServerIconView`).
+    static let glyphAsset = "mcpock-glyph"
+    static let glyphSize = NSSize(width: 18, height: 18)
     /// The image's size: room for the glyph plus the badge hanging off its corner.
     static let canvas = NSSize(width: 22, height: 18)
-    /// The badge's centre, in top-left coordinates on the canvas: on the glyph's
-    /// bottom-right corner.
-    static let badgeCenter = NSPoint(x: 17.5, y: 13.5)
+    /// The badge's centre, in top-left coordinates on the canvas: on the
+    /// bottom unit's right end, where its light is, so the badge takes the
+    /// light's place.
+    static let badgeCenter = NSPoint(x: 17.5, y: 14)
     /// The ask dot (1.16): top right, the glyph's own colour, no new colour.
     static let askCenter = NSPoint(x: 18.5, y: 3.5)
     static let askSize: CGFloat = 5.5
@@ -64,13 +71,15 @@ struct StatusIconView: View {
             .accessibilityLabel(Self.accessibilityLabel(for: aggregate, asksYou: asksYou))
     }
 
-    private static func glyph(color: NSColor? = nil) -> NSImage? {
-        var config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        if let color {
-            config = config.applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+    /// The glyph as its own image, a copy (the caller may flag it as a
+    /// template); the old system symbol if the asset is ever missing.
+    private static func glyph() -> NSImage? {
+        if let asset = NSImage(named: glyphAsset)?.copy() as? NSImage {
+            asset.size = glyphSize
+            return asset
         }
         return NSImage(systemSymbolName: "server.rack", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config)
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .medium))
     }
 
     static func image(for kind: StatusBadgeKind, asksYou: Bool = false) -> NSImage {
@@ -83,10 +92,17 @@ struct StatusIconView: View {
             let theme = ThemeColors.resolve(dark ? .dark : .light)
             guard let context = NSGraphicsContext.current else { return false }
 
-            if let symbol = glyph(color: .labelColor) {
+            // The glyph in the bar's own text colour: drawn, then coloured
+            // through its own shape (the canvas is still empty around it).
+            if let symbol = glyph() {
                 let size = symbol.size
-                let origin = NSPoint(x: (rect.width - size.width) / 2 - 1, y: (rect.height - size.height) / 2)
-                symbol.draw(in: NSRect(origin: origin, size: size))
+                let origin = NSPoint(x: 0, y: ((rect.height - size.height) / 2).rounded())
+                let box = NSRect(origin: origin, size: size)
+                symbol.draw(in: box)
+                context.compositingOperation = .sourceIn
+                NSColor.labelColor.setFill()
+                box.fill()
+                context.compositingOperation = .sourceOver
             }
 
             // Punch the knockout through the glyph, then draw the badge in it.

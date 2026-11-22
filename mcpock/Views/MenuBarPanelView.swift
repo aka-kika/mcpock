@@ -38,7 +38,7 @@ struct MenuBarPanelView: View {
     /// The search field (26pt) and the 8pt under it, only while it's open.
     nonisolated static let searchHeight: CGFloat = 34
     /// The three overview tiles (22 Nov): 10 above, the 66pt tiles, 6 below.
-    nonisolated static let overviewHeight: CGFloat = 82
+    nonisolated static let overviewHeight: CGFloat = 78
     /// One thin row, like 1.4.1.
     nonisolated static let footerHeight: CGFloat = 30
     /// The two 1pt rules: under the tabs (or the search) and above the footer.

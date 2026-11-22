@@ -8,6 +8,18 @@ import SwiftUI
 struct AccountSectionsView: View {
     @Bindable var panel: PanelState
     let theme: ThemeColors
+    @AppStorage(AppPreferences.usageWindowKey, store: AppPreferences.store) private var usageWindowRaw = UsageWindow.default.rawValue
+
+    /// A connector's calls from Claude Code in the Usage window (22 Nov):
+    /// nil with Usage off or before the first count.
+    private func calls(_ connector: ClaudeConnector) -> (count: Int, window: UsageWindow)? {
+        let window = UsageWindow(rawValue: usageWindowRaw) ?? .default
+        guard window != .off, let store = panel.usageStore,
+              let count = store.count(agent: AgentRegistry.claudeCodeLabel, server: ClaudeConnectors.usageName(connector.name),
+                                      window: window)
+        else { return nil }
+        return (count, window)
+    }
 
     /// With the attention toggle pressed only the connectors with a problem
     /// stay, and the links (never a problem) leave.
@@ -26,7 +38,7 @@ struct AccountSectionsView: View {
             if panel.includesConnectors, !connectors.isEmpty || (panel.connectorsNote != nil && panel.filter != .problems) {
                 header("Claude account", count: connectors.isEmpty ? nil : connectors.count)
                 ForEach(connectors) { connector in
-                    ConnectorRow(connector: connector, theme: theme)
+                    ConnectorRow(connector: connector, theme: theme, calls: calls(connector))
                 }
                 Text(panel.connectorsNote ?? ClaudeConnectors.footnote)
                     .font(Theme.caption)
@@ -57,11 +69,18 @@ struct AccountSectionsView: View {
 private struct ConnectorRow: View {
     let connector: ClaudeConnector
     let theme: ThemeColors
+    /// Its calls from Claude Code in the Usage window; nil when not counted.
+    var calls: (count: Int, window: UsageWindow)? = nil
 
     private var help: String {
         var lines = ["\(connector.name), a claude.ai connector. Claude Code says: \(stateWords)."]
         if !connector.offProjects.isEmpty {
             lines.append("Switched off in: " + connector.offProjects.joined(separator: ", "))
+        }
+        if let calls {
+            let span = calls.window.days.map { "in \($0) days" } ?? "all time"
+            lines.append(calls.count > 0 ? "\(ClaudeConnectors.callsWord(calls.count) ?? "") from Claude Code \(span)."
+                                         : "No calls from Claude Code \(span).")
         }
         return lines.joined(separator: "\n")
     }
@@ -91,10 +110,17 @@ private struct ConnectorRow: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 6)
+            // What it needs comes first; a connector with nothing to say shows its calls.
             if let word = connector.word {
                 Text(word)
                     .font(.system(size: 11.5))
                     .foregroundStyle(connector.wordIsProblem ? theme.badText : theme.textSecondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            } else if let callsWord = ClaudeConnectors.callsWord(calls?.count) {
+                Text(callsWord)
+                    .font(.system(size: 11.5).monospacedDigit())
+                    .foregroundStyle(theme.textSecondary)
                     .lineLimit(1)
                     .fixedSize()
             }

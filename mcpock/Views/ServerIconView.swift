@@ -16,8 +16,9 @@ struct ServerIconView: View {
     var word: String? = nil
     var size: CGFloat = 18
 
-    /// The menu bar icon's symbol (`StatusIconView`), the fallback glyph.
-    static let fallbackSymbol = "server.rack"
+    /// The fallback: the menu bar's own glyph (`StatusIconView`), the three
+    /// stacked server units. Drawn for an 18 pt box, so it fills the frame.
+    static let fallbackAsset = StatusIconView.glyphAsset
     /// The badge's centre, from the icon's bottom right corner.
     private static let badgeOffset = CGSize(width: 4, height: 3)
     private static let cutout: CGFloat = 12
@@ -67,11 +68,35 @@ struct ServerIconView: View {
                 .frame(width: size * 0.84, height: size * 0.84)
                 .foregroundStyle(theme.textSecondary)
                 .accessibilityHidden(true)
+        case .file(let path):
+            if let image = OwnIconCache.image(path) {
+                Image(nsImage: image)
+                    .renderingMode(.template)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: size * 0.84, height: size * 0.84)
+                    .foregroundStyle(theme.textSecondary)
+                    .accessibilityHidden(true)
+            } else {
+                fallbackGlyph
+            }
         case .symbol(let name):
             symbol(name)
         case .fallback:
-            symbol(Self.fallbackSymbol)
+            fallbackGlyph
         }
+    }
+
+    private var fallbackGlyph: some View {
+        Image(Self.fallbackAsset)
+            .renderingMode(.template)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .foregroundStyle(theme.textSecondary)
+            .accessibilityHidden(true)
     }
 
     private func symbol(_ name: String) -> some View {
@@ -79,5 +104,28 @@ struct ServerIconView: View {
             .font(.system(size: size * 0.72, weight: .regular))
             .foregroundStyle(theme.textSecondary)
             .accessibilityHidden(true)
+    }
+}
+
+/// Her own icon files (`ServerIcons.userDirectory`), read once per file and
+/// change date: a row is drawn many times, the file is small.
+@MainActor
+enum OwnIconCache {
+    private static var images: [String: (stamp: Date?, image: NSImage?)] = [:]
+    /// Bigger than this and the file is not a row icon.
+    static let maxBytes = 2 * 1024 * 1024
+
+    static func image(_ path: String) -> NSImage? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        let stamp = attributes?[.modificationDate] as? Date
+        if let cached = images[path], cached.stamp == stamp { return cached.image }
+        var image: NSImage?
+        if let size = (attributes?[.size] as? NSNumber)?.intValue, size <= maxBytes {
+            image = NSImage(contentsOfFile: path)
+            image?.isTemplate = true
+        }
+        if images.count > 200 { images.removeAll() }
+        images[path] = (stamp, image)
+        return image
     }
 }

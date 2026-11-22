@@ -35,6 +35,9 @@ What mcpock runs, reads, writes and sends. Back to the [README](../README.md).
   path of mcpock.app, so remove the filter before you move or delete mcpock:
   until then the agent can't start that server, and mcpock shows it as broken
   and says why.
+- **Your own server icons are read, never sent.** Pictures you put in
+  `~/Library/Application Support/mcpock/ServerIcons/` are only drawn in the
+  panel. mcpock never writes there.
 - **Everything else only reads.** "Open Config…" asks first, with Cancel as
   the default.
 - **What it runs.** To check a local server, mcpock starts the exact command

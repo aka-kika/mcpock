@@ -42,8 +42,8 @@ final class PanelLayoutTests: XCTestCase {
     /// The tabs, the three overview tiles (22 Nov), the thin footer and two
     /// rules are all the chrome there is while the search is closed.
     func testClosedChromeIsTabsTilesFooterAndRules() {
-        XCTAssertEqual(MenuBarPanelView.chromeHeight(searchOpen: false), 42 + 82 + 30 + 2)
-        XCTAssertEqual(MenuBarPanelView.listHeight(searchOpen: false), 404)
+        XCTAssertEqual(MenuBarPanelView.chromeHeight(searchOpen: false), 42 + 78 + 30 + 2)
+        XCTAssertEqual(MenuBarPanelView.listHeight(searchOpen: false), 408)
     }
 
     /// The tiles sit in their block with room around them.

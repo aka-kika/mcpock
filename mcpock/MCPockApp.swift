@@ -125,6 +125,8 @@ struct MCPockApp: App {
         // its files: a demo card must not show a real project's folder name
         // (review 22 Nov).
         panel.useStandIns(PanelState.standIns(isDemo: isDemo, isHostingTests: isHostingTests))
+        // Her own server icons, from her own folder: never in a demo picture, never in a test.
+        if !isDemo && !isHostingTests { ServerIcons.userDirectory = ServerIcons.defaultUserDirectory }
         panel.usageStore = usageStore
         // Agents read each tool's calls through the status file (1.16).
         monitor.toolUsage = { [weak usageStore] server, window in

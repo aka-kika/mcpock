@@ -285,7 +285,7 @@ enum DemoData {
     } + turnedOffConfigs
 
     /// Two servers switched off in their agent (22 Nov), so the pictures show
-    /// "2 of 3 servers" on an agent's row and the Turned off fold. Never
+    /// "2/3 servers" on an agent's row and the Turned off fold. Never
     /// probed: an off declaration is not started.
     private static let turnedOffConfigs: [ServerConfig] = [
         ("puppeteer", "Goose", "~/.config/goose/config.yaml", ["-y", "@modelcontextprotocol/server-puppeteer"]),
@@ -297,7 +297,7 @@ enum DemoData {
     }
 
     /// Tools hidden in the sample set, by `ServerConfig.id` (22 Nov): the
-    /// rows read "6 of 8 tools" and the overview counts them. Demo mode has
+    /// rows read "6/8 tools" and the overview counts them. Demo mode has
     /// no switches, so this is the only place they come from.
     static let hiddenTools: [String: Set<String>] = [
         "Code:github": ["create_pull_request", "fork_repository"],
@@ -356,7 +356,10 @@ enum DemoData {
         }
         let byAgent: [String: [UsageEvent]] = [
             "Code": events("Code", "github", recent: 18, mid: 42, old: 31)
-                + events("Code", "brave-search", recent: 20, mid: 33, old: 12),
+                + events("Code", "brave-search", recent: 20, mid: 33, old: 12)
+                // The account's connectors are counted under Claude Code's own name for them.
+                + events("Code", "claude.ai Gmail", recent: 14, mid: 27, old: 9)
+                + events("Code", "claude.ai Canva", recent: 3, mid: 5, old: 0),
             "Cursor": events("Cursor", "filesystem", recent: 25, mid: 30, old: 10)
                 + events("Cursor", "memory", recent: 7, mid: 9, old: 3)
                 + events("Cursor", "stripe", recent: 5, mid: 6, old: 2),

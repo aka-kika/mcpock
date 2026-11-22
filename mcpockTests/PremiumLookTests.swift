@@ -28,13 +28,13 @@ final class PremiumLookTests: XCTestCase {
 
     func testToolsReadInWords() {
         XCTAssertEqual(RowCounts(tools: 7).words, "7 tools")
-        XCTAssertEqual(RowCounts(tools: 7, hidden: 2).words, "5 of 7 tools")
+        XCTAssertEqual(RowCounts(tools: 7, hidden: 2).words, "5/7 tools")
         XCTAssertEqual(RowCounts(tools: 1).words, "1 tool")
         XCTAssertNil(RowCounts(tools: 0).words, "nothing to count yet: no value at all")
     }
 
     func testAnAgentsServersReadInWords() {
-        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, unit: .servers).words, "21 of 29 servers")
+        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, unit: .servers).words, "21/29 servers")
         XCTAssertEqual(RowCounts(tools: 19, unit: .servers).words, "19 servers")
         XCTAssertEqual(RowCounts(tools: 1, unit: .servers).words, "1 server")
     }
@@ -42,7 +42,7 @@ final class PremiumLookTests: XCTestCase {
     /// The calls left the rows: the words never carry them, the tooltip does.
     func testCallsStayOutOfTheWordsAndInTheTooltip() {
         let counts = RowCounts(tools: 7, hidden: 2, calls: 160, window: .default)
-        XCTAssertEqual(counts.words, "5 of 7 tools")
+        XCTAssertEqual(counts.words, "5/7 tools")
         XCTAssertTrue(counts.help.contains("160 calls"))
     }
 
@@ -53,7 +53,7 @@ final class PremiumLookTests: XCTestCase {
     }
 
     func testHiddenIsClampedInTheWords() {
-        XCTAssertEqual(RowCounts(tools: 3, hidden: 9).words, "0 of 3 tools")
+        XCTAssertEqual(RowCounts(tools: 3, hidden: 9).words, "0/3 tools")
         XCTAssertEqual(RowCounts(tools: 3, hidden: -2).words, "3 tools")
     }
 
@@ -89,10 +89,10 @@ final class PremiumLookTests: XCTestCase {
     // MARK: - The card's tools header
 
     func testTheCardSaysHowManyToolsAreOn() {
-        XCTAssertEqual(CardText.toolsTitle(count: 7, hidden: 2), "Tools \u{00B7} 5 of 7 on")
+        XCTAssertEqual(CardText.toolsTitle(count: 7, hidden: 2), "Tools \u{00B7} 5/7 on")
         XCTAssertEqual(CardText.toolsTitle(count: 7, hidden: 0), "Tools \u{00B7} 7")
         XCTAssertEqual(CardText.toolsTitle(count: 0, hidden: 0), "Tools \u{00B7} 0")
-        XCTAssertEqual(CardText.toolsTitle(count: 3, hidden: 9), "Tools \u{00B7} 0 of 3 on", "never more off than there are")
+        XCTAssertEqual(CardText.toolsTitle(count: 3, hidden: 9), "Tools \u{00B7} 0/3 on", "never more off than there are")
     }
 
     // MARK: - Off in one Claude Code project
@@ -132,7 +132,8 @@ final class PremiumLookTests: XCTestCase {
     }
 
     func testTheFallbackIsTheMenuBarGlyph() {
-        XCTAssertEqual(ServerIconView.fallbackSymbol, "server.rack")
+        XCTAssertEqual(ServerIconView.fallbackAsset, StatusIconView.glyphAsset)
+        XCTAssertNotNil(NSImage(named: StatusIconView.glyphAsset), "the glyph is in the app's assets")
     }
 
     func testUsedByNamesTheAgentsOnce() {
@@ -184,7 +185,7 @@ final class PremiumLookTests: XCTestCase {
         let overview = PanelOverview.build(groups: [group("github", tools: 3)], agentCount: 1) { _ in 0 }
         XCTAssertEqual(overview.needYou, 0)
         XCTAssertFalse(overview.hasBroken)
-        XCTAssertEqual(overview.needYouLine, "")
+        XCTAssertEqual(overview.needYouLine, "all fine")
         XCTAssertEqual(overview.toolsOffLine, "all tools on")
         XCTAssertEqual(overview.inUseLine, "in 1 agent")
     }
@@ -268,7 +269,7 @@ final class PremiumLookTests: XCTestCase {
         XCTAssertEqual(agent.countWords, "29")
         XCTAssertEqual(agent.quietCount, 8)
         agent.offCount = 8
-        XCTAssertEqual(agent.countWords, "21 of 29")
+        XCTAssertEqual(agent.countWords, "21/29")
     }
 
     /// The status file names Codex "Codex / ChatGPT desktop": its ring must

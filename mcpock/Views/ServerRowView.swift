@@ -30,7 +30,7 @@ struct ServerRowView: View {
     var isChecking = false
     /// An agent asks about this server (1.16): a small dot after the name.
     var asksYou = false
-    /// The row's one value, "5 of 7 tools" (22 Nov); the calls are in its tooltip.
+    /// The row's one value, "5/7 tools" (22 Nov); the calls are in its tooltip.
     var counts = RowCounts(tools: 0)
     let actions: ServerRowActions
     @State private var isHovered = false
@@ -155,7 +155,7 @@ struct ServerRowView: View {
 }
 
 /// A row's one value (premium look, 22 Nov, Kika's picks): the count in
-/// words, "5 of 7 tools", "29 servers", or "No tools" for a broken server
+/// words, "5/7 tools", "29 servers", or "No tools" for a broken server
 /// that never gave any. One view for server rows on both tabs and the
 /// agents' own rows, so the same thing always looks the same; the calls and
 /// the rest are in the tooltip.

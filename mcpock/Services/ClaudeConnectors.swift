@@ -69,6 +69,17 @@ enum ClaudeConnectors {
     static let refreshEvery: TimeInterval = 30 * 60
     static let timeout: Duration = .seconds(90)
 
+    /// The name Claude Code files a connector's calls under ("claude.ai
+    /// Gmail"; its tools are `mcp__claude_ai_Gmail__…`), for the usage count.
+    static func usageName(_ connector: String) -> String { prefix + connector }
+
+    /// "642 calls" on a connector's row (22 Nov, Kika's yes): nil with
+    /// nothing counted, so a row never says "0 calls".
+    static func callsWord(_ calls: Int?) -> String? {
+        guard let calls, calls > 0 else { return nil }
+        return "\(calls.formatted(.number.locale(Locale(identifier: "en_US")))) call\(calls == 1 ? "" : "s")"
+    }
+
     /// The grey line under the section.
     static let footnote = "Best effort. Needs Claude Code signed in with a claude.ai account."
 

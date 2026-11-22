@@ -516,4 +516,17 @@ final class ReviewNov22Tests: XCTestCase {
             XCTAssertEqual(ServerIcons.icon(name: name, targets: targets), ServerIcons.lookUp(name: name, targets: targets), name)
         }
     }
+
+    // MARK: A connector's calls on its row (22 Nov, Kika's yes)
+
+    func testAConnectorsCallsAreFiledUnderClaudeCodesNameForIt() {
+        // Claude Code's tool is mcp__claude_ai_Google_Sheets__x; the section shows "Google Sheets".
+        XCTAssertEqual(HealthMonitor.normalizedName(ClaudeConnectors.usageName("Google Sheets")),
+                       HealthMonitor.normalizedName("claude_ai_Google_Sheets"))
+        XCTAssertEqual(ClaudeConnectors.callsWord(642), "642 calls")
+        XCTAssertEqual(ClaudeConnectors.callsWord(1), "1 call")
+        XCTAssertEqual(ClaudeConnectors.callsWord(12_345), "12,345 calls")
+        XCTAssertNil(ClaudeConnectors.callsWord(0), "a row never says 0 calls")
+        XCTAssertNil(ClaudeConnectors.callsWord(nil))
+    }
 }

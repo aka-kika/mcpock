@@ -8,6 +8,9 @@ enum ServerIcon: Equatable, Sendable {
     case symbol(String)
     /// No icon known: the mcpock mark.
     case fallback
+    /// Her own picture for this server, a file in `ServerIcons.userDirectory`
+    /// (the path). Drawn in one colour, like the rest.
+    case file(String)
 }
 
 /// Picks a glyph for a server from its name, package or host.
@@ -107,6 +110,8 @@ enum ServerIcons {
         Entry(icon: a("youtube"), names: ["youtube"], packages: [], hosts: []),
         Entry(icon: a("whatsapp"), names: ["whatsapp"], packages: [], hosts: []),
         Entry(icon: a("reddit"), names: ["reddit"], packages: [], hosts: []),
+        Entry(icon: a("monday"), names: ["monday", "monday-com"], packages: ["@mondaydotcomorg/monday-api-mcp"], hosts: ["mcp.monday.com"]),
+        Entry(icon: s("square.3.layers.3d"), names: ["icon-composer", "iconcomposer"], packages: [], hosts: []),
     ]
 
     /// Ordered, first hit wins. A keyword matches a whole `-` part of the name.
@@ -169,9 +174,59 @@ enum ServerIcons {
     private static let cacheLock = NSLock()
     private static var cache: [String: ServerIcon] = [:]
 
+    // MARK: Your own icons (22 Nov)
+
+    /// `~/Library/Application Support/mcpock/ServerIcons/`: one picture per
+    /// server, named like the server (`my-server.svg`, `.pdf` or `.png`),
+    /// shown in one colour in place of whatever the table says. For servers
+    /// the table can't know (her own apps, a company's own server); the
+    /// files stay on her Mac. Read only, never written.
+    static var defaultUserDirectory: URL {
+        MCPockStatus.defaultDirectory().appendingPathComponent("ServerIcons", isDirectory: true)
+    }
+
+    /// Where own icons are read from; nil (the start value, and in demo mode
+    /// and hosted tests) reads nothing, so a demo picture never shows one.
+    static var userDirectory: URL? {
+        get { userLock.lock(); defer { userLock.unlock() }; return userFolder }
+        set { userLock.lock(); userFolder = newValue; userIndex = [:]; userRead = nil; userLock.unlock() }
+    }
+
+    static let userFileTypes: Set<String> = ["svg", "pdf", "png"]
+    private static let userLock = NSLock()
+    private static var userFolder: URL?
+    private static var userIndex: [String: String] = [:]
+    private static var userRead: Date?
+
+    /// The name a file and a server meet on: lowercased, the mcp/server
+    /// decoration dropped, letters and digits only ("Safari_MCP" is "safari").
+    static func userKey(_ name: String) -> String {
+        normalize(name).filter { $0.isLetter || $0.isNumber }
+    }
+
+    /// Her own picture for `name`, if the folder has one. The folder is
+    /// listed again at most every three seconds.
+    static func userIcon(name: String, now: Date = Date()) -> ServerIcon? {
+        userLock.lock()
+        defer { userLock.unlock() }
+        guard let folder = userFolder else { return nil }
+        if userRead.map({ now.timeIntervalSince($0) > 3 || now < $0 }) ?? true {
+            var index: [String: String] = [:]
+            let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            for file in files.sorted() where userFileTypes.contains((file as NSString).pathExtension.lowercased()) {
+                let key = userKey((file as NSString).deletingPathExtension)
+                if !key.isEmpty, index[key] == nil { index[key] = folder.appendingPathComponent(file).path }
+            }
+            userIndex = index
+            userRead = now
+        }
+        return userIndex[userKey(name)].map(ServerIcon.file)
+    }
+
     /// `targets` are the command lines or URLs from the config. The answer
     /// for a name and its targets never changes, so it is kept.
     static func icon(name: String, targets: [String]) -> ServerIcon {
+        if let own = userIcon(name: name) { return own }
         let key = name + "\u{1F}" + targets.joined(separator: "\u{1F}")
         cacheLock.lock()
         if let found = cache[key] {

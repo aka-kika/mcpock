@@ -188,9 +188,9 @@ extension ServerGroup {
 }
 
 /// A row's numbers, the same on the Servers and Agents tabs and on an
-/// agent's own row: one value in words (`words`): "5 of 7 tools" when some
+/// agent's own row: one value in words (`words`): "5/7 tools" when some
 /// are hidden, "7 tools" when none are; on an agent's row its servers,
-/// "21 of 29 servers" or "29 servers". The calls in the Usage window appear
+/// "21/29 servers" or "29 servers". The calls in the Usage window appear
 /// only in the tooltip (`help`). On a server row the count is tools; on an
 /// agent's row it is its servers (on / all).
 struct RowCounts: Equatable {
@@ -215,8 +215,8 @@ struct RowCounts: Equatable {
     var unit: Unit = .tools
 
     /// What a row shows since the premium look (22 Nov, Kika's picks): one
-    /// value in words, "5 of 7 tools" when some are hidden or off, "7 tools"
-    /// when none are; "21 of 29 servers", "29 servers" on an agent's row. Nil
+    /// value, "5/7 tools" when some are hidden or off (a slash since 22 Nov, Kika: "13/17 tools"), "7 tools"
+    /// when none are; "21/29 servers", "29 servers" on an agent's row. Nil
     /// when there is nothing to count yet. Calls are in the tooltip only.
     var words: String? {
         guard tools > 0 else { return nil }
@@ -226,7 +226,7 @@ struct RowCounts: Equatable {
         case .tools: noun = tools == 1 ? "tool" : "tools"
         case .servers: noun = tools == 1 ? "server" : "servers"
         }
-        return off > 0 ? "\(tools - off) of \(tools) \(noun)" : "\(tools) \(noun)"
+        return off > 0 ? "\(tools - off)/\(tools) \(noun)" : "\(tools) \(noun)"
     }
 
     /// "9,214 calls in 30 days", for an open agent's first line; nil with no

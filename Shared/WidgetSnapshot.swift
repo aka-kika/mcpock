@@ -73,10 +73,10 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
         var redCount: Int { min(brokenCount ?? problemCount, problemCount) }
         /// Neither fine nor a problem: off, paused, not checked. The bare track.
         var quietCount: Int { max(serverCount - problemCount - fineCount, 0) }
-        /// "21 of 29" when some are off, "29" when none are.
+        /// "21/29" when some are off, "29" when none are.
         var countWords: String {
             let off = min(max(offCount ?? 0, 0), serverCount)
-            return off > 0 ? "\(serverCount - off) of \(serverCount)" : "\(serverCount)"
+            return off > 0 ? "\(serverCount - off)/\(serverCount)" : "\(serverCount)"
         }
     }
 

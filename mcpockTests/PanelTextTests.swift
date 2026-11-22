@@ -247,16 +247,16 @@ final class PanelTextTests: XCTestCase {
 final class RowCountsTests: XCTestCase {
     func testTheWords() {
         XCTAssertEqual(RowCounts(tools: 24, calls: 130).words, "24 tools")
-        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 1234).words, "70 of 100 tools")
+        XCTAssertEqual(RowCounts(tools: 100, hidden: 30, calls: 1234).words, "70/100 tools")
         XCTAssertEqual(RowCounts(tools: 1, calls: 1).words, "1 tool")
         XCTAssertEqual(RowCounts(tools: 24, calls: nil).words, "24 tools", "Usage off: no call count")
         XCTAssertNil(RowCounts(tools: 0, calls: 5).words, "not checked yet: nothing to count")
-        XCTAssertEqual(RowCounts(tools: 4, hidden: 4, calls: 0).words, "0 of 4 tools")
-        XCTAssertEqual(RowCounts(tools: 4, hidden: 9).words, "0 of 4 tools", "never more hidden than there are")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 4, calls: 0).words, "0/4 tools")
+        XCTAssertEqual(RowCounts(tools: 4, hidden: 9).words, "0/4 tools", "never more hidden than there are")
     }
 
     func testAnAgentsRow() {
-        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, calls: 3100, unit: .servers).words, "21 of 29 servers")
+        XCTAssertEqual(RowCounts(tools: 29, hidden: 8, calls: 3100, unit: .servers).words, "21/29 servers")
         XCTAssertEqual(RowCounts(tools: 13, unit: .servers).words, "13 servers", "no record: no calls")
         XCTAssertEqual(RowCounts(tools: 29, hidden: 8, calls: 12, window: .thirtyDays, unit: .servers).help,
                        "21 of 29 servers on, 8 turned off, 12 calls in 30 days")

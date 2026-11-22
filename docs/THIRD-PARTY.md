@@ -206,6 +206,24 @@ POSSIBILITY OF SUCH DAMAGE.
   mcpock is not affiliated with them and uses the marks only to name the
   server.
 
+### Server glyphs from other sources
+
+Every mark is a trademark of its owner, is not affiliated with mcpock, and is
+used only to name the server.
+
+- **n8n:** Simple Icons release 15.0.0 (CC0 1.0), `icons/n8n.svg`. The file
+  in the current Simple Icons master is a different, much wider shape that
+  does not read at row size.
+- **monday.com:** `assets/logo.svg` in <https://github.com/mondaycom/mcp>
+  (MIT License, monday.com). The three colors were flattened to one.
+- **Apple Icon Composer:** an SF Symbol (`square.3.layers.3d`); no Apple
+  artwork is copied.
+
+Brands whose mark has no clear license for this use (the ones Simple Icons
+no longer carries, and marks only found on a company's own site) show
+mcpock's plain server icon. You can give any server your own picture: see
+"Your own server icons" in the README.
+
 ```
 MIT License
 
