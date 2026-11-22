@@ -107,11 +107,11 @@ final class SwitchPanelTests: XCTestCase {
         XCTAssertEqual(cursor.offCount, 1)
         XCTAssertEqual(cursor.fineCount, 1)
         XCTAssertEqual(AgentSections.problemText(cursor), "", "the row's 1/2 says it (12 Nov)")
-        XCTAssertEqual(RowCounts(tools: cursor.servers.count, hidden: cursor.offCount, unit: .servers).line, "1/2")
+        XCTAssertEqual(RowCounts(tools: cursor.servers.count, hidden: cursor.offCount, unit: .servers).words, "1 of 2 servers")
         XCTAssertEqual(cursor.servers.first { $0.name == "a" }?.note, "Off")
         let codex = sections.first { $0.agent == "Codex" }!
         XCTAssertEqual(AgentSections.problemText(codex), "")
-        XCTAssertEqual(RowCounts(tools: codex.servers.count, hidden: codex.offCount, unit: .servers).line, "0/1")
+        XCTAssertEqual(RowCounts(tools: codex.servers.count, hidden: codex.offCount, unit: .servers).words, "0 of 1 server")
         XCTAssertEqual(AgentSections.restText(codex), "Its only server is turned off")
         XCTAssertTrue(codex.problems.isEmpty)
     }
@@ -162,8 +162,8 @@ final class SwitchPanelTests: XCTestCase {
         XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter"), 1, "Cursor can't hide tools: Codex decides")
         XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter", configIDs: codex), 1)
         XCTAssertEqual(monitor.hiddenToolCount(groupName: "openrouter", configIDs: cursor), 0)
-        XCTAssertEqual(RowCounts(tools: 3, hidden: monitor.hiddenToolCount(groupName: "openrouter"), calls: 130).line,
-                       "2/3 \u{00B7} 130")
+        XCTAssertEqual(RowCounts(tools: 3, hidden: monitor.hiddenToolCount(groupName: "openrouter"), calls: 130).words,
+                       "2 of 3 tools")
 
         monitor.switchesEnabled = false
         monitor.refreshHiddenTools()

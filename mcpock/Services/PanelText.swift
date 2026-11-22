@@ -188,13 +188,13 @@ extension ServerGroup {
 }
 
 /// A row's numbers, the same on the Servers and Agents tabs and on an
-/// agent's own row (11 Nov, 37f0; numbers only since 12 Nov, Kika: "just the
-/// number"): "9/54" when some are off or hidden, "6" when none are, then the
-/// calls in the Usage window, dimmer, after a centred dot: "9/54 · 74". The
-/// words live in the tooltip. On a server row the numbers are tools; on an
-/// agent's row they are its servers (on / all) and its own calls.
+/// agent's own row: one value in words (`words`): "5 of 7 tools" when some
+/// are hidden, "7 tools" when none are; on an agent's row its servers,
+/// "21 of 29 servers" or "29 servers". The calls in the Usage window appear
+/// only in the tooltip (`help`). On a server row the count is tools; on an
+/// agent's row it is its servers (on / all).
 struct RowCounts: Equatable {
-    /// What the "x/N" counts.
+    /// What the count is of.
     enum Unit: Equatable {
         case tools, servers
     }
@@ -213,16 +213,6 @@ struct RowCounts: Equatable {
     /// The Usage window, for the tooltip.
     var window: UsageWindow = .default
     var unit: Unit = .tools
-
-    /// "9/54", "6", or nil when there is nothing to count yet.
-    var onPart: String? {
-        guard tools > 0 else { return nil }
-        let off = clampedHidden
-        return off > 0 ? "\(tools - off)/\(tools)" : "\(tools)"
-    }
-
-    /// "74", "1.2k", or nil with no call count.
-    var callsPart: String? { calls.map(UsageText.compact) }
 
     /// What a row shows since the premium look (22 Nov, Kika's picks): one
     /// value in words, "5 of 7 tools" when some are hidden or off, "7 tools"
@@ -245,12 +235,6 @@ struct RowCounts: Equatable {
         guard let calls else { return nil }
         let span = window.days.map { "in \($0) days" } ?? "all time"
         return "\(calls.formatted(.number.locale(Locale(identifier: "en_US")))) call\(calls == 1 ? "" : "s") \(span)"
-    }
-
-    /// The whole label as one string: "9/54 · 74", "6", "74", or "" when
-    /// there is nothing to say yet. The view draws the calls dimmer.
-    var line: String {
-        [onPart, callsPart].compactMap { $0 }.joined(separator: " \u{00B7} ")
     }
 
     private var clampedHidden: Int { min(max(hidden, 0), tools) }

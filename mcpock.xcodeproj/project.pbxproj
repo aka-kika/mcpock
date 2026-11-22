@@ -110,7 +110,6 @@
 		604EF6573BC560C81D22858C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 981D0A65C6D25412CF19A2A7 /* Assets.xcassets */; };
 		614771CBE72D3933C1C4A91A /* UsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878B863EF5565076330EEE51 /* UsageTests.swift */; };
 		61B664E06881ABEF74711583 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7874494E7CE378CA4E6E7226 /* WidgetKit.framework */; };
-		626C336A7214D1CB229FC756 /* RingArcs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5E8EB996C3A6B11A2C442E /* RingArcs.swift */; };
 		64C2816154BFBF06D1C4A5E0 /* StatusReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E48BCAA4C53E9F11C659DC1 /* StatusReport.swift */; };
 		6527916197299A0E4F993DDF /* ConfigDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9195D34E92749D527CA66F1 /* ConfigDiscoveryTests.swift */; };
 		65C8CD45FB7FC6818ABFA70A /* ServerRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA5A9C92A09997AC2409D /* ServerRowView.swift */; };
@@ -1341,7 +1340,6 @@
 				6B7ACABBB33F3A82308A52CF /* MCPStatusServer.swift in Sources */,
 				67B9A119FB7509414A8FA784 /* MCPockStatus.swift in Sources */,
 				67AAB90CD3C51FA712686EFE /* Models.swift in Sources */,
-				626C336A7214D1CB229FC756 /* RingArcs.swift in Sources */,
 				11D557A7AA8A7494ECEABAA8 /* SecretMask.swift in Sources */,
 				9E102B64DB44A2E77B8776B9 /* StatusReport.swift in Sources */,
 				701B745C8AF8227EF39E67CC /* StdinLineReader.swift in Sources */,

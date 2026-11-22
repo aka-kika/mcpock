@@ -113,8 +113,9 @@ targets:
         # spawn MCP servers and read configs anywhere under ~).
         com.apple.security.application-groups:
           - P5RB3W3D58.com.mcpock
-  # Read-only MCP server over stdio (round 7): answers from the status file the
-  # app writes, never probes. Settings > Connect hands out its path.
+  # MCP server over stdio (round 7): answers from the status file the app
+  # writes, never probes. Its `filter` mode starts a server that hides tools
+  # from an agent. Settings > Connect hands out its path.
   mcpock-mcp:
     type: tool
     platform: macOS
@@ -127,6 +128,7 @@ targets:
           - "AppGroup.swift"
           - "WidgetSnapshot.swift"
           - "WidgetSnapshotStore.swift"
+          - "RingArcs.swift"
       # Reused from the app: JSON-RPC framing (and the types it throws).
       - path: mcpock/Services/MCPJSONRPC.swift
       - path: mcpock/Models/Models.swift

@@ -85,7 +85,6 @@ final class AgentSectionsTests: XCTestCase {
         XCTAssertEqual(sections[1].problems.last?.note, "Points at a different command than the others",
                        "Grok is the odd one out")
         XCTAssertEqual(code.brokenCount, 1)
-        XCTAssertEqual(code.attentionCount, 1)
         XCTAssertEqual(code.fineCount, 1, "firecrawl is fine for Claude Code")
     }
 

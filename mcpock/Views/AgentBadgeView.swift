@@ -46,18 +46,3 @@ struct AgentBadgeView: View {
     /// the text beside them.
     static let logoScale: CGFloat = 0.72
 }
-
-/// "+2" after the first three badges on a row, as plain text like the logos.
-struct MoreBadgeView: View {
-    let count: Int
-    let theme: ThemeColors
-    var height: CGFloat = 18
-
-    var body: some View {
-        Text("+\(count)")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(theme.textSecondary)
-            .padding(.horizontal, 1)
-            .frame(height: height)
-    }
-}

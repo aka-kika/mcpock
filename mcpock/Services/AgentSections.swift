@@ -43,8 +43,6 @@ struct AgentSection: Identifiable, Hashable, Sendable {
     var displayName: String { AgentBadge.displayLabel(agent) }
     var problems: [AgentServer] { servers.filter(\.needsYou) }
     var brokenCount: Int { servers.filter { $0.state == .broken }.count }
-    /// Needs you, but not broken: slow, sign-in, differs.
-    var attentionCount: Int { problems.count - brokenCount }
     /// Not checked yet (right after launch). Neither a problem nor fine.
     var checkingCount: Int { servers.filter { $0.state == .unknown }.count }
     /// Paused, by her or waiting for a scan-only file's OK: not checked, so

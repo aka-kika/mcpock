@@ -67,16 +67,7 @@ struct AgentsListView: View {
                 withAnimation(.easeInOut(duration: 0.15)) { proxy.scrollTo(agent, anchor: .top) }
             }
             // Back to the agent she left open, if the list reopened scrolled away.
-            // Round 9b: also opens the health bars' "grow together" window for
-            // this first real paint (no-op on a later view); closed again once
-            // this pass has settled, so a row the LazyVStack mounts later, on a
-            // scroll, never sees it open.
             .onAppear {
-                panel.agentsTabAppeared(hasCompletedFirstPass: panel.monitor.hasCompletedFirstPass)
-                Task { @MainActor in
-                    await Task.yield()
-                    panel.closeFirstAgentsViewWindow()
-                }
                 guard let open else { return }
                 proxy.scrollTo(open, anchor: .top)
             }

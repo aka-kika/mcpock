@@ -164,20 +164,6 @@ final class PanelState {
         }
     }
 
-    /// True once the Agents tab has shown its health bars with real data at
-    /// least once this launch (round 9b: "the first time the panel opens" —
-    /// the health bar lives only on this tab, so its first paint is the
-    /// moment that reads as opening). Session-only, never persisted: a
-    /// relaunch starts over, and a later tab switch or panel re-open never
-    /// replays it — only a refresh finishing does (`healthBarShouldGrow`).
-    @ObservationIgnored private(set) var hasShownAgentsTabOnce = false
-    /// True for the short window right after that first real paint:
-    /// every `HealthBar` that exists then — the rows visible without
-    /// scrolling — grows in together. `AgentsListView` closes it once that
-    /// paint has settled, so a row the `LazyVStack` mounts later, scrolled
-    /// into view, never sees it open and never starts its own grow.
-    private(set) var firstAgentsViewWindowOpen = false
-
     /// The MenuBarExtra window, found through the panel's hosting view. The
     /// keyboard handler only answers events aimed at it (or at the card).
     @ObservationIgnored weak var panelWindow: NSWindow?
@@ -637,46 +623,6 @@ final class PanelState {
     /// Whether the panel should switch itself to Needs you. Pure.
     nonisolated static func shouldJumpToNeedsYou(hasBroken: Bool, filter: PanelFilter, userPickedFilter: Bool) -> Bool {
         hasBroken && filter != .problems && !userPickedFilter
-    }
-
-    /// Whether the Agents tab's health bars (`HealthBar`, round 9) should grow
-    /// in: only on the `isRefreshing` true -> false edge, a full check (the
-    /// timer's own cycle or the footer's Refresh) finishing. A single row's
-    /// "Check again" (`HealthMonitor.refresh(groupName:)`) never touches
-    /// `isRefreshing`, so it never qualifies here. Pure.
-    nonisolated static func healthBarShouldGrow(wasRefreshing: Bool, isRefreshing: Bool) -> Bool {
-        wasRefreshing && !isRefreshing
-    }
-
-    /// Whether the Agents tab's first view this launch should open the
-    /// health bars' "grow together" window (round 9b): only the first time,
-    /// and only once there is something real to grow. A peek before the
-    /// first check finishes is skipped without spending the one-per-launch
-    /// opportunity — `healthBarShouldGrow`'s refresh edge covers it once
-    /// results arrive, and a later, real first view still gets this one. Pure.
-    nonisolated static func healthBarShouldGrowOnFirstAgentsView(
-        hasShownAgentsTabOnce: Bool, hasCompletedFirstPass: Bool
-    ) -> Bool {
-        !hasShownAgentsTabOnce && hasCompletedFirstPass
-    }
-
-    /// The Agents tab appeared. Opens `firstAgentsViewWindowOpen` for the
-    /// rows already visible without scrolling to grow in together; does
-    /// nothing on a later view (tab switch, panel re-open) or when there is
-    /// nothing real to show yet. `AgentsListView` closes the window again
-    /// once its first paint has settled.
-    func agentsTabAppeared(hasCompletedFirstPass: Bool) {
-        guard Self.healthBarShouldGrowOnFirstAgentsView(
-            hasShownAgentsTabOnce: hasShownAgentsTabOnce,
-            hasCompletedFirstPass: hasCompletedFirstPass
-        ) else { return }
-        hasShownAgentsTabOnce = true
-        firstAgentsViewWindowOpen = true
-    }
-
-    /// Closes the window `agentsTabAppeared` opened.
-    func closeFirstAgentsViewWindow() {
-        firstAgentsViewWindowOpen = false
     }
 
     // MARK: - Selection and card

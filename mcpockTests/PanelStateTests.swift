@@ -186,61 +186,6 @@ final class PanelStateTests: XCTestCase {
         XCTAssertTrue(state.monitor.isHidden("reed-md"), "…and expiring never unhides")
     }
 
-    // MARK: - Health bar animation (round 9)
-
-    /// The Agents tab's health bar grows in exactly on the true -> false edge
-    /// of `isRefreshing` — a full check finishing — and never on any other
-    /// transition (starting a check, staying refreshing, staying idle).
-    func testHealthBarGrowsOnlyWhenRefreshingFinishes() {
-        XCTAssertTrue(PanelState.healthBarShouldGrow(wasRefreshing: true, isRefreshing: false),
-                       "a full check finishing grows the bar")
-        XCTAssertFalse(PanelState.healthBarShouldGrow(wasRefreshing: false, isRefreshing: true),
-                        "a check starting does not")
-        XCTAssertFalse(PanelState.healthBarShouldGrow(wasRefreshing: true, isRefreshing: true),
-                        "still checking does not")
-        XCTAssertFalse(PanelState.healthBarShouldGrow(wasRefreshing: false, isRefreshing: false),
-                        "already idle does not")
-    }
-
-    /// The Agents tab's first real paint this launch (round 9b) grows the
-    /// health bars, but only once, and only once there is something real to
-    /// show; a peek before the first check finishes is skipped without
-    /// spending that one-per-launch opportunity.
-    func testHealthBarGrowsOnlyOnceForTheAgentsTabsFirstRealView() {
-        XCTAssertTrue(PanelState.healthBarShouldGrowOnFirstAgentsView(
-            hasShownAgentsTabOnce: false, hasCompletedFirstPass: true))
-        XCTAssertFalse(PanelState.healthBarShouldGrowOnFirstAgentsView(
-            hasShownAgentsTabOnce: false, hasCompletedFirstPass: false),
-            "nothing real to grow yet")
-        XCTAssertFalse(PanelState.healthBarShouldGrowOnFirstAgentsView(
-            hasShownAgentsTabOnce: true, hasCompletedFirstPass: true),
-            "already shown once this launch")
-    }
-
-    /// `agentsTabAppeared` opens the window exactly once, does not open it
-    /// again on a later view, and a peek before results exist neither opens
-    /// the window nor burns the one-per-launch opportunity — a later, real
-    /// first view still gets it.
-    func testAgentsTabAppearedOpensTheWindowOnceAndOnlyWithRealData() {
-        let state = makeState()
-        XCTAssertFalse(state.firstAgentsViewWindowOpen)
-        XCTAssertFalse(state.hasShownAgentsTabOnce)
-
-        state.agentsTabAppeared(hasCompletedFirstPass: false)
-        XCTAssertFalse(state.firstAgentsViewWindowOpen, "nothing real yet")
-        XCTAssertFalse(state.hasShownAgentsTabOnce, "so the opportunity is not spent")
-
-        state.agentsTabAppeared(hasCompletedFirstPass: true)
-        XCTAssertTrue(state.firstAgentsViewWindowOpen)
-        XCTAssertTrue(state.hasShownAgentsTabOnce)
-
-        state.closeFirstAgentsViewWindow()
-        XCTAssertFalse(state.firstAgentsViewWindowOpen)
-
-        state.agentsTabAppeared(hasCompletedFirstPass: true)
-        XCTAssertFalse(state.firstAgentsViewWindowOpen, "a later view never reopens it")
-    }
-
     /// r3 ad7a: the welcome line shows once, on a Mac where mcpock never ran.
     func testWelcomeOnlyOnAFirstInstall() {
         XCTAssertTrue(PanelState.shouldWelcome(defaults: defaults, ranBefore: false))
