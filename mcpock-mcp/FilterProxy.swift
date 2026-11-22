@@ -22,28 +22,45 @@ enum FilterProxy {
         let output = LockedHandle(FileHandle.standardOutput)
         let serverInPipe = Pipe()
         let serverOutPipe = Pipe()
+        let serverDone = DispatchSemaphore(value: 0)
         let process = Process()
-        // Through env, so a bare command ("npx") is found on the agent's PATH.
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [invocation.command] + invocation.arguments
+        // Started directly, by its full path: `/usr/bin/env` would read a
+        // path with "=" in it as a variable (review 22 Nov).
+        guard let executable = resolve(invocation.command) else {
+            fail("could not find \(invocation.command)", status: 127)
+        }
+        process.executableURL = executable
+        process.arguments = invocation.arguments
         process.standardInput = serverInPipe
         process.standardOutput = serverOutPipe
         process.standardError = FileHandle.standardError
+        // Set before it starts: a server that exits at once is still seen.
+        process.terminationHandler = { finished in
+            _ = serverDone.wait(timeout: .now() + 2)
+            exit(finished.terminationReason == .exit ? finished.terminationStatus : 1)
+        }
         do {
             try process.run()
         } catch {
             fail("could not start \(invocation.command)", status: 127)
         }
-        filterChildPID = process.processIdentifier
-        // The agent stops the filter: the server stops with it.
+        let child = process.processIdentifier
+        // The agent stops the filter: the server stops with it, and whatever
+        // the server started (`npx` and `uvx` run the real server as their
+        // own child). The child leads its own process group, so the whole
+        // group is signalled, then forced after a short wait.
         for sig in [SIGTERM, SIGINT, SIGHUP] {
-            signal(sig) { _ in
-                if filterChildPID > 0 { kill(filterChildPID, SIGTERM) }
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .global())
+            source.setEventHandler {
+                stopGroup(child)
+                exit(128 + sig)
             }
+            source.resume()
+            filterSignalSources.append(source)
         }
 
         // Server to agent, on its own thread.
-        let serverDone = DispatchSemaphore(value: 0)
         let reader = Thread {
             var splitter = FilterLineSplitter()
             let handle = serverOutPipe.fileHandleForReading
@@ -59,12 +76,6 @@ enum FilterProxy {
         }
         reader.stackSize = 1 << 20
         reader.start()
-
-        // The server ended on its own: finish its output, then end too.
-        process.terminationHandler = { finished in
-            _ = serverDone.wait(timeout: .now() + 2)
-            exit(finished.terminationReason == .exit ? finished.terminationStatus : 1)
-        }
 
         // Agent to server, here.
         let serverInput = serverInPipe.fileHandleForWriting
@@ -94,13 +105,43 @@ enum FilterProxy {
         try? serverInput.close()
         let deadline = Date().addingTimeInterval(3)
         while process.isRunning, Date() < deadline { usleep(20_000) }
-        if process.isRunning {
-            process.terminate()
-            usleep(300_000)
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-        }
+        if process.isRunning { stopGroup(child) }
         _ = serverDone.wait(timeout: .now() + 1)
         exit(process.isRunning ? 1 : (process.terminationReason == .exit ? process.terminationStatus : 1))
+    }
+
+    /// SIGTERM to the server's whole process group, SIGKILL to what is left
+    /// after a second and a half. Falls back to the one process when it
+    /// leads no group.
+    private static func stopGroup(_ pid: pid_t) {
+        guard pid > 0 else { return }
+        if kill(-pid, SIGTERM) != 0 { kill(pid, SIGTERM) }
+        var waited = 0
+        while waited < 30, kill(-pid, 0) == 0 || kill(pid, 0) == 0 {
+            usleep(50_000)
+            waited += 1
+        }
+        if kill(-pid, SIGKILL) != 0 { kill(pid, SIGKILL) }
+    }
+
+    /// The command's executable: a path as it is (a relative one from this
+    /// folder), a bare name looked up on PATH like a shell would.
+    private static func resolve(_ command: String) -> URL? {
+        let fm = FileManager.default
+        if command.contains("/") {
+            let url = URL(fileURLWithPath: command, relativeTo: URL(fileURLWithPath: fm.currentDirectoryPath)).standardizedFileURL
+            return fm.isExecutableFile(atPath: url.path) ? url : nil
+        }
+        let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        for folder in path.split(separator: ":") where !folder.isEmpty {
+            let candidate = URL(fileURLWithPath: String(folder)).appendingPathComponent(command)
+            var isDirectory: ObjCBool = false
+            if fm.fileExists(atPath: candidate.path, isDirectory: &isDirectory), !isDirectory.boolValue,
+               fm.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
     }
 
     /// One server line, filtered only when something is hidden.
@@ -117,16 +158,17 @@ enum FilterProxy {
     }
 }
 
-/// The server's pid, for the signal handlers (which can capture nothing).
-private var filterChildPID: pid_t = 0
+/// Kept for the life of the process, or the signals would go unheard.
+private var filterSignalSources: [DispatchSourceSignal] = []
 
-/// The hidden tools, read again when the file's change date moves.
+/// The hidden tools, read again when the file's change date moves. A file
+/// that goes missing or breaks keeps the last good list (`HideList`).
 private final class HideFile: @unchecked Sendable {
     private let path: String
     private let lock = NSLock()
     private var stamp: Date?
     private var loaded = false
-    private var hidden: Set<String> = []
+    private var list = ToolFilterCore.HideList()
 
     init(path: String) {
         self.path = path
@@ -137,11 +179,11 @@ private final class HideFile: @unchecked Sendable {
         defer { lock.unlock() }
         let changed = (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate]) as? Date
         if !loaded || changed != stamp {
-            hidden = ToolFilterCore.hidden(fromFileText: try? String(contentsOfFile: path, encoding: .utf8))
+            list.update(fileText: try? String(contentsOfFile: path, encoding: .utf8))
             stamp = changed
             loaded = true
         }
-        return hidden
+        return list.names
     }
 }
 
