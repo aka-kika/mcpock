@@ -66,6 +66,26 @@ final class PremiumLookTests: XCTestCase {
         XCTAssertFalse(ServerRowView.showsNoTools(group("new", .unknown)), "not checked yet")
     }
 
+    // MARK: - The panel opens on Agents
+
+    @MainActor
+    func testThePanelOpensOnTheAgentsTabEveryTime() {
+        let suite = "mcpock.tests.opens-on-agents.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let panel = PanelState(monitor: HealthMonitor(defaults: defaults), defaults: defaults)
+        panel.loadConnectors = { .unavailable("") }
+        panel.loadClaudeProjectOff = { [:] }
+        XCTAssertEqual(panel.tab, .agents, "at launch")
+        panel.panelOpened()
+        panel.tab = .servers
+        XCTAssertEqual(panel.tab, .servers, "her pick lasts while the panel is open")
+        panel.panelClosed()
+        panel.panelOpened()
+        XCTAssertEqual(panel.tab, .agents, "and the next opening starts on Agents again")
+        panel.panelClosed()
+    }
+
     // MARK: - The card's tools header
 
     func testTheCardSaysHowManyToolsAreOn() {

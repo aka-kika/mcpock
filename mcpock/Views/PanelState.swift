@@ -36,8 +36,9 @@ final class PanelState {
     /// The server a notification asked to show, once the panel is up.
     @ObservationIgnored var serverToOpen: String?
 
-    /// Agents first (1.5.4): the health bars are the most telling view.
-    /// Not saved; the tab she picks lasts until the app quits.
+    /// Agents first (1.5.4): the most telling view. Every time the panel
+    /// opens it starts there (22 Nov, Kika: "opens on agents default not
+    /// servers tab"); the tab she picks lasts while the panel stays open.
     var tab: PanelTab = .agents {
         // Each tab has its own list, so a selection (and its card) never carries
         // over: the Servers tab's row may not be in the open agent, and back.
@@ -361,6 +362,9 @@ final class PanelState {
     func panelOpened() {
         installKeyMonitor()
         isPanelOpen = true
+        // Always the Agents tab on opening (22 Nov). A notification that
+        // asked for a server's card switches to Servers further down.
+        tab = .agents
         // A server an open session lost shows without waiting for the timer (1.12).
         Task { await monitor.refreshSessionDrops() }
         // The account's connectors, when she asked for them and the list is old.
