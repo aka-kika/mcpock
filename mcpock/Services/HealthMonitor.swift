@@ -514,6 +514,8 @@ final class HealthMonitor {
     /// hides. Agents with no way to hide tools are left out.
     func hiddenTools(groupName: String) -> [String: Set<String>] {
         let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
+        // Demo mode reads no file: the sample set's own, so the card and its row agree.
+        if let demoHiddenTools { return demoHiddenTools.filter { ids.contains($0.key) } }
         let configs = servers.map(\.config).filter { ids.contains($0.id) }
         return ToolPlanner.hiddenTools(configs: configs, allTools: toolNames(groupName: groupName), ownTools: ownToolNames(ids),
                                        claudeSettingsPath: claudeSettingsPath)
