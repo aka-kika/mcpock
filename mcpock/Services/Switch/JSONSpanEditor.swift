@@ -201,10 +201,37 @@ enum JSONSpanEditor {
         }
         let member = members[index]
         let valueText = self.text(scalars[member.value.start..<member.value.end])
+        let starts = members.map(\.keyStart), ends = members.map(\.value.end)
+        // A comment above the entry stays in the file (review 22 Nov: VS
+        // Code's `mcp.json` has comments, and the old cut took it along).
+        if index > 0, hasComment(scalars, ends[index - 1]..<starts[index]) {
+            // The entry's own line start (its indent and the line break before it).
+            var lineStart = starts[index]
+            while lineStart > ends[index - 1], scalars[lineStart - 1] == " " || scalars[lineStart - 1] == "\t" { lineStart -= 1 }
+            if lineStart > ends[index - 1], scalars[lineStart - 1] == "\n" { lineStart -= 1 }
+            if lineStart > ends[index - 1], scalars[lineStart - 1] == "\r" { lineStart -= 1 }
+            if index + 1 < members.count {
+                // A middle entry: itself and the comma after it. The comments
+                // around it stay where they are.
+                var comma = ends[index]
+                while comma < starts[index + 1], isSpace(scalars[comma]) { comma += 1 }
+                if comma < starts[index + 1], scalars[comma] == "," {
+                    return (splice(scalars, lineStart..<(comma + 1), ""), valueText)
+                }
+            } else {
+                // The last entry: itself, and the comma that came before the comment.
+                var comma = ends[index - 1]
+                while comma < starts[index], isSpace(scalars[comma]) { comma += 1 }
+                if comma < lineStart, scalars[comma] == "," {
+                    let cutEntry = splice(scalars, lineStart..<ends[index], "")
+                    return (splice(Array(cutEntry.unicodeScalars), comma..<(comma + 1), ""), valueText)
+                }
+            }
+        }
         let range = removalRange(
             index: index,
-            starts: members.map(\.keyStart),
-            ends: members.map(\.value.end),
+            starts: starts,
+            ends: ends,
             container: object.start..<object.end,
             scalars: scalars
         )
@@ -261,6 +288,20 @@ enum JSONSpanEditor {
     }
 
     // MARK: Helpers
+
+    private static func isSpace(_ scalar: Unicode.Scalar) -> Bool {
+        scalar == " " || scalar == "\t" || scalar == "\n" || scalar == "\r"
+    }
+
+    /// True when the gap between two members holds a `//` or `/* */` comment.
+    private static func hasComment(_ scalars: [Unicode.Scalar], _ range: Range<Int>) -> Bool {
+        var i = range.lowerBound
+        while i + 1 < range.upperBound {
+            if scalars[i] == "/", scalars[i + 1] == "/" || scalars[i + 1] == "*" { return true }
+            i += 1
+        }
+        return false
+    }
 
     /// What to cut so the neighbours and their commas still read right: a
     /// later item goes with the comma before it, the first one with the comma
