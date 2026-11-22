@@ -132,7 +132,8 @@ struct MenuBarPanelView: View {
             groups: monitor.visibleGroups,
             agentCount: panel.allAgentSections.filter { !$0.servers.isEmpty }.count,
             hiddenTools: { monitor.hiddenToolCount(groupName: $0.name) },
-            checking: isChecking
+            checking: isChecking,
+            connectors: panel.includesConnectors ? panel.connectors : []
         )
     }
 
@@ -443,8 +444,13 @@ struct MenuBarPanelView: View {
                 // Not `.disabled` while checking: a dimmed glyph reads as "off",
                 // and the spin must read as "working". A tap mid-check does nothing.
                 guard !isChecking else { return }
-                monitor.startRefreshAll()   // spins at once, not after discovery
-                panel.refreshConnectorsIfDue(force: true)   // her Refresh asks Claude Code again too
+                let check = monitor.startRefreshAll()   // spins at once, not after discovery
+                // Her Refresh asks Claude Code again too, once mcpock's own
+                // check is over: both start Claude Code's servers (review 22 Nov).
+                Task { @MainActor in
+                    await check.value
+                    panel.refreshConnectorsIfDue(force: true)
+                }
             }
             FooterGlyphButton(systemImage: "gearshape", title: "Settings, updates and Quit", theme: theme) {
                 StatusItemRightClick.showFromFooter()

@@ -2,7 +2,7 @@ import Foundation
 
 /// The three numbers at the top of the panel (premium look, 22 Nov, Kika's
 /// pick "three tiles"): servers in use, tools turned off, and what needs her.
-/// Pure, so `PanelOverviewTests` covers the counting and the wording.
+/// Pure, so `PremiumLookTests` covers the counting and the wording.
 struct PanelOverview: Equatable, Sendable {
     /// Visible servers that are on in at least one agent.
     var inUse: Int
@@ -25,7 +25,8 @@ struct PanelOverview: Equatable, Sendable {
         groups: [ServerGroup],
         agentCount: Int,
         hiddenTools: (ServerGroup) -> Int,
-        checking: Bool = false
+        checking: Bool = false,
+        connectors: [ClaudeConnector] = []
     ) -> PanelOverview {
         let on = groups.filter { !$0.isOffEverywhere }
         let hidden = on.map(hiddenTools).filter { $0 > 0 }
@@ -42,15 +43,18 @@ struct PanelOverview: Equatable, Sendable {
             agents: agentCount,
             toolsOff: hidden.reduce(0, +),
             toolsOffServers: hidden.count,
-            needYou: needs.count,
-            hasBroken: needs.contains { $0.state == .broken },
-            needLine: needLine(needs),
+            // The account's connectors with a problem count here too (review
+            // 22 Nov): a failing one must not sit under "All fine". The menu
+            // bar icon and the widgets stay about the servers mcpock checks.
+            needYou: needs.count + connectors.filter(\.needsYou).count,
+            hasBroken: needs.contains { $0.state == .broken } || connectors.contains { $0.state == .failing },
+            needLine: needLine(needs, connectors: connectors.filter(\.needsYou).count),
             checkingLine: checkingLine
         )
     }
 
     /// One word per row, in the footer tooltip's order.
-    static func needLine(_ needs: [ServerGroup]) -> String {
+    static func needLine(_ needs: [ServerGroup], connectors: Int = 0) -> String {
         var kinds: [(count: Int, word: String)] = []
         func add(_ count: Int, _ word: String) { if count > 0 { kinds.append((count, word)) } }
         let degraded = needs.filter { $0.state == .degraded }
@@ -64,6 +68,7 @@ struct PanelOverview: Equatable, Sendable {
         let lost = healthy.filter(\.droppedInSession).count
         add(healthy.count - lost, "set up differently")
         add(lost, "lost in a session")
+        add(connectors, connectors == 1 ? "connector" : "connectors")
 
         guard kinds.count > 2 else {
             return kinds.map { "\($0.count) \($0.word)" }.joined(separator: " \u{00B7} ")

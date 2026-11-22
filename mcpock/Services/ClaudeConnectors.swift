@@ -4,8 +4,8 @@ import Foundation
 /// Kika's pick: its own section on the Agents tab). These are servers of the
 /// Claude account, not of a config file, so mcpock cannot check them itself:
 /// it shows what Claude Code says. Best effort, and only when she turned it on.
-struct ClaudeConnector: Identifiable, Equatable, Sendable {
-    enum State: Equatable, Sendable {
+struct ClaudeConnector: Identifiable, Equatable, Sendable, Codable {
+    enum State: String, Equatable, Sendable, Codable {
         case connected
         /// Claude Code could not reach it.
         case failing
@@ -53,6 +53,9 @@ struct ClaudeConnector: Identifiable, Equatable, Sendable {
     }
 
     var wordIsProblem: Bool { state == .failing }
+
+    /// Claude Code says it needs her: counted in the panel's Need you tile.
+    var needsYou: Bool { state == .failing || state == .needsSignIn }
 }
 
 /// Reads the connectors from Claude Code: `claude mcp list` for the names,
@@ -104,36 +107,40 @@ enum ClaudeConnectors {
         return host.lowercased()
     }
 
+    /// Known words only (review 22 Nov): "Disconnected" or "Not connected"
+    /// is a failure, never "connected".
     static func state(of status: String) -> ClaudeConnector.State {
         let text = status.lowercased()
         if text.contains("needs auth") || text.contains("sign in") || text.contains("unauthorized") { return .needsSignIn }
-        if text.contains("failed") || text.contains("error") || status.contains("\u{2718}") || status.contains("\u{2717}") {
+        if text.contains("failed") || text.contains("error") || text.contains("disconnected") || text.contains("not connected")
+            || status.contains("\u{2718}") || status.contains("\u{2717}") {
             return .failing
         }
         if text.contains("connected") { return .connected }
         return .unknown
     }
 
-    /// From `~/.claude.json`: for every connector, the projects whose
-    /// `disabledMcpServers` name it, by folder name, sorted. Keys are the
-    /// connector names without the prefix, lowercased.
-    static func offProjects(claudeJSON data: Data) -> [String: [String]] {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let projects = root["projects"] as? [String: Any]
-        else { return [:] }
-        var result: [String: Set<String>] = [:]
-        for (path, value) in projects {
-            guard let project = value as? [String: Any],
-                  let disabled = project["disabledMcpServers"] as? [String]
-            else { continue }
-            let folder = (path as NSString).lastPathComponent
-            for entry in disabled where entry.hasPrefix(prefix) {
-                let name = String(entry.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces).lowercased()
-                guard !name.isEmpty, !folder.isEmpty else { continue }
-                result[name, default: []].insert(folder)
-            }
+    /// True when the output names connectors at all, read or not: lines that
+    /// start with "claude.ai ". When there are some and none could be read,
+    /// the format changed, which is a failure, not "no connectors".
+    static func namesConnectors(_ output: String) -> Bool {
+        output.split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix(prefix) }
+    }
+
+    /// For every connector, the projects whose off list names it, as shown.
+    /// Keys are the connector names without the prefix, lowercased.
+    static func offProjects(byPath: [String: [String]]) -> [String: [String]] {
+        var paths: [String: Set<String>] = [:]
+        for (entry, projects) in byPath where entry.hasPrefix(prefix) {
+            let name = String(entry.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces).lowercased()
+            guard !name.isEmpty else { continue }
+            paths[name, default: []].formUnion(projects)
         }
-        return result.mapValues { $0.sorted() }
+        return paths.mapValues { ClaudeProjectOff.displayNames($0.sorted()) }
+    }
+
+    static func offProjects(claudeJSON data: Data) -> [String: [String]] {
+        offProjects(byPath: ClaudeProjectOff.byPath(claudeJSON: data))
     }
 
     /// The listed connectors with their off projects filled in, by name.
@@ -199,9 +206,19 @@ enum ClaudeConnectors {
         await runner.terminateAndReap()
 
         if timedOut { return .unavailable("Claude Code did not answer in time.") }
-        guard normalExit else { return .unavailable("Claude Code could not list its servers.") }
+        return result(output: output, normalExit: normalExit, off: offProjects(byPath: ClaudeProjectOff.byPath(file: claudeJSONPath)))
+    }
 
-        let off = FileManager.default.contents(atPath: claudeJSONPath).map(offProjects(claudeJSON:)) ?? [:]
-        return .connectors(merged(parse(output), off: off))
+    /// What one run means (review 22 Nov). The list counts whatever the exit
+    /// code: Claude Code can exit non-zero because one server failed and
+    /// still print every line. Connector lines that can't be read mean the
+    /// format changed, never "no connectors".
+    static func result(output: String, normalExit: Bool, off: [String: [String]]) -> LoadResult {
+        let listed = parse(output)
+        if listed.isEmpty {
+            if namesConnectors(output) { return .unavailable("mcpock can't read Claude Code's list: its wording may have changed.") }
+            if !normalExit { return .unavailable("Claude Code could not list its servers.") }
+        }
+        return .connectors(merged(listed, off: off))
     }
 }

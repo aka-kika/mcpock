@@ -403,9 +403,8 @@ final class PanelState {
     /// from `~/.claude.json` when the panel opens. Swapped in tests.
     private(set) var claudeProjectOff: [String: [String]] = [:]
     @ObservationIgnored var loadClaudeProjectOff: () -> [String: [String]] = {
-        guard let agent = AgentRegistry.known.first(where: { $0.label == AgentRegistry.claudeCodeLabel }),
-              let data = FileManager.default.contents(atPath: agent.path) else { return [:] }
-        return ClaudeProjectOff.projects(claudeJSON: data)
+        guard let agent = AgentRegistry.known.first(where: { $0.label == AgentRegistry.claudeCodeLabel }) else { return [:] }
+        return ClaudeProjectOff.projects(byPath: ClaudeProjectOff.byPath(file: agent.path))
     }
 
     /// What replaces the two reads of Claude Code's own state (its connector
@@ -447,43 +446,95 @@ final class PanelState {
     /// Empty until she turns the setting on and Claude Code has answered.
     private(set) var connectors: [ClaudeConnector] = []
     /// One grey line in the section's place: "Asking Claude Code…", or why
-    /// there is no list.
+    /// there is no list, or how old the list is.
     private(set) var connectorsNote: String?
-    @ObservationIgnored private var connectorsLoadedAt: Date?
     @ObservationIgnored private var connectorsTask: Task<Void, Never>?
     /// Swapped in tests and in demo mode, which never start a process.
     @ObservationIgnored var loadConnectors: () async -> ClaudeConnectors.LoadResult = { await ClaudeConnectors.load() }
 
     var includesConnectors: Bool { AppPreferences.loadIncludeConnectors(from: defaults) }
 
-    /// Asks Claude Code again when the list is older than
+    /// When Claude Code was last asked, and when it last answered with a
+    /// list. Saved with the list (review 22 Nov): "at most every 30 minutes"
+    /// has to hold across launches, since asking makes Claude Code start
+    /// its servers.
+    private static let connectorsAskedKey = "claudeConnectorsAskedAt"
+    private static let connectorsListedKey = "claudeConnectorsListedAt"
+    private static let connectorsListKey = "claudeConnectorsList"
+
+    private var connectorsAskedAt: Date? {
+        get { defaults.object(forKey: Self.connectorsAskedKey) as? Date }
+        set { defaults.set(newValue, forKey: Self.connectorsAskedKey) }
+    }
+
+    private var connectorsListedAt: Date? {
+        get { defaults.object(forKey: Self.connectorsListedKey) as? Date }
+        set { defaults.set(newValue, forKey: Self.connectorsListedKey) }
+    }
+
+    /// The saved list, shown at once after a launch.
+    private func loadSavedConnectors() {
+        guard includesConnectors, connectors.isEmpty, let data = defaults.data(forKey: Self.connectorsListKey),
+              let saved = try? JSONDecoder().decode([ClaudeConnector].self, from: data) else { return }
+        connectors = saved
+    }
+
+    private func forgetConnectors() {
+        connectors = []
+        connectorsNote = nil
+        for key in [Self.connectorsAskedKey, Self.connectorsListedKey, Self.connectorsListKey] { defaults.removeObject(forKey: key) }
+    }
+
+    /// "This list is from 14:02."
+    nonisolated static func listAge(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "d MMM, HH:mm"
+        return "This list is from \(formatter.string(from: date))."
+    }
+
+    /// Asks Claude Code again when the last ask is older than
     /// `ClaudeConnectors.refreshEvery`, or at once with `force` (the footer's
-    /// Refresh, or the setting just turned on). Off: the list is dropped.
+    /// Refresh). Off: the list is dropped. Never while mcpock's own check
+    /// runs: both would start Claude Code's servers at the same moment.
     func refreshConnectorsIfDue(force: Bool = false, now: Date = Date()) {
         guard includesConnectors else {
             connectorsTask?.cancel()
             connectorsTask = nil
-            connectors = []
-            connectorsNote = nil
-            connectorsLoadedAt = nil
+            if !connectors.isEmpty || connectorsNote != nil || connectorsAskedAt != nil { forgetConnectors() }
             return
         }
+        loadSavedConnectors()
         guard connectorsTask == nil else { return }
-        if !force, let loaded = connectorsLoadedAt, now.timeIntervalSince(loaded) < ClaudeConnectors.refreshEvery { return }
+        if !force, let asked = connectorsAskedAt, now.timeIntervalSince(asked) < ClaudeConnectors.refreshEvery,
+           now >= asked { return }
         if connectors.isEmpty { connectorsNote = "Asking Claude Code\u{2026}" }
         connectorsTask = Task { @MainActor [weak self] in
-            guard let load = self?.loadConnectors else { return }
+            // Wait out a running check (bounded), then ask.
+            var waited = 0
+            while let self, self.monitor.isRefreshing, waited < 600, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(200))
+                waited += 1
+            }
+            guard let load = self?.loadConnectors, !Task.isCancelled else { return }
             let result = await load()
             guard let self, !Task.isCancelled else { return }
             self.connectorsTask = nil
-            self.connectorsLoadedAt = Date()
+            self.connectorsAskedAt = Date()
             switch result {
             case .connectors(let list):
                 self.connectors = list
+                self.connectorsListedAt = Date()
+                self.defaults.set(try? JSONEncoder().encode(list), forKey: Self.connectorsListKey)
                 self.connectorsNote = list.isEmpty ? "Claude Code lists no claude.ai connectors." : nil
             case .unavailable(let reason):
-                // Keep the last list on a hiccup; say why there is none otherwise.
-                self.connectorsNote = self.connectors.isEmpty ? reason : nil
+                // The last list stays, with why it is not newer and how old it is.
+                if self.connectors.isEmpty {
+                    self.connectorsNote = reason
+                } else {
+                    self.connectorsNote = [reason, self.connectorsListedAt.map(Self.listAge)].compactMap { $0 }
+                        .filter { !$0.isEmpty }.joined(separator: " ")
+                }
             }
         }
     }
