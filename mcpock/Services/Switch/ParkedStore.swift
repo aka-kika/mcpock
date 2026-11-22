@@ -11,7 +11,11 @@ import Foundation
 /// readable only by the user (it holds what the config held, keys included):
 ///
 ///     { "file": "<the config it came from>",
-///       "servers": { "<name>": { "raw": "<the entry's JSON, as written>" } } }
+///       "servers": { "<name>": { "raw": "<the entry's JSON, as written>",
+///                                "after": "<the entry above it>", "before": "<the entry below it>" } } }
+///
+/// `after` and `before` (22 Nov) are where it sat, so Turn On puts it back in
+/// its own place and not at the end; a store from before has neither.
 enum ParkedStore {
     static var defaultDirectory: URL {
         MCPockStatus.defaultDirectory().appendingPathComponent("parked", isDirectory: true)
@@ -33,12 +37,32 @@ enum ParkedStore {
     /// way `save` writes it; nil when the text is not a store or has no such entry.
     static func text(replacing name: String, raw: String, in text: String) -> String? {
         guard var root = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
-              var servers = root["servers"] as? [String: Any], servers[name] != nil else { return nil }
-        servers[name] = ["raw": raw]
+              var servers = root["servers"] as? [String: Any], var fields = servers[name] as? [String: Any] else { return nil }
+        fields["raw"] = raw   // where it sat stays as it is
+        servers[name] = fields
         root["servers"] = servers
         guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         else { return nil }
         return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Where an entry sat in its list: the names of its neighbours.
+    struct Place: Equatable, Sendable {
+        var after: String?
+        var before: String?
+    }
+
+    /// One waiting entry: its JSON text and where it sat.
+    private struct Entry {
+        var raw: String
+        var place = Place()
+
+        var json: [String: Any] {
+            var out: [String: Any] = ["raw": raw]
+            if let after = place.after { out["after"] = after }
+            if let before = place.before { out["before"] = before }
+            return out
+        }
     }
 
     enum StoreError: Error, Equatable {
@@ -52,19 +76,20 @@ enum ParkedStore {
     /// The store, or an empty one when there is none yet. A store that is
     /// there but can't be read throws: reading it as empty and saving over
     /// it lost every server parked in it (review 10 Nov, fable-1).
-    private static func read(agent: String, directory: URL) throws -> (file: String, servers: [String: String]) {
+    private static func read(agent: String, directory: URL) throws -> (file: String, servers: [String: Entry]) {
         let file = url(agent: agent, directory: directory)
         guard FileManager.default.fileExists(atPath: file.path) else { return ("", [:]) }
         guard let data = try? Data(contentsOf: file),
               let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { throw StoreError.unreadable }
-        var servers: [String: String] = [:]
+        var servers: [String: Entry] = [:]
         for (name, value) in root["servers"] as? [String: Any] ?? [:] {
-            if let raw = (value as? [String: Any])?["raw"] as? String { servers[name] = raw }
+            guard let fields = value as? [String: Any], let raw = fields["raw"] as? String else { continue }
+            servers[name] = Entry(raw: raw, place: Place(after: fields["after"] as? String, before: fields["before"] as? String))
         }
         return (root["file"] as? String ?? "", servers)
     }
 
-    private static func load(agent: String, directory: URL) -> (file: String, servers: [String: String]) {
+    private static func load(agent: String, directory: URL) -> (file: String, servers: [String: Entry]) {
         (try? read(agent: agent, directory: directory)) ?? ("", [:])
     }
 
@@ -73,19 +98,25 @@ enum ParkedStore {
     /// not this file's.
     static func entries(agent: String, configPath: String, directory: URL) -> [String: String] {
         let stored = load(agent: agent, directory: directory)
-        return stored.file == configPath ? stored.servers : [:]
+        return stored.file == configPath ? stored.servers.mapValues(\.raw) : [:]
+    }
+
+    /// Where a waiting entry sat in `configPath`'s list; empty for one parked before 22 Nov.
+    static func place(of name: String, agent: String, configPath: String, directory: URL) -> Place {
+        let stored = load(agent: agent, directory: directory)
+        return stored.file == configPath ? (stored.servers[name]?.place ?? Place()) : Place()
     }
 
     /// Parks one entry. Refused, with nothing written, when the store can't
     /// be read or still holds servers parked from another config file: those
     /// would be lost (fable-1). An empty store from another file starts over.
-    static func add(name: String, raw: String, agent: String, configPath: String, directory: URL) throws {
+    static func add(name: String, raw: String, place: Place = Place(), agent: String, configPath: String, directory: URL) throws {
         var stored = try read(agent: agent, directory: directory)
         if stored.file != configPath {
             guard stored.servers.isEmpty else { throw StoreError.otherFile(stored.file) }
             stored = (configPath, [:])
         }
-        stored.servers[name] = raw
+        stored.servers[name] = Entry(raw: raw, place: place)
         try save(stored, agent: agent, directory: directory)
     }
 
@@ -95,11 +126,11 @@ enum ParkedStore {
         try save(stored, agent: agent, directory: directory)
     }
 
-    private static func save(_ stored: (file: String, servers: [String: String]), agent: String, directory: URL) throws {
+    private static func save(_ stored: (file: String, servers: [String: Entry]), agent: String, directory: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let file = url(agent: agent, directory: directory)
-        let root: [String: Any] = ["file": stored.file, "servers": stored.servers.mapValues { ["raw": $0] }]
+        let root: [String: Any] = ["file": stored.file, "servers": stored.servers.mapValues(\.json)]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         // 0600 from the first byte: it holds what the config held, keys included.
         let temp = directory.appendingPathComponent(".\(file.lastPathComponent).mcpock-\(UUID().uuidString)")

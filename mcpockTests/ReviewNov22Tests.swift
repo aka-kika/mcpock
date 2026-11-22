@@ -529,4 +529,83 @@ final class ReviewNov22Tests: XCTestCase {
         XCTAssertNil(ClaudeConnectors.callsWord(0), "a row never says 0 calls")
         XCTAssertNil(ClaudeConnectors.callsWord(nil))
     }
+
+    // MARK: Turn On puts the entry back in its own place (22 Nov, seen with the real Claude Desktop)
+
+    private let fiveServers = """
+        {
+          "globalShortcut": "",
+          "mcpServers": {
+            "alpha": { "command": "a" },
+            "bravo": {
+              "command": "npx",
+              "args": ["-y", "bravo-mcp"],
+              "env": { "KEY": "made-up" }
+            },
+            "charlie": { "command": "c" },
+            "delta": { "command": "d" },
+            "echo": { "command": "e" }
+          },
+          "preferences": { "x": 1 }
+        }
+
+        """
+
+    private func desktop() -> [ServerConfig] {
+        ParsedFileCache.removeAll()
+        return ConfigDiscovery.discover(registry: [KnownAgent(label: "Claude Desktop", path: path("desktop.json"), shape: .json)],
+                                        scanRoots: [], parkedDirectory: parked, filterDirectory: filters)
+    }
+
+    private func flip(_ server: String, on: Bool) throws {
+        let plan = SwitchPlanner.plan(server: server, configs: desktop().filter { $0.name == server }, turnOn: on,
+                                      claudeSettingsPath: path(".claude/settings.json"), running: { _ in false }, parkedDirectory: parked)
+        XCTAssertTrue(plan.problems.isEmpty, "\(server) \(on): \(plan.problems)")
+        XCTAssertEqual(plan.changes.count, 1, "\(server) \(on)")
+        XCTAssertNil(SwitchWriter.apply(plan, backups: backups, parked: parked).error)
+    }
+
+    func testTurnedOnAgainTheEntryIsBackInItsOwnPlaceByteForByte() throws {
+        for server in ["alpha", "bravo", "charlie", "echo"] {   // first, a long middle one, a middle one, last
+            try put("desktop.json", fiveServers)
+            try flip(server, on: false)
+            XCTAssertNotEqual(text("desktop.json"), fiveServers)
+            XCTAssertNil(ServerSwitch.jsonObject(text("desktop.json") ?? "").flatMap { ($0 as? [String: Any])?["mcpServers"] as? [String: Any] }?[server])
+            try flip(server, on: true)
+            XCTAssertEqual(text("desktop.json"), fiveServers, "\(server): the same place, the same bytes")
+        }
+    }
+
+    func testTwoNeighboursOffAndOnInAnyOrderKeepTheListsOrder() throws {
+        try put("desktop.json", fiveServers)
+        try flip("bravo", on: false)
+        try flip("charlie", on: false)   // its upper neighbour is already gone: it remembers alpha above, delta below
+        try flip("bravo", on: true)      // charlie is still off: bravo goes back after alpha
+        try flip("charlie", on: true)
+        XCTAssertEqual(text("desktop.json"), fiveServers)
+
+        try flip("delta", on: false)
+        try flip("echo", on: false)
+        try flip("delta", on: true)      // its lower neighbour is off: after charlie
+        try flip("echo", on: true)
+        XCTAssertEqual(text("desktop.json"), fiveServers)
+    }
+
+    /// The neighbours were renamed or removed meanwhile, or the entry was
+    /// parked by an older build: it goes to the end, as before, never lost.
+    func testWithItsNeighboursGoneTheEntryGoesLast() throws {
+        try put("desktop.json", fiveServers)
+        try flip("charlie", on: false)
+        let without = try XCTUnwrap(text("desktop.json"))
+        try put("desktop.json", without.replacingOccurrences(of: "\"bravo\"", with: "\"bravo2\"").replacingOccurrences(of: "\"delta\"", with: "\"delta2\""))
+        try flip("charlie", on: true)
+        let keys = JSONSpanEditor.memberKeys(in: try XCTUnwrap(text("desktop.json")), objectPath: ["mcpServers"])
+        XCTAssertEqual(keys, ["alpha", "bravo2", "delta2", "echo", "charlie"])
+        // Taking the filter off a waiting entry keeps where it sat.
+        try ParkedStore.add(name: "zulu", raw: "{}", place: ParkedStore.Place(after: "alpha", before: nil), agent: "Claude Desktop",
+                            configPath: path("desktop.json"), directory: parked)
+        let store = try String(contentsOf: ParkedStore.fileURL(agent: "Claude Desktop", directory: parked), encoding: .utf8)
+        let changed = try XCTUnwrap(ParkedStore.text(replacing: "zulu", raw: "{\"command\": \"z\"}", in: store))
+        XCTAssertTrue(changed.contains("\"after\" : \"alpha\""), changed)
+    }
 }

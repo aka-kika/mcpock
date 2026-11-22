@@ -107,8 +107,9 @@ enum ServerSwitch {
     /// The result is checked before it is returned.
     /// `parkedValue`: the entry's JSON text from `ParkedStore`, needed to turn
     /// a `.parkOutside` server on.
+    /// `parkedPlace`: where that entry sat, so it comes back in its own place.
     static func edited(_ text: String?, mechanism: SwitchMechanism, server: String, turnOn: Bool,
-                       parkedValue: String? = nil) throws -> String {
+                       parkedValue: String? = nil, parkedPlace: ParkedStore.Place = ParkedStore.Place()) throws -> String {
         let before: String
         if let text {
             before = text
@@ -128,7 +129,8 @@ enum ServerSwitch {
                     guard let parkedValue, jsonObject(parkedValue) is [String: Any],
                           let root = JSONSpanEditor.parse(before), root.members != nil else { throw SwitchError.cannotEdit }
                     if root.member(key)?.value.members != nil {
-                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [key], key: server, valueText: parkedValue)
+                        after = try JSONSpanEditor.insertMember(in: before, objectPath: [key], key: server, valueText: parkedValue,
+                                                                after: parkedPlace.after, before: parkedPlace.before)
                     } else {
                         guard root.member(key) == nil else { throw SwitchError.cannotEdit }
                         let entry = "{\(JSONSpanEditor.quoted(server)): \(parkedValue)}"

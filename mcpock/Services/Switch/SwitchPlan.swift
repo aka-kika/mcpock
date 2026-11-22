@@ -41,6 +41,8 @@ struct ParkedEdit: Equatable, Sendable {
     let name: String
     /// The entry's JSON as the config wrote it; set when it moves in.
     let raw: String?
+    /// Where it sat in its list, for putting it back in its own place.
+    var place = ParkedStore.Place()
     var movesIn: Bool { raw != nil }
 }
 
@@ -174,19 +176,27 @@ enum SwitchPlanner {
                     }
                     if index == 0 { firstMechanism = mechanism }
                     var parkedValue: String?
+                    var place = ParkedStore.Place()
                     if let parkKey = mechanism.parkKey {
                         if turnOn {
                             parkedValue = ParkedStore.entries(agent: step.agent, configPath: path, directory: parkedDirectory)[step.name]
+                            place = ParkedStore.place(of: step.name, agent: step.agent, configPath: path, directory: parkedDirectory)
                             parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: nil))
                         } else {
                             guard let raw = text.flatMap({ ServerSwitch.entryText(in: $0, server: step.name, key: parkKey) }) else {
                                 throw ServerSwitch.SwitchError.cannotEdit
                             }
-                            parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: raw))
+                            // Its neighbours, so Turn On puts it back between them.
+                            let keys = text.flatMap { JSONSpanEditor.memberKeys(in: $0, objectPath: [parkKey]) } ?? []
+                            if let index = keys.firstIndex(of: step.name) {
+                                place = ParkedStore.Place(after: index > 0 ? keys[index - 1] : nil,
+                                                          before: index + 1 < keys.count ? keys[index + 1] : nil)
+                            }
+                            parked.append(ParkedEdit(agent: step.agent, configPath: path, name: step.name, raw: raw, place: place))
                         }
                     }
                     text = try ServerSwitch.edited(text, mechanism: mechanism, server: step.name, turnOn: turnOn,
-                                                   parkedValue: parkedValue)
+                                                   parkedValue: parkedValue, parkedPlace: place)
                 }
                 guard let after = text, after != before else { continue }
                 changes.append(SwitchChange(
@@ -318,8 +328,8 @@ enum SwitchWriter {
                 guard change.parked.isEmpty || allowed(parked) else { throw WriteError.failed(change.path) }
                 let movingIn = change.parked.filter(\.movesIn)
                 for edit in movingIn {
-                    try ParkedStore.add(name: edit.name, raw: edit.raw ?? "", agent: edit.agent, configPath: edit.configPath,
-                                        directory: parked)
+                    try ParkedStore.add(name: edit.name, raw: edit.raw ?? "", place: edit.place, agent: edit.agent,
+                                        configPath: edit.configPath, directory: parked)
                 }
                 do {
                     try write(change, backups: backups, now: now)

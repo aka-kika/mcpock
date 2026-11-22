@@ -190,6 +190,61 @@ enum JSONSpanEditor {
         return splice(scalars, object.start..<object.end, piece)
     }
 
+    /// `"key": value` put back where it was: right after the member `after`,
+    /// else right before the member `before`, else last (22 Nov, seen with
+    /// the real Claude Desktop: an entry turned on again came back at the
+    /// end of the list). With the neighbours it had when it was taken out,
+    /// the file comes back byte for byte.
+    static func insertMember(in text: String, objectPath: [String], key: String, valueText: String,
+                             after: String?, before: String?) throws -> String {
+        let scalars = Array(text.unicodeScalars)
+        guard let root = parse(text) else { throw EditError.notJSON }
+        guard let object = root.value(at: objectPath), let members = object.members else {
+            throw EditError.missing(objectPath.joined(separator: "."))
+        }
+        guard object.member(key) == nil else { throw EditError.alreadyThere(key) }
+        let newline = text.contains("\r\n") ? "\r\n" : "\n"
+        let member = "\(quoted(key)): \(valueText)"
+        func afterMember(_ previous: JSONSpan.Member) -> String {
+            let piece: String
+            if let indent = lineIndent(scalars, at: previous.keyStart) {
+                piece = "," + newline + indent + member
+            } else {
+                piece = ", " + member
+            }
+            return splice(scalars, previous.value.end..<previous.value.end, piece)
+        }
+        func beforeMember(_ next: JSONSpan.Member) -> String {
+            let piece: String
+            if let indent = lineIndent(scalars, at: next.keyStart) {
+                piece = member + "," + newline + indent
+            } else {
+                piece = member + ", "
+            }
+            return splice(scalars, next.keyStart..<next.keyStart, piece)
+        }
+        let previousIndex = after.flatMap { name in members.firstIndex { $0.key == name } }
+        let nextIndex = before.flatMap { name in members.firstIndex { $0.key == name } }
+        // It was the last one (or nothing is remembered): last again.
+        if before != nil {
+            // Its gap is as it was: between the same two.
+            if let previousIndex, let nextIndex, nextIndex == previousIndex + 1 { return afterMember(members[previousIndex]) }
+            // Something else was turned off or on beside it meanwhile: the one
+            // below it is the better guide (what sat above may have been off
+            // when this one was taken out), then the one above.
+            if let nextIndex { return beforeMember(members[nextIndex]) }
+            if let previousIndex { return afterMember(members[previousIndex]) }
+            // It was the first and its neighbour is gone: first again.
+            if after == nil, let first = members.first { return beforeMember(first) }
+        }
+        return try insertMember(in: text, objectPath: objectPath, key: key, valueText: valueText)
+    }
+
+    /// The keys of the object at `objectPath`, in the file's order; nil when it is not there.
+    static func memberKeys(in text: String, objectPath: [String]) -> [String]? {
+        parse(text)?.value(at: objectPath)?.members?.map(\.key)
+    }
+
     /// Takes `key` out of the object at `objectPath`, with its comma. Returns
     /// the new text and the removed value exactly as it was written.
     static func removeMember(in text: String, objectPath: [String], key: String) throws -> (text: String, valueText: String) {
