@@ -493,6 +493,8 @@ final class HealthMonitor {
             }.value
             guard !Task.isCancelled, let self, self.hiddenToolsByConfig != found else { return }
             self.hiddenToolsByConfig = found
+            // The widgets say "N tools off" too: a new snapshot (review 22 Nov).
+            self.statusDidChange()
         }
         return hiddenToolsTask
     }

@@ -60,5 +60,9 @@ enum WidgetReloadPolicy {
             || previous.problems != next.problems
             || previous.agents != next.agents
             || previous.brokenCount != next.brokenCount
+            // The numbers the ring widgets added (review 22 Nov).
+            || previous.inUse != next.inUse
+            || previous.toolsOff != next.toolsOff
+            || previous.agentCount != next.agentCount
     }
 }

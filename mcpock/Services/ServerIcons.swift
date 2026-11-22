@@ -152,14 +152,49 @@ enum ServerIcons {
         ("containeruse", .symbol("shippingbox")),
     ]
 
-    /// Pure. `targets` are the command lines or URLs from the config.
+    /// The table by name, built once: as written, and normalized (review
+    /// 22 Nov: every row of every draw walked and normalized the whole table).
+    private static let byName: [String: ServerIcon] = {
+        var out: [String: ServerIcon] = [:]
+        for e in table { for n in e.names where out[n] == nil { out[n] = e.icon } }
+        return out
+    }()
+
+    private static let byNormalizedName: [String: ServerIcon] = {
+        var out: [String: ServerIcon] = [:]
+        for e in table { for n in e.names.map(normalize) where out[n] == nil { out[n] = e.icon } }
+        return out
+    }()
+
+    private static let cacheLock = NSLock()
+    private static var cache: [String: ServerIcon] = [:]
+
+    /// `targets` are the command lines or URLs from the config. The answer
+    /// for a name and its targets never changes, so it is kept.
     static func icon(name: String, targets: [String]) -> ServerIcon {
+        let key = name + "\u{1F}" + targets.joined(separator: "\u{1F}")
+        cacheLock.lock()
+        if let found = cache[key] {
+            cacheLock.unlock()
+            return found
+        }
+        cacheLock.unlock()
+        let found = lookUp(name: name, targets: targets)
+        cacheLock.lock()
+        if cache.count > 2000 { cache.removeAll() }
+        cache[key] = found
+        cacheLock.unlock()
+        return found
+    }
+
+    /// Pure: the lookup itself.
+    static func lookUp(name: String, targets: [String]) -> ServerIcon {
         let lower = name.lowercased()
         let normalized = normalize(lower)
 
         // a. Name: exact, then normalized.
-        for e in table where e.names.contains(lower) { return e.icon }
-        for e in table where e.names.contains(where: { normalize($0) == normalized }) { return e.icon }
+        if let icon = byName[lower] { return icon }
+        if let icon = byNormalizedName[normalized] { return icon }
 
         // b. Package as a whole token of a command line.
         let tokens = targets.flatMap { $0.split(whereSeparator: { $0.isWhitespace }).map(String.init) }

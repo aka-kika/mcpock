@@ -68,7 +68,7 @@ struct StatusRing: View {
 
     private var centerText: String {
         if !snapshot.firstCheckDone { return "\u{2026}" }
-        return snapshot.problemCount > 0 ? "\(snapshot.problemCount)" : "\(snapshot.totalServers)"
+        return snapshot.problemCount > 0 ? "\(snapshot.problemCount)" : "\(snapshot.allFineNumber)"
     }
 
     private var centerColor: Color {

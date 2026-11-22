@@ -30,7 +30,7 @@ struct ProblemsWidgetView: View {
                 Text(StatusRing.label(snapshot))
                     .font(.system(size: 11.5, weight: .medium))
                     .padding(.top, 7)
-                Text(snapshot.inUse.map { "of \($0) in use" } ?? "\(snapshot.totalServers) servers")
+                Text(Self.underRing(snapshot))
                     .font(.system(size: 10.5))
                     .foregroundStyle(WidgetColors.grey(colorScheme))
                     .padding(.top, 1)
@@ -63,6 +63,12 @@ struct ProblemsWidgetView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
         .padding(2)
+    }
+
+    /// "of 14 in use" under a count of problems; "in use" under the in-use number itself.
+    static func underRing(_ s: MCPockWidgetSnapshot) -> String {
+        guard let inUse = s.inUse else { return "\(s.totalServers) servers" }
+        return s.firstCheckDone && s.problemCount == 0 ? "in use" : "of \(inUse) in use"
     }
 
     private func row(_ problem: MCPockWidgetSnapshot.Problem) -> some View {

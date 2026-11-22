@@ -256,7 +256,7 @@ final class PremiumLookTests: XCTestCase {
         s.inUse = 41
         XCTAssertEqual(s.inUseLine, "41 in use")
         s.toolsOff = 12
-        XCTAssertEqual(s.inUseLine, "41 in use \u{00B7} 12 off")
+        XCTAssertEqual(s.inUseLine, "41 in use \u{00B7} 12 tools off")
         XCTAssertEqual(s.ringCounts.broken, 1)
         XCTAssertEqual(s.ringCounts.attention, 2)
         XCTAssertEqual(s.ringCounts.fine, 38)

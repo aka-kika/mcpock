@@ -90,8 +90,13 @@ struct MCPockWidgetSnapshot: Codable, Equatable, Sendable {
     var inUseLine: String {
         guard let inUse else { return "\(totalServers) server\(totalServers == 1 ? "" : "s")" }
         guard let toolsOff, toolsOff > 0 else { return "\(inUse) in use" }
-        return "\(inUse) in use \u{00B7} \(toolsOff) off"
+        // "tools": a bare "12 off" read as servers (review 22 Nov).
+        return "\(inUse) in use \u{00B7} \(toolsOff) \(toolsOff == 1 ? "tool" : "tools") off"
     }
+
+    /// The number inside the ring while all is fine: the servers in use, the
+    /// same number the line under it names (review 22 Nov).
+    var allFineNumber: Int { inUse ?? totalServers }
 
     /// The ring's numbers: broken, the other problems, fine, and the rest
     /// (off, paused, not checked) as the bare track.

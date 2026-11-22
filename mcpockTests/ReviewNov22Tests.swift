@@ -349,4 +349,165 @@ final class ReviewNov22Tests: XCTestCase {
         XCTAssertEqual(splitter.feed(Data("rd\n\n".utf8)), [Data("third".utf8), Data()])
         XCTAssertNil(splitter.finish())
     }
+
+    // MARK: Connectors: DS3, F9, F13, DS8, DS9, DS13
+
+    @MainActor
+    private func makePanel(_ suite: String) -> (PanelState, UserDefaults) {
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let panel = PanelState(monitor: HealthMonitor(defaults: defaults), defaults: defaults)
+        panel.loadClaudeProjectOff = { [:] }
+        return (panel, defaults)
+    }
+
+    /// "At most every 30 minutes" holds across a relaunch: the time of the
+    /// last ask and the last list are saved.
+    @MainActor
+    func testARelaunchDoesNotAskClaudeCodeAgainWithinTheHalfHour() async throws {
+        let suite = "mcpock.tests.connectors-saved.\(UUID().uuidString)"
+        let (first, defaults) = makePanel(suite)
+        defaults.set(true, forKey: AppPreferences.includeConnectorsKey)
+        var asked = 0
+        first.loadConnectors = {
+            asked += 1
+            return .connectors([ClaudeConnector(name: "Gmail", host: "gmail.mcp.claude.com", state: .connected)])
+        }
+        first.refreshConnectorsIfDue()
+        for _ in 0..<100 where first.connectors.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(asked, 1)
+
+        // The app starts again: a new panel on the same settings.
+        let (second, _) = makePanel(suite)
+        second.loadConnectors = { asked += 1; return .connectors([]) }
+        second.refreshConnectorsIfDue()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(asked, 1, "not asked again")
+        XCTAssertEqual(second.connectors.map(\.name), ["Gmail"], "the saved list shows at once")
+
+        // Half an hour later it is asked again.
+        second.refreshConnectorsIfDue(now: Date().addingTimeInterval(ClaudeConnectors.refreshEvery + 5))
+        for _ in 0..<100 where asked < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(asked, 2)
+    }
+
+    /// A failed ask keeps the last list, and says why it is not newer and how old it is.
+    @MainActor
+    func testAFailedAskKeepsTheListAndSaysItsAge() async throws {
+        let (panel, defaults) = makePanel("mcpock.tests.connectors-stale.\(UUID().uuidString)")
+        defaults.set(true, forKey: AppPreferences.includeConnectorsKey)
+        panel.loadConnectors = { .connectors([ClaudeConnector(name: "Gmail", host: "", state: .connected)]) }
+        panel.refreshConnectorsIfDue()
+        for _ in 0..<100 where panel.connectors.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertNil(panel.connectorsNote)
+        panel.loadConnectors = { .unavailable("Claude Code did not answer in time.") }
+        panel.refreshConnectorsIfDue(force: true)
+        for _ in 0..<100 where panel.connectorsNote == nil { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(panel.connectors.map(\.name), ["Gmail"])
+        let note = try XCTUnwrap(panel.connectorsNote)
+        XCTAssertTrue(note.hasPrefix("Claude Code did not answer in time. This list is from "), note)
+        // Turned off: the list, the note and what was saved are gone.
+        defaults.set(false, forKey: AppPreferences.includeConnectorsKey)
+        panel.refreshConnectorsIfDue()
+        XCTAssertTrue(panel.connectors.isEmpty)
+        XCTAssertNil(defaults.data(forKey: "claudeConnectorsList"))
+    }
+
+    func testOnlyKnownWordsMeanConnected() {
+        XCTAssertEqual(ClaudeConnectors.state(of: "\u{2714} Connected"), .connected)
+        XCTAssertEqual(ClaudeConnectors.state(of: "Disconnected"), .failing)
+        XCTAssertEqual(ClaudeConnectors.state(of: "Not connected"), .failing)
+        XCTAssertEqual(ClaudeConnectors.state(of: "Pending"), .unknown)
+    }
+
+    func testTwoProjectsWithTheSameFolderNameAreTwo() {
+        let json = """
+            {"projects": {
+              "/Users/me/code/shop": {"disabledMcpServers": ["github", "claude.ai Gmail"]},
+              "/Users/me/work/shop": {"disabledMcpServers": ["github", "claude.ai Gmail"]},
+              "/Users/me/code/blog": {"disabledMcpServers": ["github"]}
+            }}
+            """
+        let servers = ClaudeProjectOff.projects(claudeJSON: Data(json.utf8))
+        XCTAssertEqual(servers["github"], ["blog", "code/shop", "work/shop"])
+        XCTAssertEqual(ClaudeProjectOff.note(servers["github"] ?? []), "Off in 3 projects: blog, code/shop, work/shop")
+        let connectors = ClaudeConnectors.offProjects(claudeJSON: Data(json.utf8))
+        XCTAssertEqual(connectors["gmail"], ["code/shop", "work/shop"])
+        XCTAssertEqual(ClaudeConnectors.merged([ClaudeConnector(name: "Gmail", host: "", state: .connected)], off: connectors).first?.word,
+                       "Off in 2 projects")
+    }
+
+    func testAListPrintedWithAFailingExitStillCountsAndAnUnreadableOneIsAFailure() {
+        let printed = "claude.ai Gmail: https://gmail.mcp.claude.com/mcp - \u{2714} Connected\nclaude.ai Linear: https://mcp.linear.app/sse - \u{2718} Failed to connect"
+        guard case .connectors(let list) = ClaudeConnectors.result(output: printed, normalExit: false, off: [:]) else {
+            return XCTFail("the lines were printed: they count, whatever the exit code")
+        }
+        XCTAssertEqual(list.map(\.name), ["Linear", "Gmail"])
+        let changed = "claude.ai Gmail \u{2014} https://gmail.mcp.claude.com/mcp (connected)"
+        XCTAssertEqual(ClaudeConnectors.result(output: changed, normalExit: true, off: [:]),
+                       .unavailable("mcpock can't read Claude Code's list: its wording may have changed."),
+                       "connector lines it can't read are never \"no connectors\"")
+        XCTAssertEqual(ClaudeConnectors.result(output: "", normalExit: false, off: [:]), .unavailable("Claude Code could not list its servers."))
+        XCTAssertEqual(ClaudeConnectors.result(output: "github: npx x - \u{2714} Connected", normalExit: true, off: [:]), .connectors([]))
+    }
+
+    func testAFailingConnectorIsNotUnderAllFine() {
+        let fine = ServerGroup(name: "github", state: .healthy, sourceLabels: ["Code"], tools: [], issues: [], variantCount: 1)
+        let connectors = [ClaudeConnector(name: "Gmail", host: "", state: .failing),
+                          ClaudeConnector(name: "Canva", host: "", state: .needsSignIn),
+                          ClaudeConnector(name: "Zed", host: "", state: .connected)]
+        let overview = PanelOverview.build(groups: [fine], agentCount: 1, hiddenTools: { _ in 0 }, connectors: connectors)
+        XCTAssertEqual(overview.needYou, 2)
+        XCTAssertTrue(overview.hasBroken)
+        XCTAssertEqual(overview.needYouLine, "2 connectors")
+        XCTAssertEqual(PanelOverview.build(groups: [fine], agentCount: 1, hiddenTools: { _ in 0 }).needYou, 0)
+    }
+
+    func testTheClaudeFileIsReadAgainOnlyWhenItChanged() throws {
+        try put("claude.json", #"{"projects": {"/p/shop": {"disabledMcpServers": ["github"]}}}"#)
+        XCTAssertEqual(ClaudeProjectOff.byPath(file: path("claude.json")), ["github": ["/p/shop"]])
+        XCTAssertEqual(ClaudeProjectOff.byPath(file: path("claude.json")), ["github": ["/p/shop"]])
+        // A change (another size) is seen.
+        try put("claude.json", #"{"projects": {"/p/shop": {"disabledMcpServers": ["github", "notion"]}}}"#)
+        XCTAssertEqual(ClaudeProjectOff.byPath(file: path("claude.json"))["notion"], ["/p/shop"])
+        XCTAssertEqual(ClaudeProjectOff.byPath(file: path("not-there.json")), [:])
+    }
+
+    // MARK: Widgets: F11, F12, DS7
+
+    func testTheWidgetsReloadWhenTheNewNumbersChange() {
+        var a = MCPockWidgetSnapshot(generated: Date(timeIntervalSince1970: 1_800_000_000), checking: false, firstCheckDone: true,
+                                     totalServers: 48, problemCount: 0, fineCount: 46, problems: [], agents: [], brokenCount: 0,
+                                     inUse: 46, toolsOff: 0, agentCount: 7)
+        let before = a
+        XCTAssertFalse(WidgetReloadPolicy.displayDiffers(before, a))
+        a.toolsOff = 1
+        XCTAssertTrue(WidgetReloadPolicy.displayDiffers(before, a), "a tool was hidden: the widget says \"1 tool off\"")
+        a = before; a.inUse = 45
+        XCTAssertTrue(WidgetReloadPolicy.displayDiffers(before, a))
+        a = before; a.agentCount = 8
+        XCTAssertTrue(WidgetReloadPolicy.displayDiffers(before, a))
+    }
+
+    func testTheRingAndItsLineNameTheSameNumber() {
+        var s = MCPockWidgetSnapshot(generated: Date(timeIntervalSince1970: 1_800_000_000), checking: false, firstCheckDone: true,
+                                     totalServers: 48, problemCount: 0, fineCount: 46, problems: [], agents: [], brokenCount: 0,
+                                     inUse: 46, toolsOff: 12, agentCount: 7)
+        XCTAssertEqual(s.allFineNumber, 46, "the number in the ring is the in-use number the line names")
+        XCTAssertEqual(s.inUseLine, "46 in use \u{00B7} 12 tools off")
+        s.toolsOff = 1
+        XCTAssertEqual(s.inUseLine, "46 in use \u{00B7} 1 tool off")
+        s.inUse = nil
+        XCTAssertEqual(s.allFineNumber, 48, "an older snapshot has only the total")
+    }
+
+    // MARK: F17: the icon lookup
+
+    func testTheIconLookupIsTheSameThroughItsCache() {
+        for (name, targets) in [("github", [String]()), ("GitHub_MCP", []), ("x", ["npx -y @upstash/context7-mcp@latest"]),
+                                ("y", ["https://docs.mcp.cloudflare.com/sse"]), ("apple-notes", []), ("nothing-known", ["npx z"])] {
+            XCTAssertEqual(ServerIcons.icon(name: name, targets: targets), ServerIcons.lookUp(name: name, targets: targets), name)
+            XCTAssertEqual(ServerIcons.icon(name: name, targets: targets), ServerIcons.lookUp(name: name, targets: targets), name)
+        }
+    }
 }
