@@ -21,6 +21,7 @@ A native macOS menu bar app that checks every MCP server your AI agents use and 
 - macOS 26 or later, Apple Silicon. Lives in the menu bar only: no Dock icon, no window.
 - Swift and SwiftUI, one dependency (Sparkle, for signed updates).
 - Reads Claude Code, Claude Desktop, Cursor, Windsurf, Codex, Grok, Goose, Hermes, OpenCode, VS Code and more, plus any standard MCP config it finds.
+- Turns a server off or on per agent, hides single tools, and shows each change before it writes.
 - Ships its own small MCP server, so you can say "check my mcpock" to an agent.
 
 ## Problems first, in plain words
@@ -68,7 +69,7 @@ When a server drops inside a Claude Code session that is still open, its row say
 
 ![Dark mode. Left, the github card (demo data): "Tools, 6/8 on", with two folds, tools not used in 30 days and hidden tools. Middle, the Servers tab searched for "github", the row reading "6/8 tools". Right, the card of a made-up server after one tool was turned off: Claude Code says "1 tool hidden", Cursor says "1 tool hidden through mcpock's filter", then five tools, each with its switch, and "Hidden, 1" at the end.](docs/images/mcpock-tools-dark.png)
 
-A switch beside each agent on a server's card turns that server on or off there, and a switch beside each tool hides that tool from your agents. mcpock uses each agent's own setting where it has one (Claude Code's blocked and deny lists, `enabled` and `disabled_tools` lines in Codex, Grok, Goose, Hermes and OpenCode, `disabled` in Cline), shows you the change first and saves a backup of the file. Claude Desktop, Cursor, VS Code and Windsurf have no off setting, so a server you turn off there waits in mcpock's own folder and moves back when you turn it on. Nothing is deleted, and one click turns it back.
+A switch beside each agent on a server's card turns that server on or off there, and a switch beside each tool hides that tool from your agents. mcpock uses each agent's own setting where it has one (Claude Code's blocked and deny lists, `enabled` and `disabled_tools` lines in Codex, Grok, Goose, Hermes (its profiles too) and OpenCode, `disabled` in Cline), shows you the change first and saves a backup of the file. Claude Desktop, Cursor, VS Code and Windsurf have no off setting, so a server you turn off there waits in mcpock's own folder and moves back when you turn it on, into the same place in the file it came from. Nothing is deleted, and one click turns it back.
 
 Agents can't flip a switch. They can only ask: an ask shows on the server's card with its reason and Yes and No, and only your Yes changes anything, through the same sheet. Everything else mcpock does only reads.
 
