@@ -793,6 +793,18 @@ final class PanelState {
         pendingSwitch = monitor.switchPlan(groupName: name, configIDs: pendingSwitchIDs, turnOn: turnOn)
     }
 
+    /// "Set up" on the card's filter notice, or "Remove": show what it would
+    /// change in the agents that can't hide single tools. Nothing is written here.
+    func askFilter(_ name: String, setUp: Bool) {
+        guard monitor.switchesEnabled else { return }
+        isComparing = false
+        switchError = nil
+        switchShowsChange = false
+        untickedPaths = []
+        pendingSwitchIDs = nil
+        pendingSwitch = monitor.filterPlan(groupName: name, setUp: setUp)
+    }
+
     /// A tool switch on the card was flipped, or "Hide all" pressed: show
     /// what it would change. Nothing is written here.
     func askToolSwitch(_ name: String, hide: [String] = [], show: [String] = [], configIDs: Set<String>? = nil) {
@@ -892,15 +904,17 @@ final class PanelState {
             let whenByPath = Dictionary(plan.changes.map { ($0.path, $0.when) }, uniquingKeysWith: { first, _ in first })
             // A tool write: the agent's row says "1 tool hidden" instead (seen in the VM:
             // "Hidden in new sessions" there read like the server was off).
-            for source in plan.tools == nil ? monitor.groups.first(where: { $0.name == plan.server })?.sources ?? [] : [] {
+            for source in plan.tools == nil && plan.filter == nil ? monitor.groups.first(where: { $0.name == plan.server })?.sources ?? [] : [] {
                 let path = source.agent == AgentRegistry.claudeCodeLabel ? monitor.claudeSettingsPath : source.path
                 if outcome.written.contains(path), let when = whenByPath[path] { switchNotes[source.configID] = when }
             }
-            if plan.tools != nil { loadHiddenTools(for: plan.server) }
+            if plan.tools != nil || plan.filter != nil { loadHiddenTools(for: plan.server) }
             if let error = outcome.error {
                 switchError = Self.switchErrorText(error, plan: plan)
                 // What was written is done; the sheet now shows what is left.
-                if let tools = plan.tools {
+                if let setUp = plan.filter {
+                    pendingSwitch = monitor.filterPlan(groupName: plan.server, setUp: setUp)
+                } else if let tools = plan.tools {
                     pendingSwitch = monitor.toolPlan(groupName: plan.server, configIDs: pendingSwitchIDs,
                                                      hide: tools.hide, show: tools.show)
                 } else {

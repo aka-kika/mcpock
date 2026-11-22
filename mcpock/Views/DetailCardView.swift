@@ -424,8 +424,11 @@ struct DetailCardView: View {
     private func toolNote(for source: GroupSource) -> String? {
         guard !source.isOff else { return nil }
         let hidden = state.hiddenTools(for: group.name)
-        return CardText.toolNote(canHide: hidden[source.configID] != nil, hiddenHere: hidden[source.configID]?.count ?? 0,
-                                 anyHidden: hidden.values.contains { !$0.isEmpty }, toolCount: group.tools.count)
+        let note = CardText.toolNote(canHide: hidden[source.configID] != nil, hiddenHere: hidden[source.configID]?.count ?? 0,
+                                     anyHidden: hidden.values.contains { !$0.isEmpty }, toolCount: group.tools.count)
+        // Hidden there by mcpock's filter, not by a setting of the agent's own (22 Nov).
+        guard source.filter == .on else { return note }
+        return CardText.filteredToolNote(note)
     }
 
     private func usedByRow(_ source: GroupSource) -> some View {
@@ -463,6 +466,13 @@ struct DetailCardView: View {
             SectionHeader(title: [CardText.toolsTitle(count: group.tools.count, hidden: sections.hidden.count),
                                   usage == nil ? nil : CardText.callsWindowTitle(window: usageWindow)]
                 .compactMap { $0 }.joined(separator: " \u{00B7} "), count: nil, theme: theme)
+            // For agents that can't hide single tools (22 Nov, Kika's pick):
+            // one line and a button, right where she turns tools off.
+            if state.monitor.switchesEnabled, let notice = CardText.filterNotice(for: group) {
+                FilterNotice(text: notice, button: "Set up", prominent: true, theme: theme) {
+                    state.askFilter(group.name, setUp: true)
+                }
+            }
             if group.tools.isEmpty {
                 Text(group.state == .unknown ? "Tools show up after the first check." : "No tools reported.")
                     .font(Theme.caption)
@@ -492,6 +502,12 @@ struct DetailCardView: View {
                         showsHiddenTools.toggle()
                     }
                     if showsHiddenTools { toolRows(sections.hidden, canHide: canHide) }
+                }
+            }
+            // The way back: the filter is hers to remove.
+            if state.monitor.switchesEnabled, let line = CardText.filteredLine(for: group) {
+                FilterNotice(text: line, button: "Remove", prominent: false, theme: theme) {
+                    state.askFilter(group.name, setUp: false)
                 }
             }
         }
@@ -835,6 +851,53 @@ struct ShowMoreRow: View {
 /// right-click offers the shared path menu (round 8: Show in Finder, Copy Path,
 /// Open Config… last; no double-click); a faint hover fill says the row does
 /// something.
+/// One icon, one line, one button (the calm notice card): the tool filter's
+/// offer above the tools, and its quiet "go through mcpock's filter" below.
+private struct FilterNotice: View {
+    let text: String
+    let button: String
+    /// The offer is a filled button; the way back is a plain one.
+    let prominent: Bool
+    let theme: ThemeColors
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.textSecondary)
+                .frame(width: 24, height: 24)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(theme.rowHighlight))
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.system(size: 11.5))
+                .foregroundStyle(prominent ? theme.textPrimary : theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button(action: action) {
+                Text(button)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(prominent ? theme.background : theme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(prominent ? theme.textPrimary : theme.rowHighlight)
+                    }
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(theme.rowHighlight.opacity(prominent ? 1 : 0.6))
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct UsedByRow: View {
     let source: GroupSource
     let differs: Bool

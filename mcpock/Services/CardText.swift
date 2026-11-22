@@ -282,9 +282,36 @@ enum CardText {
         return isOff ? "Turned off" : nil
     }
 
+    /// The card's notice above the tools (22 Nov): "Cursor and VS Code can't
+    /// hide single tools. mcpock's filter can." nil when no agent of the row
+    /// is waiting for one.
+    static func filterNotice(for group: ServerGroup) -> String? {
+        let agents = filterAgents(group, state: .available)
+        guard !agents.isEmpty else { return nil }
+        return "\(list(agents)) can't hide single tools. mcpock's filter can."
+    }
+
+    /// "Cursor's tools go through mcpock's filter." nil when none is set up.
+    static func filteredLine(for group: ServerGroup) -> String? {
+        let agents = filterAgents(group, state: .on)
+        guard !agents.isEmpty else { return nil }
+        return agents.count == 1 ? "\(agents[0])'s tools go through mcpock's filter."
+            : "The tools of \(list(agents)) go through mcpock's filter."
+    }
+
+    static func filterAgents(_ group: ServerGroup, state: GroupSource.FilterState) -> [String] {
+        var seen = Set<String>()
+        return group.sources.filter { $0.filter == state }.map { AgentBadge.displayLabel($0.agent) }
+            .filter { seen.insert($0).inserted }
+    }
+
     /// The sheet's small print: agents with no switch, files left alone.
     static func switchNotes(for plan: SwitchPlan) -> [String] {
         var lines = plan.problems
+        if plan.filter != nil {
+            if plan.isEmpty, lines.isEmpty { lines.append("Nothing to change there.") }
+            return lines
+        }
         if plan.tools != nil {
             // Agents with no way to hide tools are listed as rows of their own.
             if plan.isEmpty, lines.isEmpty, plan.skipped.isEmpty { lines.append("Nothing to change there.") }
@@ -464,6 +491,12 @@ enum CardText {
         }
         guard anyHidden else { return nil }
         return "Sees all \(toolCount) tools: can't hide single tools"
+    }
+
+    /// "2 tools hidden through mcpock's filter", or just "Through mcpock's
+    /// filter" while nothing is hidden there.
+    static func filteredToolNote(_ note: String?) -> String {
+        note.map { $0 + " through mcpock's filter" } ?? "Through mcpock's filter"
     }
 
     /// "A", "A and B", "A, B and C".

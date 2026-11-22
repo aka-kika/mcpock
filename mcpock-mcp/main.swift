@@ -10,6 +10,12 @@ import Foundation
 // Bundled at mcpock.app/Contents/Helpers/mcpock-mcp; Settings > Connect copies
 // the snippet each agent needs.
 
+// `mcpock-mcp filter …` (22 Nov): the tool filter, a different job from the
+// status server below. It never returns.
+if CommandLine.arguments.dropFirst().first == ToolFilterCore.mode {
+    FilterProxy.run(Array(CommandLine.arguments.dropFirst()))
+}
+
 let environment = ProcessInfo.processInfo.environment
 let statusURL: URL = (environment["MCPOCK_STATUS_FILE"] ?? environment["MCPBAR_STATUS_FILE"])
     .map { URL(fileURLWithPath: $0) }

@@ -22,6 +22,10 @@ enum ToolMechanism: Equatable, Sendable {
     /// OpenCode (v2): a `{"action": "<server>_<tool>", "resource": "*",
     /// "effect": "deny"}` rule in the `permissions` list.
     case openCode
+    /// mcpock's tool filter (22 Nov), for an agent with no setting of its
+    /// own: the names in the filter's hide file (`ToolFilterCore`), which is
+    /// mcpock's own file, not the agent's.
+    case filter
 }
 
 enum ToolSwitch {
@@ -84,8 +88,10 @@ enum ToolSwitch {
     /// read that way. `allTools` is the server's own list (Goose's list names
     /// the tools it may use, so the hidden ones are the rest).
     static func hidden(in text: String?, mechanism: ToolMechanism, server: String, allTools: [String]) -> Set<String>? {
-        guard let text else { return mechanism == .claudeDeny ? [] : nil }
+        guard let text else { return mechanism == .claudeDeny || mechanism == .filter ? [] : nil }
         switch mechanism {
+        case .filter:
+            return ToolFilterCore.hidden(fromFileText: text)
         case .claudeDeny:
             guard let root = ServerSwitch.jsonObject(text) as? [String: Any] else { return nil }
             let deny = (root["permissions"] as? [String: Any])?["deny"] as? [Any] ?? []
@@ -133,7 +139,7 @@ enum ToolSwitch {
         if let text {
             before = text
         } else {
-            guard mechanism == .claudeDeny else { throw ToolError.cannotEdit }
+            guard mechanism == .claudeDeny || mechanism == .filter else { throw ToolError.cannotEdit }
             before = "{}\n"
         }
         if mechanism == .openCode, isOlderOpenCode(before, server: server) { throw ToolError.olderOpenCode }
@@ -148,6 +154,7 @@ enum ToolSwitch {
         let after: String
         do {
             switch mechanism {
+            case .filter: after = ToolFilterCore.fileText(hidden: wanted)
             case .claudeDeny: after = try claudeDeny(before, server: server, hide: hide, show: show)
             case .openCode: after = try openCode(before, server: server, hide: hide, show: show)
             case .codex:
@@ -308,6 +315,9 @@ enum ToolSwitch {
                        wanted: Set<String>, allTools: [String]) -> Bool {
         guard hidden(in: after, mechanism: mechanism, server: server, allTools: allTools) == wanted else { return false }
         switch mechanism {
+        case .filter:
+            // mcpock's own file, written whole: the names are the check.
+            return true
         case .claudeDeny:
             guard var old = ServerSwitch.jsonObject(before) as? [String: Any],
                   var new = ServerSwitch.jsonObject(after) as? [String: Any] else { return false }

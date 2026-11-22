@@ -197,8 +197,17 @@ enum ConfigDiscovery {
         // A command given as a list (["npx", "pkg"]) runs its first word with
         // the rest in front of `args`, as the agents that accept it do (r3 e412).
         let listed = (entry["command"] as? [String])?.filter { !$0.isEmpty }
-        let command = (entry["command"] as? String) ?? listed?.first
-        let args = (listed.map { Array($0.dropFirst()) } ?? []) + ((entry["args"] as? [String]) ?? [])
+        var command = (entry["command"] as? String) ?? listed?.first
+        var args = (listed.map { Array($0.dropFirst()) } ?? []) + ((entry["args"] as? [String]) ?? [])
+        // An entry that starts mcpock's tool filter first (22 Nov) is read as
+        // the server inside it: the row, the check and "set up differently"
+        // all go by the server's own command, and its full tool list.
+        var filterFile: String?
+        if let filtered = ToolFilter.invocation(command: command, arguments: args) {
+            command = filtered.command
+            args = filtered.arguments
+            filterFile = filtered.hideFile
+        }
         let env = stringifyEnv(entry["env"])
         let headers = stringifyEnv(entry["headers"])
         let builtin = (entry["builtin"] as? Bool) ?? false
@@ -240,6 +249,7 @@ enum ConfigDiscovery {
                 builtin: builtin
             )
             config.turnedOff = turnedOff
+            config.filterFile = filterFile
             return config
         }
 

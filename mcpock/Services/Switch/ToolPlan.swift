@@ -28,11 +28,11 @@ enum ToolPlanner {
 
         for config in configs {
             let agent = AgentBadge.displayLabel(config.source.label)
-            guard let mechanism = ToolSwitch.mechanism(agent: config.source.label, configID: config.id, builtin: config.builtin) else {
+            guard let mechanism = mechanism(for: config) else {
                 if !skipped.contains(agent) { skipped.append(agent) }
                 continue
             }
-            let path = mechanism == .claudeDeny ? claudeSettingsPath : config.source.path
+            let path = self.path(for: config, mechanism: mechanism, claudeSettingsPath: claudeSettingsPath)
             if steps[path] == nil { order.append(path) }
             // Claude Code's rules go by name: two projects with it are one step.
             if steps[path]?.contains(where: { $0.name == config.name }) == true { continue }
@@ -60,7 +60,7 @@ enum ToolPlanner {
                     before: before,
                     after: after,
                     what: what(first.mechanism, hiding: !hide.isEmpty, server: server),
-                    when: when(agent: first.agent, hiding: !hide.isEmpty),
+                    when: when(agent: first.agent, hiding: !hide.isEmpty, filtered: first.mechanism == .filter),
                     // Any way but parking: the plain changed lines.
                     diff: SwitchPlanner.diff(before: before, after: after, mechanism: .claudeDeny, server: first.name, turnOn: false)
                 ))
@@ -77,6 +77,22 @@ enum ToolPlanner {
                           tools: ToolEdit(hide: hide, show: show))
     }
 
+    /// The way one declaration hides tools: mcpock's filter where its entry
+    /// starts it, else the agent's own setting.
+    static func mechanism(for config: ServerConfig) -> ToolMechanism? {
+        if config.filterFile != nil { return .filter }
+        return ToolSwitch.mechanism(agent: config.source.label, configID: config.id, builtin: config.builtin)
+    }
+
+    /// The file that holds the hidden tools of one declaration.
+    static func path(for config: ServerConfig, mechanism: ToolMechanism, claudeSettingsPath: String) -> String {
+        switch mechanism {
+        case .claudeDeny: return claudeSettingsPath
+        case .filter: return config.filterFile ?? config.source.path
+        default: return config.source.path
+        }
+    }
+
     /// The list an agent's edit works from: Goose's own copy when it was
     /// checked (its setting names every tool it may use), else the row's.
     static func tools(for config: ServerConfig, mechanism: ToolMechanism, allTools: [String],
@@ -88,6 +104,8 @@ enum ToolPlanner {
     /// What happens in the file, in plain words.
     static func what(_ mechanism: ToolMechanism, hiding: Bool, server: String) -> String {
         switch mechanism {
+        case .filter:
+            return hiding ? "Goes on the list mcpock's filter leaves out." : "Comes off the list mcpock's filter leaves out."
         case .claudeDeny:
             return hiding ? "Goes on Claude Code's deny list." : "Comes off Claude Code's deny list."
         case .codex, .grok, .hermes:
@@ -102,8 +120,10 @@ enum ToolPlanner {
     }
 
     /// When the agent notices. `agent` is a `ServerSource.label`.
-    static func when(agent: String, hiding: Bool) -> String {
+    static func when(agent: String, hiding: Bool, filtered: Bool = false) -> String {
         let word = hiding ? "Hidden" : "Back"
+        // The filter reads its list again each time the agent asks for the tools.
+        if filtered { return "\(word) the next time \(AgentBadge.displayLabel(agent)) lists its tools" }
         switch agent {
         case AgentRegistry.claudeCodeLabel, "Goose":
             return "\(word) in new sessions"
@@ -128,10 +148,10 @@ enum ToolPlanner {
         var cache: [String: String?] = [:]
         var result: [String: Set<String>] = [:]
         for config in configs {
-            guard let mechanism = ToolSwitch.mechanism(agent: config.source.label, configID: config.id, builtin: config.builtin) else {
+            guard let mechanism = mechanism(for: config) else {
                 continue
             }
-            let path = mechanism == .claudeDeny ? claudeSettingsPath : config.source.path
+            let path = self.path(for: config, mechanism: mechanism, claudeSettingsPath: claudeSettingsPath)
             if cache[path] == nil { cache[path] = .some(read(path)) }
             let text = cache[path] ?? nil
             let list = tools(for: config, mechanism: mechanism, allTools: allTools, ownTools: ownTools)

@@ -396,6 +396,14 @@ final class HealthMonitor {
                                   parkedDirectory: switchParked)
     }
 
+    /// What setting up (or removing) the tool filter would change in the
+    /// agents that can't hide single tools: read, nothing written (22 Nov).
+    func filterPlan(groupName: String, setUp: Bool) -> SwitchPlan {
+        let ids = Set(Self.instanceIDs(forGroup: groupName, in: servers))
+        let configs = servers.filter { ids.contains($0.config.id) && !$0.awaitingFileOK }.map(\.config)
+        return FilterPlanner.plan(server: groupName, configs: configs, setUp: setUp, running: SwitchPlanner.isRunning)
+    }
+
     /// Writes a plan she confirmed, then reads the configs again; a server
     /// turned on is checked at once. The only write to another app's file.
     func applySwitch(_ plan: SwitchPlan) async -> SwitchWriter.Outcome {
@@ -1191,7 +1199,8 @@ final class HealthMonitor {
                     awaitingFileOK: v.awaitingFileOK,
                     // Never a file still waiting for her OK (a Hermes profile the scan found).
                     canSwitch: !v.awaitingFileOK && ServerSwitch.mechanism(agent: v.config.source.label, configID: v.config.id,
-                                                                           builtin: v.config.builtin) != nil
+                                                                           builtin: v.config.builtin) != nil,
+                    filter: v.config.filterFile != nil ? .on : (ToolFilter.canSetUp(v.config) ? .available : .none)
                 )
             }
             // A switched-off declaration is not compared: nothing starts it.

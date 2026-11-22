@@ -106,6 +106,10 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
     /// Switched off in its agent's own config (or parked by mcpock): the agent
     /// does not start it, so mcpock doesn't either (1.14).
     var turnedOff = false
+    /// Set when the entry starts mcpock's tool filter first (22 Nov): the
+    /// file that names its hidden tools. `command` and `args` are the
+    /// server's own, as they sit inside the filter's arguments.
+    var filterFile: String? = nil
 
     /// The same config with other static headers (the helper's output merged in
     /// for one probe). Never stored back into the monitor.
@@ -116,6 +120,7 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
         )
         copy.headersHelper = headersHelper
         copy.turnedOff = turnedOff
+        copy.filterFile = filterFile
         return copy
     }
 
@@ -237,6 +242,16 @@ struct GroupSource: Sendable, Hashable, Identifiable {
     var awaitingFileOK = false
     /// mcpock has a way to turn this declaration on or off (`ServerSwitch`).
     var canSwitch = false
+    /// mcpock's tool filter here (22 Nov): not offered, offered, or set up.
+    var filter: FilterState = .none
+
+    enum FilterState: Sendable, Hashable {
+        case none
+        /// The agent can't hide single tools; the filter could be set up.
+        case available
+        /// The entry starts mcpock's filter first.
+        case on
+    }
 
     var isOff: Bool { state == .off }
 }

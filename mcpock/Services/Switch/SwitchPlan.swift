@@ -51,12 +51,19 @@ struct SwitchPlan: Equatable, Sendable {
     /// Set when the plan hides or shows single tools (Part 2) instead of
     /// turning the server off or on.
     var tools: ToolEdit? = nil
+    /// Set when the plan sets up (true) or removes (false) mcpock's tool
+    /// filter in the agents that can't hide single tools (22 Nov).
+    var filter: Bool? = nil
 
     var isEmpty: Bool { changes.isEmpty }
 
     /// "Turn off openrouter everywhere?" / "Turn on openrouter in Cursor?" /
     /// "Hide delete_repository in github?" / "Show 3 tools of github?"
     var title: String {
+        if let filter {
+            let agents = CardText.list(changes.flatMap(\.agents))
+            return filter ? "Let mcpock filter \(server) for \(agents)?" : "Remove mcpock's filter from \(server) in \(agents)?"
+        }
         if let tools {
             let names = tools.hide.isEmpty ? tools.show : tools.hide
             let what = names.count == 1 ? names[0] : "\(names.count) tools"
@@ -69,11 +76,19 @@ struct SwitchPlan: Equatable, Sendable {
 
     /// The sheet's button.
     var confirmTitle: String {
+        if let filter { return filter ? "Use the Filter" : "Remove the Filter" }
         if let tools { return tools.hide.isEmpty ? "Show" : "Hide" }
         return turnOn ? "Turn On" : "Turn Off"
     }
 
     var reassuranceText: String {
+        if let filter {
+            return filter
+                ? "These agents have no setting for hiding single tools. With the filter, the agent starts mcpock's small helper, "
+                    + "the helper starts \(server) and leaves out the tools you turn off. Nothing else changes. "
+                    + "Remove the filter before you delete mcpock, or \(server) stops starting there."
+                : "\(server) starts on its own again. Every tool shows there again."
+        }
         guard let tools else { return Self.reassurance }
         let names = tools.hide.isEmpty ? tools.show : tools.hide
         if names.count > 1 {
