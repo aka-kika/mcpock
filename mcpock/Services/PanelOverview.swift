@@ -43,12 +43,14 @@ struct PanelOverview: Equatable, Sendable {
             agents: agentCount,
             toolsOff: hidden.reduce(0, +),
             toolsOffServers: hidden.count,
-            // The account's connectors with a problem count here too (review
-            // 22 Nov): a failing one must not sit under "All fine". The menu
-            // bar icon and the widgets stay about the servers mcpock checks.
-            needYou: needs.count + connectors.filter(\.needsYou).count,
-            hasBroken: needs.contains { $0.state == .broken } || connectors.contains { $0.state == .failing },
-            needLine: needLine(needs, connectors: connectors.filter(\.needsYou).count),
+            // The number is the servers that need her: the same count as the
+            // Needs you section, the menu bar icon and the widgets. Only when
+            // no server does, the account's connectors with a problem stand
+            // here instead (review 22 Nov), so a failing one never sits under
+            // "All fine".
+            needYou: needs.isEmpty ? connectors.filter(\.needsYou).count : needs.count,
+            hasBroken: needs.isEmpty ? connectors.contains { $0.state == .failing } : needs.contains { $0.state == .broken },
+            needLine: needs.isEmpty ? needLine([], connectors: connectors.filter(\.needsYou).count) : needLine(needs),
             checkingLine: checkingLine
         )
     }

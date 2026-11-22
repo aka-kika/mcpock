@@ -461,6 +461,12 @@ final class ReviewNov22Tests: XCTestCase {
         XCTAssertTrue(overview.hasBroken)
         XCTAssertEqual(overview.needYouLine, "2 connectors")
         XCTAssertEqual(PanelOverview.build(groups: [fine], agentCount: 1, hiddenTools: { _ in 0 }).needYou, 0)
+        // With a server that needs her, the number stays the servers' own: it
+        // is the count of the Needs you section, the icon and the widgets.
+        let broken = ServerGroup(name: "postgres", state: .broken, sourceLabels: ["Code"], tools: [], issues: [], variantCount: 1)
+        let both = PanelOverview.build(groups: [fine, broken], agentCount: 1, hiddenTools: { _ in 0 }, connectors: connectors)
+        XCTAssertEqual(both.needYou, 1)
+        XCTAssertEqual(both.needYouLine, "1 broken")
     }
 
     func testTheClaudeFileIsReadAgainOnlyWhenItChanged() throws {
