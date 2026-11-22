@@ -91,6 +91,7 @@ The one place mcpock changes another app's file, and only on her click.
 |------|------|
 | `Services/Switch/ServerSwitch.swift` | `SwitchMechanism`: how each agent says off (Claude Code's `deniedMcpServers` in `~/.claude/settings.json`, never `~/.claude.json`; `enabled` in TOML and YAML; OpenCode's two shapes; `.parkOutside` for Claude Desktop and Cursor; `.park`, under `_mcpock_disabled` in the same file, is kept for entries already parked that way and used by no agent). `edited` returns the new text, `verify` checks it is the old one with exactly that change (JSON compared as data, TOML and YAML line by line and through the readers) |
 | `Services/Switch/ParkedStore.swift` | Claude Desktop rewrites its config at launch and drops keys it does not know (seen with the real app, 2026-11-10), and a logged-in Cursor may rewrite `mcp.json` too, so their switched-off entries are moved, as written, into `~/Library/Application Support/mcpock/parked/<agent>.json` (0600) and back on Turn On. The store is written before the config loses the entry and cleaned after it has it again; discovery lists what is in it as turned off |
+| 1.18 additions | `SwitchMechanism.jsonDisabled`: Cline's own `"disabled": true` under `mcpServers.<name>`. `.parkOutside(key:)` now names the object the servers sit in: `mcpServers` for Claude Desktop, Cursor and Windsurf, `servers` for VS Code (its schema allows no unknown key, so nothing may wait inside that file). A Hermes profile's `config.yaml` (a scan-found file) is switched like Hermes's own, never while it still waits for her OK. `ClaudeProjectOff.swift` reads which Claude Code projects switched a server off (`disabledMcpServers`), for the card's "Off in one project" line: read only. `JSONSpanEditor.removeMember` keeps the comments around an entry it takes out. |
 | `Services/Switch/JSONSpanEditor.swift` | Span-level JSON / JSONC edits: one member or element in or out, every other character kept (comments, order, indentation) |
 | `Services/Switch/LineSwitch.swift` | `TOMLSwitch`, `YAMLSwitch`: one line changed or added; a layout they can't change safely returns nil, never a guess |
 | `Services/Switch/SwitchPlan.swift` | `SwitchPlanner` builds a `SwitchPlan` (per file: plain words, when it counts, masked changed lines) without writing; `SwitchWriter` checks the file is still what the sheet showed, copies it to `backups/` (0600, newest 60), writes a temp file beside it and renames. A symlinked config is written where it really is. While hosting tests only the temporary folder may be written |
@@ -120,7 +121,9 @@ The one place mcpock changes another app's file, and only on her click.
 
 | File | Role |
 |------|------|
-| `Services/PanelSections.swift` | Needs you / Pinned / Everything else; the attention filter |
+| `Services/PanelSections.swift` | Needs you / Pinned / All servers / Turned off; the attention filter |
+| `Services/PanelOverview.swift`, `Views/OverviewTilesView.swift` | 1.18: the three tiles under the tabs (servers in use, tools turned off, need you), the same on both tabs. Need you also counts the Claude account's connectors with a problem |
+| `Services/ServerIcons.swift`, `Views/ServerIconView.swift` | 1.18: a mono icon per server (Simple Icons glyphs and SF Symbols, matched by name, package or URL host; the menu bar glyph when none is known). The icon carries the state: nothing while fine, a small `HealthMark` on its corner otherwise |
 | `Services/AgentSections.swift` | The Agents tab: one section per agent, sorted by what needs you. 1.5.3: a server counts for an agent only when that agent's own declaration fails, or it differs and that agent is an odd one out. 1.5.4: with the attention filter, agents with nothing wrong stay listed after the others and `isDimmed` tells the view to fade them |
 | `Services/Differs.swift` | "Set up differently": a source whose launch target differs from the majority (aka never counts). 1.5.2: `fingerprints` (SHA-256 of each launch target, deduped) for "Mark as intended" |
 | `Services/ShortReason.swift`, `PanelText.swift`, `CardText.swift`, `MenuText.swift` | Every short line, footer summary, card sentence and menu text |
@@ -140,7 +143,7 @@ The one place mcpock changes another app's file, and only on her click.
 | `Views/MenuBarPanelView.swift`, `PanelState.swift`, `PanelChrome.swift`, `PanelBackdrop.swift` | The 380 x 560 panel, keyboard handling, tabs, footer, backdrop (menu material in Light, soft dark in Dark, Apple's `.glassEffect` in Glass) |
 | `Views/GlassPanelController.swift` | Glass theme on macOS 27+ (1.8): its own `NSStatusItem` (expanded-interface session) and a clear borderless `GlassPanelWindow` hosting the same `MenuBarPanelView`; the MenuBarExtra item hides meanwhile (`GlassPanelStyle.usesGlassPanel`) |
 | `Views/ServerRowView.swift`, `HealthMark.swift`, `AgentBadgeView.swift` | A row: health shape, name, agent logos, tool count; right-click menu |
-| `Views/AgentsListView.swift` | The Agents tab (the panel opens on it, 1.5.4). Its `HealthBar` grows in on the tab's first real view each launch and after every full check (`PanelState.healthBarShouldGrow`, `agentsTabAppeared`) |
+| `Views/AgentsListView.swift` | The Agents tab (the panel opens on it every time, 1.18). One line per agent: logo, name, a mark when one of its servers needs you, "21 of 29 servers", chevron; no bar. An open agent says its calls on its first line and lists its servers; the Claude account and Managed online sections follow the agents |
 | `Views/DetailCardPresenter.swift`, `DetailCardView.swift` | Detail card as a child panel; its problem boxes (1.5.3 layout B: `CardText.problems` picks why / differs / marked; equal-width `CardButton(fillsWidth:)` rows, `CopyFlashButton` for the orange "Copied"); its tools list (first 5, "+N more" in place (tooltip "Show N more tools"); 1.5.3 dropped the separate tools window) |
 | `Views/ConfigPathMenu.swift` | One right-click menu for every config path (Show in Finder, Copy Path, Open Config… with a confirmation) |
 | `Views/StatusIconView.swift`, `SpinnableIcon.swift` | Menu-bar icon; the refresh glyph's spin |
@@ -164,6 +167,27 @@ Same sheet, writer, backups and checks as the server switch; only the edits are 
 | `UsageStore.toolUsage` | Calls per tool in the window and the last day on record, across every agent's records (usage.json version 4; files from before are read once more from the start for the tool counts only) |
 | `StatusSnapshot` `hiddenTools` | Per agent, in `status.json`, `mcpock_switches` and `mcpock_server` |
 | `StatusSnapshot` `toolCalls` / `usageWindow` | 1.16: each tool's calls in the Usage window and its last day, the card's numbers, in `mcpock_server`; rewritten when `UsageStore.onCountsChanged` fires |
+
+### The tool filter (1.18)
+
+For agents with no setting for hiding single tools (Cursor, Claude Desktop, VS Code, Cline, Windsurf). A third write, through the same sheet, writer, backups and checks.
+
+| File | Role |
+|------|------|
+| `Shared/ToolFilterCore.swift` | The rules, pure: how the helper is invoked (`mcpock-mcp filter --hide-file <path> -- <command> <args>`), the hide file (`{"hide": [...]}`), and what happens to one message: a tool list loses the hidden tools, a call to one is answered by the filter, a batch with such a call is answered whole, everything else passes byte for byte. `HideList` keeps the last good list when the file goes missing |
+| `mcpock-mcp/FilterProxy.swift` | The filter itself, a mode of the bundled helper: starts the real server (found on PATH, started directly) with the environment and folder the agent gave the entry, reads the hide file again when it changes, and on a stop signals the server's whole process group. No log, no network |
+| `Services/Switch/ToolFilter.swift` | `wrapped` / `unwrapped`: only the entry's `command` and `args` change, checked as data (`verify`). `recognized`: an entry counts as filtered only in an agent's own known file, when it starts a helper inside an app bundle and its hide file sits in `~/Library/Application Support/mcpock/filter/`; anything else is shown and checked as written. `FilterPlanner` builds the `SwitchPlan` (`filter` set): refused from a disk image or a translocated copy, takes the filter off an entry that waits in `ParkedStore`, and empties the hide file on Remove |
+| `ConfigDiscovery.parseEntry` | Reads through a recognized filter: `command` and `args` are the server's own, `filterFile` and `filterHelper` are kept. A filtered entry whose helper is gone is reported broken by `HealthMonitor.probeServer` (the agent can't start it) |
+| `ToolMechanism.filter` | With the filter on, a tool switch writes only the hide file (mcpock's own: no backup, so it never uses up the 60) |
+| `CardText.filterNotice` / `filteredLine`, `DetailCardView.FilterNotice` | The card's offer ("… can't hide single tools. mcpock's filter can." Set up) and the way back (Remove) |
+
+### Not on this Mac (1.18)
+
+| File | Role |
+|------|------|
+| `Services/ClaudeConnectors.swift` | The Claude account's connectors, as Claude Code lists them: `claude mcp list` parsed for the `claude.ai …` lines (name, host only, state), off by default. Asked when the panel opens and the last ask is older than 30 minutes (the time and the list are saved), on Refresh, and never while mcpock's own check runs. Never written |
+| `Services/ManagedOnline.swift` | Agents whose servers live on the vendor's site (Grok web, ChatGPT, Cursor cloud, Gemini): a row per product with an agent on this Mac, a link, and the server names she typed. Nothing is read or checked |
+| `Views/AccountSectionsView.swift` | The two sections under the agents |
 
 ### Asks from agents (1.16)
 
@@ -199,6 +223,7 @@ Where every other agent keeps its calls: [USAGE-SOURCES.md](USAGE-SOURCES.md).
 | `mcpock/Services/Widgets/WidgetSnapshotWriter.swift` | App-only: coalesces writes into the App Group container, then asks `WidgetReloadPolicy` whether to call `WidgetCenter.reloadAllTimelines()` |
 | `mcpock/Services/Widgets/WidgetReloadPolicy.swift` | Pure: reload only on a real display change, at most once a minute |
 | `mcpockWidgets/` (target `mcpockWidgets`, `.appex`) | The three widgets (Status, Problems, Agents), a shared `TimelineProvider` that reads the App Group snapshot, `.after(15 min)` fallback refresh |
+| `Shared/RingArcs.swift`, `mcpockWidgets/Views/WidgetRing.swift` | 1.18: the widgets draw rings. Status (small) and Problems (medium) show one ring of all servers, with a sliver for each one that needs you (never thinner than 4.5% of the circle, so one among forty can be seen) and the bare track for what is off; Agents (medium and small) shows a ring per agent with its logo inside. The arcs are pure (`RingArcs.arcs`). The widgets use their own grey (`WidgetColors.grey`): the system's secondary read 3.95:1 on a light widget |
 
 `MCPockStatus.perAgent` (optional field, `StatusSnapshot.build`) feeds the
 per-agent widget; it's the same rows `AgentSections.build` gives the tab.
@@ -366,8 +391,8 @@ falls back to streamable HTTP, because many configs label streamable servers
     **names** only; `SecretMask` masks the rest. `StatusSnapshotTests`,
     `SecretMaskTests`.
 12. **mcpock writes another app's config only through the server switch**
-    (1.14) and the tool switch (1.15), on her click, after the sheet showed the
-    change: `SwitchWriter`
+    (1.14), the tool switch (1.15) and the tool filter's Set up and Remove
+    (1.18), on her click, after the sheet showed the change: `SwitchWriter`
     is the single write path, every write is checked (`ServerSwitch.verify`),
     backed up and done in one rename, and a file that changed since the sheet
     is refused. No other feature writes a config. The helper writes no
@@ -398,8 +423,9 @@ falls back to streamable HTTP, because many configs label streamable servers
     `MenuBarPanelView.rowID`): the sections' nested `ForEach`s flatten into
     one `LazyVStack`, so a bare-name id let a row that moved sections keep its
     old look. `scrollTo` goes through `rowID(forName:in:)`. `StaleRowTests`.
-20. **Animations end.** The health bar grow is a one-shot `scaleEffect`,
-    never a timer or `.repeatForever`, and Reduce Motion skips it.
+20. **Animations end.** Nothing in the panel repeats forever: the spinning
+    arcs are `TimelineView`s that stop with their state, and Reduce Motion
+    is respected.
 21. **Usage readers only read, and keep three facts.** Agent, server, date:
     never arguments, results or chat text. SQLite stores open read-only
     (never a write, never a WAL checkpoint). `UsageTests` and each reader's tests.

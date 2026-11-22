@@ -129,8 +129,8 @@ enum StatusReport {
                 lines.append(contentsOf: serverLines(server, number: index + 1, full: false, now: now))
             }
             lines.append("")
-            lines.append("Fix each server in the config file(s) listed with it. mcpock only reads configs, it never "
-                + "changes them. After a fix, mcpock sees the changed config within seconds and checks that server again; "
+            lines.append("Fix each server in the config file(s) listed with it. mcpock does not fix a config: it changes "
+                + "one only when the user flips a switch in the app. After a fix, mcpock sees the changed config within seconds and checks that server again; "
                 + "with checks set to Manual, its Refresh button does.")
         }
         let waiting = status.servers.filter { $0.needsApp != nil && !$0.hidden }

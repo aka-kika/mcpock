@@ -70,15 +70,23 @@ panel until it works again. Change it in Settings > Servers.
 
 ## Uninstalling
 
-1. In each agent's MCP config, remove the `mcpock` entry you added in
-   **Connect your agents** (in the README) (mcpock did not add it for you). If you turned a
-   server off with mcpock, turn it back on first: one turned off for Claude
-   Desktop or Cursor waits in `~/Library/Application Support/mcpock/parked/`.
-2. In mcpock, open Settings > General and turn **Open at Login** off.
-3. Quit mcpock from its menu bar icon.
-4. Delete `mcpock.app` from Applications.
-5. Optional, to remove what it left behind (open Finder, press Shift+Cmd+G, and
-   paste each path):
-   - `~/Library/Application Support/mcpock` (the status and usage files)
+1. **Remove mcpock's tool filter first**, on every server that has it: open
+   the server's card and press **Remove** (the line "…'s tools go through
+   mcpock's filter"). A filtered server starts through a helper inside
+   mcpock.app; with the app gone, Cursor, Claude Desktop, VS Code, Cline or
+   Windsurf can't start that server until its entry is put back.
+2. If you turned a server off with mcpock, turn it back on: one turned off
+   for Claude Desktop, Cursor, VS Code or Windsurf waits in
+   `~/Library/Application Support/mcpock/parked/`, not in the agent's file.
+3. In each agent's MCP config, remove the `mcpock` entry you added in
+   **Connect your agents** (in the README) (mcpock did not add it for you).
+4. In mcpock, open Settings > General and turn **Open at Login** off.
+5. Quit mcpock from its menu bar icon.
+6. Delete `mcpock.app` from Applications.
+7. Optional, to remove what it left behind (open Finder, press Shift+Cmd+G, and
+   paste each path). Do steps 1 and 2 first: this folder also holds servers
+   that are turned off and the backups of your configs.
+   - `~/Library/Application Support/mcpock` (the status and usage files, the
+     backups, servers that wait while turned off, and the filter's lists)
    - `~/Library/Preferences/com.mcpock.app.plist` (your settings)
    - `~/Library/Group Containers/P5RB3W3D58.com.mcpock` (shared with the widgets)

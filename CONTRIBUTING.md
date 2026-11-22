@@ -102,7 +102,9 @@ monitor and panel persist into a throwaway `UserDefaults` suite instead).
 These stay out unless there is a deliberate product decision first:
 
 - Notifications or alerts
-- Editing or writing any MCP config file (mcpock only reads)
+- Writing an MCP config file outside the three switches (a server on or
+  off, a tool hidden or shown, the tool filter set up or removed); each one
+  shows the change first and keeps a backup. Everything else only reads.
 - A heavy MCP SDK or more third-party dependencies (JSON-RPC stays
   hand-rolled; Sparkle, for updates, is the one dependency)
 - Sandbox on with exceptions (it would break starting servers and reading
