@@ -32,8 +32,9 @@ final class DemoDataTests: XCTestCase {
 
     func testConfigsCoverTheCuratedFourteenServers() {
         let configs = DemoData.configs
-        XCTAssertEqual(configs.count, 15, "14 servers, one (stripe) declared twice on purpose")
-        let names = Set(configs.map(\.name))
+        XCTAssertEqual(configs.count, 17, "14 servers, one (stripe) declared twice on purpose, two switched off")
+        XCTAssertEqual(Set(configs.filter(\.turnedOff).map(\.name)), ["puppeteer", "sqlite"])
+        let names = Set(configs.filter { !$0.turnedOff }.map(\.name))
         let expected: Set<String> = [
             "github", "filesystem", "playwright", "context7", "linear", "sentry",
             "postgres", "slack", "brave-search", "memory", "notion", "figma",
@@ -95,8 +96,17 @@ final class DemoDataTests: XCTestCase {
         await monitor.reloadConfigs()
         await monitor.refreshNow(force: true)
 
-        let groups = monitor.groups
+        XCTAssertEqual(monitor.groups.count, 16, "the 14, and the two that are switched off")
+        XCTAssertEqual(Set(monitor.groups.filter(\.isOffEverywhere).map(\.name)), ["puppeteer", "sqlite"])
+        let groups = monitor.groups.filter { !$0.isOffEverywhere }
         XCTAssertEqual(groups.count, 14)
+        // The sample set's hidden tools exist as tools and as configs.
+        for (id, tools) in DemoData.hiddenTools {
+            let config = DemoData.configs.first { $0.id == id }
+            XCTAssertNotNil(config, id)
+            let all = Set((DemoData.probeResult(for: config!).tools ?? []).map(\.name))
+            XCTAssertTrue(tools.isSubset(of: all), id)
+        }
 
         let healthyAndAgreeing = groups.filter { $0.state == .healthy && !$0.differsNeedsAttention }
         XCTAssertEqual(healthyAndAgreeing.count, 9, "nine plain healthy rows")

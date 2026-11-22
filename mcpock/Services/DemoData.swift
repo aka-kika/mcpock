@@ -153,6 +153,11 @@ enum DemoData {
                 tool("create_issue", "Open a new issue in a repository."),
                 tool("search_repositories", "Search GitHub repositories by name or topic."),
                 tool("get_pull_request", "Fetch a pull request's details and review status."),
+                tool("search_code", "Search code across repositories."),
+                tool("get_file_contents", "Read a file from a repository."),
+                tool("list_pull_requests", "List the pull requests of a repository."),
+                tool("create_pull_request", "Open a pull request."),
+                tool("fork_repository", "Fork a repository to your account."),
              ])),
         Spec("brave-search", agent: "Code", path: "~/.claude.json",
              command: "npx", args: ["-y", "@modelcontextprotocol/server-brave-search"],
@@ -266,9 +271,9 @@ enum DemoData {
         )
     }
 
-    /// Every declared instance (15: the 14 servers, plus stripe's second
-    /// declaration), in a stable order. What `HealthMonitor.discover` is
-    /// swapped for in demo mode.
+    /// Every declared instance (17: the 14 servers, stripe's second
+    /// declaration, and two that are switched off), in a stable order. What
+    /// `HealthMonitor.discover` is swapped for in demo mode.
     static let configs: [ServerConfig] = specs.flatMap { spec -> [ServerConfig] in
         var out = [makeConfig(name: spec.name, agent: spec.agent, path: spec.path,
                                command: spec.command, args: spec.args, env: spec.env)]
@@ -277,7 +282,27 @@ enum DemoData {
                                    command: extra.command, args: extra.args, env: [:]))
         }
         return out
+    } + turnedOffConfigs
+
+    /// Two servers switched off in their agent (22 Nov), so the pictures show
+    /// "2 of 3 servers" on an agent's row and the Turned off fold. Never
+    /// probed: an off declaration is not started.
+    private static let turnedOffConfigs: [ServerConfig] = [
+        ("puppeteer", "Goose", "~/.config/goose/config.yaml", ["-y", "@modelcontextprotocol/server-puppeteer"]),
+        ("sqlite", "Grok", "~/.grok/config.toml", ["-y", "mcp-server-sqlite"]),
+    ].map { name, agent, path, args in
+        var config = makeConfig(name: name, agent: agent, path: path, command: "npx", args: args, env: [:])
+        config.turnedOff = true
+        return config
     }
+
+    /// Tools hidden in the sample set, by `ServerConfig.id` (22 Nov): the
+    /// rows read "6 of 8 tools" and the overview counts them. Demo mode has
+    /// no switches, so this is the only place they come from.
+    static let hiddenTools: [String: Set<String>] = [
+        "Code:github": ["create_pull_request", "fork_repository"],
+        "Cursor:filesystem": ["write_file"],
+    ]
 
     /// The canned result for every config above, keyed by `ServerConfig.id`.
     private static let probeResultsByID: [String: ProbeResult] = {

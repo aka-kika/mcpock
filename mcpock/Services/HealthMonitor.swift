@@ -377,6 +377,9 @@ final class HealthMonitor {
 
     /// False in demo mode: its rows are made up, and nothing may be written.
     @ObservationIgnored var switchesEnabled = true
+    /// Demo mode's own hidden tools (`DemoData.hiddenTools`), shown as
+    /// counts only; nil everywhere else.
+    @ObservationIgnored var demoHiddenTools: [String: Set<String>]?
     /// Claude Code's user settings, where its blocked list lives.
     @ObservationIgnored var claudeSettingsPath = ServerSwitch.claudeSettingsPath(
         claudeJSON: (NSHomeDirectory() as NSString).appendingPathComponent(".claude.json"))
@@ -469,7 +472,9 @@ final class HealthMonitor {
     func refreshHiddenTools() -> Task<Void, Never>? {
         hiddenToolsTask?.cancel()
         guard switchesEnabled else {
-            if !hiddenToolsByConfig.isEmpty { hiddenToolsByConfig = [:] }
+            // No switches (demo mode): only the sample set's own hidden tools, if any.
+            let sample = demoHiddenTools ?? [:]
+            if hiddenToolsByConfig != sample { hiddenToolsByConfig = sample }
             return nil
         }
         let inputs = groups.map { group -> ([ServerConfig], [String], [String: [String]]) in
