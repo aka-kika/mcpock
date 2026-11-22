@@ -41,7 +41,10 @@ struct SettingsAboutPane: View {
         VStack(spacing: 0) {
             Spacer(minLength: 20)
             VStack(spacing: 10) {
-                Image(nsImage: NSApp.applicationIconImage)
+                // The app's own picture of its icon, light or dark with the
+                // window (22 Nov): the system's copy follows the Mac's icon
+                // style setting, so a dark window showed the light icon.
+                Image(WhatsNew.iconAsset)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: 88, height: 88)

@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/images/icon.png" width="128" alt="mcpock icon: a soft grey cube inside four camera-style corner brackets on a lavender tile"></p>
+<p align="center"><img src="docs/images/icon.png" width="128" alt="mcpock icon: three stacked server units, each with a slot and a small light, on a soft grey tile"></p>
 
 # mcpock
 

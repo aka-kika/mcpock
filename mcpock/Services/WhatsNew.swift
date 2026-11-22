@@ -6,6 +6,9 @@ import SwiftUI
 /// version in a folder (here `release-notes/<version>.md`, copied from Docs/release-notes).
 enum WhatsNew {
     static let lastSeenKey = "whatsNewLastSeenVersion"
+    /// The app icon as a picture in the asset catalog, with a dark variant,
+    /// for About and What's New: it follows the window's look.
+    static let iconAsset = "app-icon"
 
     static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
@@ -62,7 +65,7 @@ struct WhatsNewSheet: View {
         VStack(spacing: 0) {
             VStack(spacing: 8) {
                 #if os(macOS)
-                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64)
+                Image(WhatsNew.iconAsset).resizable().interpolation(.high).frame(width: 64, height: 64)
                 #else
                 Image(systemName: "viewfinder").font(.system(size: 40, weight: .light)).foregroundStyle(.tint)
                 #endif

@@ -134,6 +134,7 @@ final class PremiumLookTests: XCTestCase {
     func testTheFallbackIsTheMenuBarGlyph() {
         XCTAssertEqual(ServerIconView.fallbackAsset, StatusIconView.glyphAsset)
         XCTAssertNotNil(NSImage(named: StatusIconView.glyphAsset), "the glyph is in the app's assets")
+        XCTAssertNotNil(NSImage(named: WhatsNew.iconAsset), "and the icon's own picture, for About and What's New")
     }
 
     func testUsedByNamesTheAgentsOnce() {
