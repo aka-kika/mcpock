@@ -32,12 +32,47 @@ enum ToolFilter {
     /// agent, a server that runs as a command, on, and not filtered yet.
     static func canSetUp(_ config: ServerConfig) -> Bool {
         config.filterFile == nil && !config.turnedOff && config.transport == .stdio && config.command != nil
+            && !config.commandWasList
             && serversKey(agent: config.source.label, configID: config.id, builtin: config.builtin) != nil
     }
 
     /// mcpock's helper inside the running app.
-    static var helperPath: String {
-        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/\(ToolFilterCore.helperName)").path
+    static var helperPath: String { ConnectSnippets.helperPath() }
+
+    /// Where a helper sits inside an app bundle: the only shape read as mcpock's own.
+    static let helperSuffix = "/Contents/Helpers/\(ToolFilterCore.helperName)"
+
+    /// A helper path that may be written into an agent's config: not on a
+    /// disk image, not a translocated copy, and really there (review 22 Nov).
+    static func isUsableHelper(_ path: String) -> Bool {
+        !ConnectSnippets.isTemporaryLocation(path) && FileManager.default.isExecutableFile(atPath: path)
+    }
+
+    static let moveFirst = "mcpock is running from a disk image or a temporary copy. Move it to your Applications folder "
+        + "and open it from there, then set up the filter."
+
+    /// The row's reason when a filtered entry's helper is gone: the agent
+    /// can't start the server, whatever the server itself does.
+    static func helperMissingReason(_ helper: String) -> String {
+        "mcpock's filter is missing: the entry starts \(CardText.shortPath(helper)), which is not there. "
+            + "Remove the filter on this card, then set it up again."
+    }
+
+    /// The filter invocation of an entry mcpock may treat as filtered, or nil:
+    /// an agent's own known file, an agent the filter is for, an absolute
+    /// path to a helper inside an app bundle, and a hide file that sits
+    /// directly inside mcpock's own filter folder.
+    static func recognized(command: String?, arguments: [String], agent: String, configID: String, builtin: Bool,
+                           directory: URL) -> ToolFilterCore.Invocation? {
+        guard serversKey(agent: agent, configID: configID, builtin: builtin) != nil,
+              let command, command.hasPrefix("/"), command.hasSuffix(helperSuffix),
+              let found = ToolFilterCore.invocation(arguments: arguments)
+        else { return nil }
+        let file = URL(fileURLWithPath: found.hideFile).standardizedFileURL
+        guard file.deletingLastPathComponent().path == directory.standardizedFileURL.path,
+              file.pathExtension == "json"
+        else { return nil }
+        return found
     }
 
     /// `~/Library/Application Support/mcpock/filter/`
@@ -57,10 +92,20 @@ enum ToolFilter {
         return directory.appendingPathComponent(name).path
     }
 
-    /// The filter invocation an entry carries, when it is filtered.
+    /// The filter invocation an entry carries, by shape alone: for taking
+    /// an entry apart again. Whether mcpock treats an entry as filtered is
+    /// `recognized`.
     static func invocation(command: String?, arguments: [String]) -> ToolFilterCore.Invocation? {
         guard let command, ToolFilterCore.isHelper(command) else { return nil }
         return ToolFilterCore.invocation(arguments: arguments)
+    }
+
+    /// A parked entry's JSON (`ParkedStore`), with the filter taken out of
+    /// it: for removing the filter from a server that is turned off.
+    static func unwrappedEntry(_ raw: String) -> String? {
+        let wrapper = "{\"s\": {\"e\": \(raw)}}"
+        guard let after = try? unwrapped(wrapper, key: "s", server: "e") else { return nil }
+        return ServerSwitch.entryText(in: after, server: "e", key: "s")
     }
 
     // MARK: The edit
@@ -139,16 +184,50 @@ enum FilterPlanner {
         setUp: Bool,
         helper: String = ToolFilter.helperPath,
         directory: URL = ToolFilter.defaultDirectory,
+        parkedDirectory: URL = ParkedStore.defaultDirectory,
+        helperIsUsable: (String) -> Bool = ToolFilter.isUsableHelper,
         running: (String) -> Bool = { _ in false },
         read: (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) }
     ) -> SwitchPlan {
         var changes: [SwitchChange] = []
         var problems: [String] = []
+        // Never a path into a config that stops working after an eject or a restart (review 22 Nov).
+        if setUp, ConnectSnippets.isTemporaryLocation(helper) || !helperIsUsable(helper) {
+            return SwitchPlan(server: server, turnOn: false, changes: [], skipped: [], problems: [ToolFilter.moveFirst], filter: setUp)
+        }
         for config in configs {
             guard let key = ToolFilter.serversKey(agent: config.source.label, configID: config.id, builtin: config.builtin),
                   setUp ? ToolFilter.canSetUp(config) : config.filterFile != nil
             else { continue }
             let agent = AgentBadge.displayLabel(config.source.label)
+            // Removing empties the list of hidden tools, so a later Set up starts clean (review 22 Nov).
+            let emptied = setUp ? nil : config.filterFile.flatMap { file in
+                read(file).map(ToolFilterCore.hidden(fromFileText:))?.isEmpty == false ? file : nil
+            }
+            // A filtered server that is turned off waits in mcpock's own
+            // folder, not in the agent's file: the filter comes off there.
+            if !setUp, config.turnedOff,
+               ServerSwitch.mechanism(agent: config.source.label, configID: config.id, builtin: config.builtin)?.parkKey != nil {
+                let store = ParkedStore.fileURL(agent: config.source.label, directory: parkedDirectory).path
+                guard let before = read(store),
+                      let raw = ParkedStore.entries(agent: config.source.label, configPath: config.source.path,
+                                                    directory: parkedDirectory)[config.name],
+                      let plain = ToolFilter.unwrappedEntry(raw),
+                      let after = ParkedStore.text(replacing: config.name, raw: plain, in: before), after != before
+                else {
+                    problems.append("\(agent): mcpock can't change the entry it keeps while \(server) is off. Turn it on, then remove the filter.")
+                    continue
+                }
+                changes.append(SwitchChange(
+                    agents: [agent], path: store, before: before, after: after,
+                    what: "\(server) is turned off and waits in mcpock's folder: the filter comes off there. "
+                        + "Turned on, it starts \(server) itself again.",
+                    when: "Unfiltered when you turn it on",
+                    diff: ["- mcpock's filter in front of \(server)", "+ \(server), as it was before the filter"],
+                    ownFile: true, emptiesHideFile: emptied
+                ))
+                continue
+            }
             let path = config.source.path
             guard let before = read(path) else {
                 problems.append("\(agent): mcpock can't read its file, so it is left alone.")
@@ -169,10 +248,10 @@ enum FilterPlanner {
                     what: setUp
                         ? "\(server)'s entry starts mcpock's filter first. Its own command, arguments and keys stay inside, word for word."
                         : "\(server)'s entry starts \(server) itself again, as it did before the filter.",
-                    when: SwitchPlanner.when(agent: config.source.label, turnOn: true, running: running(config.source.label))
-                        .replacingOccurrences(of: "On ", with: setUp ? "Filtered " : "Unfiltered ")
-                        .replacingOccurrences(of: ": on ", with: setUp ? ": filtered " : ": unfiltered "),
-                    diff: SwitchPlanner.diff(before: before, after: after, mechanism: .claudeDeny, server: config.name, turnOn: false)
+                    when: SwitchPlanner.when(agent: config.source.label, word: setUp ? "Filtered" : "Unfiltered",
+                                             running: running(config.source.label)),
+                    diff: SwitchPlanner.plainDiff(before: before, after: after),
+                    emptiesHideFile: emptied
                 ))
             } catch {
                 problems.append("\(agent): mcpock can't change its file safely, so it is left alone.")

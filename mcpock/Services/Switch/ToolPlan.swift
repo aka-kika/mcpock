@@ -61,8 +61,8 @@ enum ToolPlanner {
                     after: after,
                     what: what(first.mechanism, hiding: !hide.isEmpty, server: server),
                     when: when(agent: first.agent, hiding: !hide.isEmpty, filtered: first.mechanism == .filter),
-                    // Any way but parking: the plain changed lines.
-                    diff: SwitchPlanner.diff(before: before, after: after, mechanism: .claudeDeny, server: first.name, turnOn: false)
+                    diff: SwitchPlanner.plainDiff(before: before, after: after),
+                    ownFile: first.mechanism == .filter
                 ))
             } catch ToolSwitch.ToolError.olderOpenCode {
                 problems.append("\(agent): its file uses the older layout, which has no setting for hiding single tools, "

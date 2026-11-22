@@ -187,7 +187,12 @@ final class ToolFilterTests: XCTestCase {
     private func discover() -> [ServerConfig] {
         ParsedFileCache.removeAll()
         return ConfigDiscovery.discover(registry: [KnownAgent(label: "Cursor", path: path(".cursor/mcp.json"), shape: .json)],
-                                        scanRoots: [], parkedDirectory: parked)
+                                        scanRoots: [], parkedDirectory: parked, filterDirectory: filters)
+    }
+
+    private func filterPlan(setUp: Bool) -> SwitchPlan {
+        FilterPlanner.plan(server: "github", configs: discover(), setUp: setUp, helper: helper, directory: filters,
+                           parkedDirectory: parked, helperIsUsable: { _ in true })
     }
 
     func testSetUpThenHideAToolThenRemove() throws {
@@ -198,7 +203,7 @@ final class ToolFilterTests: XCTestCase {
         XCTAssertNil(ToolPlanner.mechanism(for: before), "Cursor has no setting of its own")
 
         // Set up.
-        let setUp = FilterPlanner.plan(server: "github", configs: discover(), setUp: true, helper: helper, directory: filters)
+        let setUp = filterPlan(setUp: true)
         XCTAssertEqual(setUp.changes.map(\.agents), [["Cursor"]])
         XCTAssertEqual(setUp.title, "Let mcpock filter github for Cursor?")
         XCTAssertEqual(setUp.confirmTitle, "Use the Filter")
@@ -215,7 +220,7 @@ final class ToolFilterTests: XCTestCase {
         XCTAssertTrue(hideFile.hasPrefix(filters.path))
         XCTAssertEqual(ToolPlanner.mechanism(for: filtered), .filter)
         XCTAssertFalse(ToolFilter.canSetUp(filtered), "never twice")
-        XCTAssertTrue(FilterPlanner.plan(server: "github", configs: discover(), setUp: true, helper: helper, directory: filters).isEmpty)
+        XCTAssertTrue(filterPlan(setUp: true).isEmpty)
 
         // Hide a tool: only mcpock's own file changes.
         let all = ["search_code", "delete_repository", "fork_repository"]
@@ -240,7 +245,7 @@ final class ToolFilterTests: XCTestCase {
                        [filtered.id: []])
 
         // Remove the filter: Cursor's file is as it was.
-        let remove = FilterPlanner.plan(server: "github", configs: discover(), setUp: false, helper: helper, directory: filters)
+        let remove = filterPlan(setUp: false)
         XCTAssertEqual(remove.confirmTitle, "Remove the Filter")
         XCTAssertNil(SwitchWriter.apply(remove, backups: backups, parked: parked).error)
         XCTAssertEqual(text(".cursor/mcp.json"), cursorConfig)

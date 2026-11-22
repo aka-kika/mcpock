@@ -138,6 +138,8 @@ enum JSONConfigShape {
     /// becomes `command` + `args`, and `environment` becomes `env`.
     private static func normalize(_ entry: inout [String: Any]) {
         if let argv = entry["command"] as? [String], let first = argv.first {
+            // Remembered: the tool filter can't be put in front of this shape (review 22 Nov).
+            entry[ServerSwitch.commandListKey] = true
             entry["command"] = first
             if entry["args"] == nil { entry["args"] = Array(argv.dropFirst()) }
         }

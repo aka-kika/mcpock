@@ -19,6 +19,12 @@ struct SwitchChange: Identifiable, Equatable, Sendable {
     let diff: [String]
     /// Entries that move to or from mcpock's own folder with this change.
     var parked: [ParkedEdit] = []
+    /// mcpock's own file (a filter's hide list, a waiting entry): written
+    /// without a backup, so it never pushes an agent's config out of the
+    /// backups that are kept (review 22 Nov).
+    var ownFile = false
+    /// A filter's hide list to empty once this change is written (Remove).
+    var emptiesHideFile: String? = nil
 }
 
 /// The tools a plan hides or shows.
@@ -218,7 +224,11 @@ enum SwitchPlanner {
 
     /// When the agent notices. `agent` is a `ServerSource.label`.
     static func when(agent: String, turnOn: Bool, running: Bool) -> String {
-        let word = turnOn ? "On" : "Off"
+        when(agent: agent, word: turnOn ? "On" : "Off", running: running)
+    }
+
+    /// The same sentence with another first word ("Filtered", "Unfiltered").
+    static func when(agent: String, word: String, running: Bool) -> String {
         switch agent {
         case AgentRegistry.claudeCodeLabel, "Goose":
             return "\(word) in new sessions"
@@ -250,6 +260,11 @@ enum SwitchPlanner {
             let kept = "mcpock/parked/\(ParkedStore.fileName(forAgent: agent)): \(name)"
             return turnOn ? ["- " + kept, "+ " + active] : ["- " + active, "+ " + kept]
         }
+        return plainDiff(before: before, after: after)
+    }
+
+    /// The changed lines of any edit, `- old` and `+ new`, secrets masked.
+    static func plainDiff(before: String?, after: String) -> [String] {
         let old = (before ?? "").components(separatedBy: "\n")
         let new = after.components(separatedBy: "\n")
         var prefix = 0
@@ -317,6 +332,14 @@ enum SwitchWriter {
                     try? ParkedStore.remove(name: edit.name, agent: edit.agent, directory: parked)
                 }
                 outcome.written.append(change.path)
+                // Removing a filter empties its hide list (best effort: the list is mcpock's own).
+                if let hideFile = change.emptiesHideFile, allowed(URL(fileURLWithPath: hideFile)) {
+                    let url = URL(fileURLWithPath: hideFile)
+                    let temp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).mcpock-\(UUID().uuidString)")
+                    if (try? writeNew(Data(ToolFilterCore.fileText(hidden: []).utf8), to: temp, mode: 0o600)) != nil {
+                        if rename(temp.path, url.path) != 0 { try? FileManager.default.removeItem(at: temp) }
+                    }
+                }
             } catch let error as WriteError {
                 outcome.error = error
                 break
@@ -339,7 +362,9 @@ enum SwitchWriter {
         guard current == change.before, exists == (change.before != nil) else { throw WriteError.fileChanged(change.path) }
 
         var permissions: NSNumber = 0o600
-        if exists {
+        if exists, change.ownFile {
+            permissions = (try? fm.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber) ?? 0o600
+        } else if exists {
             permissions = (try? fm.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber) ?? 0o600
             try fm.createDirectory(at: backups, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let copy = backups.appendingPathComponent(backupName(for: target, agent: change.agents.first ?? "", now: now))

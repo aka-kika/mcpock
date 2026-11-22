@@ -408,6 +408,25 @@ final class PanelState {
         return ClaudeProjectOff.projects(claudeJSON: data)
     }
 
+    /// What replaces the two reads of Claude Code's own state (its connector
+    /// list and `~/.claude.json`) outside a normal run. nil: the real reads.
+    struct StandIns {
+        let connectors: () async -> ClaudeConnectors.LoadResult
+        let projectOff: () -> [String: [String]]
+    }
+
+    nonisolated static func standIns(isDemo: Bool, isHostingTests: Bool) -> StandIns? {
+        if isDemo { return StandIns(connectors: { .connectors(DemoData.connectors) }, projectOff: { [:] }) }
+        if isHostingTests { return StandIns(connectors: { .unavailable("") }, projectOff: { [:] }) }
+        return nil
+    }
+
+    func useStandIns(_ standIns: StandIns?) {
+        guard let standIns else { return }
+        loadConnectors = standIns.connectors
+        loadClaudeProjectOff = standIns.projectOff
+    }
+
     func refreshClaudeProjectOff() {
         Task { @MainActor [weak self] in
             guard let load = self?.loadClaudeProjectOff else { return }

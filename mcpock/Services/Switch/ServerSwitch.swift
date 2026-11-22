@@ -48,6 +48,8 @@ enum ServerSwitch {
     static let parkedKey = "_mcpock_disabled"
     /// Marks a discovered entry as turned off (never a key an agent writes).
     static let offKey = "\u{1F}off"
+    /// Marks a discovered entry whose command was written as a list.
+    static let commandListKey = "\u{1F}commandList"
 
     enum SwitchError: Error, Equatable {
         /// The file is not laid out in a way mcpock can change safely.

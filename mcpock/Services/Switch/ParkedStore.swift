@@ -26,6 +26,21 @@ enum ParkedStore {
         directory.appendingPathComponent(fileName(forAgent: agent))
     }
 
+    /// The store's file, for a plan that changes an entry while it waits (review 22 Nov).
+    static func fileURL(agent: String, directory: URL) -> URL { url(agent: agent, directory: directory) }
+
+    /// The store's text with one waiting entry's JSON replaced, written the
+    /// way `save` writes it; nil when the text is not a store or has no such entry.
+    static func text(replacing name: String, raw: String, in text: String) -> String? {
+        guard var root = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
+              var servers = root["servers"] as? [String: Any], servers[name] != nil else { return nil }
+        servers[name] = ["raw": raw]
+        root["servers"] = servers
+        guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     enum StoreError: Error, Equatable {
         /// The store is there but can't be read as one: it may still hold
         /// parked servers, so it is never started over.

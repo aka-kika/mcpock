@@ -1502,6 +1502,12 @@ final class HealthMonitor {
         if config.transport == .stdio && (config.command ?? "").isEmpty {
             return ProbeResult(state: .broken, failureReason: noEndpointReason, tools: nil, needsAttention: true)
         }
+        // A filtered entry whose helper is gone (mcpock moved or deleted):
+        // the agent can't start the server, so neither does mcpock pretend
+        // it is fine by starting the server itself (review 22 Nov).
+        if let helper = config.filterHelper, !FileManager.default.isExecutableFile(atPath: helper) {
+            return ProbeResult(state: .broken, failureReason: ToolFilter.helperMissingReason(helper), tools: nil)
+        }
         // `${VAR}` and friends filled in as the agent would; one that can't be
         // is not started with the literal text (review 2026-10-20, 0d87). Amber
         // "not checked", never red, backs off like a sign-in.

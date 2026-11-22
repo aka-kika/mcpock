@@ -110,6 +110,12 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
     /// file that names its hidden tools. `command` and `args` are the
     /// server's own, as they sit inside the filter's arguments.
     var filterFile: String? = nil
+    /// The helper the filtered entry starts, as written in the agent's file
+    /// (review 22 Nov): the agent can't start the server when it is gone.
+    var filterHelper: String? = nil
+    /// The entry writes its command as a list (`["npx", "pkg"]`): the filter
+    /// can't be put in front of that shape, so it is not offered.
+    var commandWasList = false
 
     /// The same config with other static headers (the helper's output merged in
     /// for one probe). Never stored back into the monitor.
@@ -121,6 +127,8 @@ struct ServerConfig: Identifiable, Sendable, Hashable {
         copy.headersHelper = headersHelper
         copy.turnedOff = turnedOff
         copy.filterFile = filterFile
+        copy.filterHelper = filterHelper
+        copy.commandWasList = commandWasList
         return copy
     }
 

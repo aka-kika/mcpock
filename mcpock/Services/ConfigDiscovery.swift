@@ -31,7 +31,8 @@ enum ConfigDiscovery {
         scanRoots: [String],
         knownScanFiles: [String]? = nil,
         folderExists: (String) -> Bool = ConfigDiscovery.isExistingFolder,
-        parkedDirectory: URL? = ParkedStore.defaultDirectory
+        parkedDirectory: URL? = ParkedStore.defaultDirectory,
+        filterDirectory: URL = ToolFilter.defaultDirectory
     ) -> [ServerConfig] {
         var servers: [ServerConfig] = []
         var claimedPaths = Set<String>()
@@ -61,7 +62,8 @@ enum ConfigDiscovery {
             let entries = droppingStaleProjects(parsed ?? [], folderExists: folderExists) + parked.sorted { $0.name < $1.name }
             claimedPaths.insert(canonical)
             let source = ServerSource(label: agent.label, path: agent.path)
-            servers.append(contentsOf: configs(from: entries, source: source, idPrefix: "reg:\(agent.label)"))
+            servers.append(contentsOf: configs(from: entries, source: source, idPrefix: "reg:\(agent.label)",
+                                               filterDirectory: filterDirectory))
         }
 
         // A project's `.mcp.json` servers run only when Claude Code was told to
@@ -170,7 +172,8 @@ enum ConfigDiscovery {
         from entries: [DiscoveredEntry],
         source: ServerSource,
         idPrefix: String,
-        projectPath: String? = nil
+        projectPath: String? = nil,
+        filterDirectory: URL? = nil
     ) -> [ServerConfig] {
         entries.compactMap { e in
             let scope = e.projectPath.map { "proj:\($0)" } ?? "global"
@@ -179,7 +182,8 @@ enum ConfigDiscovery {
                 entry: e.entry,
                 source: source,
                 projectPath: e.projectPath ?? projectPath,
-                idPrefix: "\(idPrefix):\(scope)"
+                idPrefix: "\(idPrefix):\(scope)",
+                filterDirectory: filterDirectory
             )
         }
     }
@@ -189,7 +193,8 @@ enum ConfigDiscovery {
         entry: [String: Any],
         source: ServerSource,
         projectPath: String?,
-        idPrefix: String
+        idPrefix: String,
+        filterDirectory: URL? = nil
     ) -> ServerConfig? {
         let typeString = (entry["type"] as? String)?.lowercased()
         // Antigravity and Windsurf write a remote server's address as `serverUrl` (1.12).
@@ -202,8 +207,17 @@ enum ConfigDiscovery {
         // An entry that starts mcpock's tool filter first (22 Nov) is read as
         // the server inside it: the row, the check and "set up differently"
         // all go by the server's own command, and its full tool list.
+        // Only mcpock's own helper, in an agent's own known file, with its
+        // hide file inside mcpock's own folder (review 22 Nov): anything else
+        // that looks like a filter is shown and checked exactly as written,
+        // and its "hide file" is never a path mcpock writes.
         var filterFile: String?
-        if let filtered = ToolFilter.invocation(command: command, arguments: args) {
+        var filterHelper: String?
+        if let filterDirectory,
+           let filtered = ToolFilter.recognized(command: command, arguments: args, agent: source.label,
+                                                configID: idPrefix, builtin: (entry["builtin"] as? Bool) ?? false,
+                                                directory: filterDirectory) {
+            filterHelper = command
             command = filtered.command
             args = filtered.arguments
             filterFile = filtered.hideFile
@@ -250,6 +264,8 @@ enum ConfigDiscovery {
             )
             config.turnedOff = turnedOff
             config.filterFile = filterFile
+            config.filterHelper = filterHelper
+            config.commandWasList = listed != nil || (entry[ServerSwitch.commandListKey] as? Bool) == true
             return config
         }
 
