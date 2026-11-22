@@ -6,7 +6,7 @@
   <a href="#install"><img src="https://img.shields.io/badge/signed%20%26%20notarized-Developer%20ID-6b8e6b" alt="Signed and notarized by Apple"></a>
   <a href="#connect-an-agent"><img src="https://img.shields.io/badge/MCP-5%20tools-7a8fb0" alt="MCP server with 5 tools"></a>
   <a href="docs/THIRD-PARTY.md"><img src="https://img.shields.io/badge/dependencies-1%20(Sparkle)-6b8e6b" alt="One dependency: Sparkle"></a>
-  <a href="docs/release-notes/1.17.1.md"><img src="https://img.shields.io/badge/version-1.17.1-7a8fb0" alt="Version 1.17.1"></a>
+  <a href="docs/release-notes/1.18.0.md"><img src="https://img.shields.io/badge/version-1.18.0-7a8fb0" alt="Version 1.18.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-888" alt="MIT License"></a>
 </p>
 
@@ -124,7 +124,7 @@ Needs macOS 26 or later on Apple Silicon. Launch it and look for its icon in the
 
 ## Release
 
-Each version's notes are in [docs/release-notes/](docs/release-notes/); the newest is [1.17.1](docs/release-notes/1.17.1.md). Signed and notarized DMGs are on the [Releases](https://github.com/aka-kika/mcpock/releases) page and mcpock.com. How a release is built: [docs/DEVELOPING.md](docs/DEVELOPING.md#release).
+Each version's notes are in [docs/release-notes/](docs/release-notes/); the newest is [1.18.0](docs/release-notes/1.18.0.md). Signed and notarized DMGs are on the [Releases](https://github.com/aka-kika/mcpock/releases) page and mcpock.com. How a release is built: [docs/DEVELOPING.md](docs/DEVELOPING.md#release).
 
 ## Thanks
 
