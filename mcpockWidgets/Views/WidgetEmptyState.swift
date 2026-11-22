@@ -3,14 +3,16 @@ import SwiftUI
 /// Nothing to show yet — first install, or the app hasn't finished its first
 /// check. Every widget falls back to this instead of a blank or crashed view.
 struct WidgetEmptyState: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         VStack(spacing: 4) {
             Text("mcpock")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WidgetColors.grey(colorScheme))
             Text("Open mcpock to start checking.")
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WidgetColors.grey(colorScheme))
                 .multilineTextAlignment(.center)
         }
         .padding()

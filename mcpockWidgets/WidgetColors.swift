@@ -14,6 +14,14 @@ enum WidgetColors {
         scheme == .dark ? Color(hex: 0xDCC27A) : Color(hex: 0xB8860B)
     }
 
+    /// The widgets' grey text (22 Nov, Runway 6332). The system's
+    /// `.secondary` measured 3.95:1 on a light widget (#808080 on white, VM
+    /// pictures), under the 4.5 bar; this one reads about 6:1 in both looks,
+    /// like the panel's own grey.
+    static func grey(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.58) : Color.black.opacity(0.62)
+    }
+
     static func broken(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(hex: 0xDF9C9C) : Color(hex: 0xB54545)
     }

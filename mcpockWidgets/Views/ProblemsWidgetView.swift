@@ -32,7 +32,7 @@ struct ProblemsWidgetView: View {
                     .padding(.top, 7)
                 Text(snapshot.inUse.map { "of \($0) in use" } ?? "\(snapshot.totalServers) servers")
                     .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetColors.grey(colorScheme))
                     .padding(.top, 1)
             }
             .frame(width: 78)
@@ -46,7 +46,7 @@ struct ProblemsWidgetView: View {
                         .font(.system(size: 17, weight: .semibold))
                     Text(snapshot.inUseLine)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WidgetColors.grey(colorScheme))
                         .padding(.top, 2)
                     Spacer(minLength: 0)
                 } else {
@@ -57,7 +57,7 @@ struct ProblemsWidgetView: View {
                 }
                 footer(snapshot)
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetColors.grey(colorScheme))
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -75,7 +75,7 @@ struct ProblemsWidgetView: View {
                 if let agents = problem.agents, !agents.isEmpty {
                     Text(agents.joined(separator: ", "))
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WidgetColors.grey(colorScheme))
                         .lineLimit(1)
                 }
             }
@@ -83,7 +83,7 @@ struct ProblemsWidgetView: View {
             // The state keeps its room; a long name or agent line gives way.
             Text(problem.status)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WidgetColors.grey(colorScheme))
                 .lineLimit(1)
                 .fixedSize()
                 .layoutPriority(1)

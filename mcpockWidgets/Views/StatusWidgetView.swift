@@ -32,11 +32,11 @@ struct StatusWidgetView: View {
             if snapshot.isStale(now: entry.date) {
                 WidgetCheckedAt(date: snapshot.generated, stale: true)
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetColors.grey(colorScheme))
             } else {
                 Text(snapshot.inUseLine)
                     .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetColors.grey(colorScheme))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }

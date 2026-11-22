@@ -49,7 +49,7 @@ struct AgentsWidgetView: View {
                 if let count = snapshot.agentCount {
                     Text("\(count) agent\(count == 1 ? "" : "s")")
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WidgetColors.grey(colorScheme))
                         .lineLimit(1)
                 }
             }
@@ -59,7 +59,7 @@ struct AgentsWidgetView: View {
                         AgentRing(agent: agent, size: 44, colorScheme: colorScheme)
                         Text(agent.countWords)
                             .font(.system(size: 10, design: .rounded).monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(WidgetColors.grey(colorScheme))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -83,7 +83,7 @@ struct AgentsWidgetView: View {
                 WidgetCheckedAt(date: snapshot.generated, stale: snapshot.isStale(now: entry.date))
             }
             .font(.system(size: 10.5))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(WidgetColors.grey(colorScheme))
             .lineLimit(1)
         }
         .padding(2)
